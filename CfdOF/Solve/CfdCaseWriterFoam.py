@@ -22,6 +22,7 @@
 # *                                                                         *
 # ***************************************************************************
 
+import math
 import os
 import os.path
 from FreeCAD import Units, Vector
@@ -66,6 +67,8 @@ class CfdCaseWriterFoam:
 
         self.settings = None
         self.SnappySettings = None
+        self.velocity_time_functions = {}
+        self.velocity_function_times = []
 
     def writeCase(self):
         """ writeCase() will collect case settings, and finally build a runnable case. """
@@ -188,6 +191,7 @@ class CfdCaseWriterFoam:
         self.setupPatchNames()
 
         TemplateBuilder(self.case_folder, self.template_path, self.settings)
+        self.writeVelocityFunctionData()
 
         # Update Allrun permission - will fail silently on Windows
         file_name = os.path.join(self.case_folder, "Allrun")
@@ -348,38 +352,81 @@ class CfdCaseWriterFoam:
         # Copy keys so that we can delete while iterating
         settings = self.settings
         bc_names = list(settings['boundaries'].keys())
+        self.velocity_time_functions = {}
+        self.velocity_function_times = []
+        velocity_function_boundaries = [
+            name
+            for name in bc_names
+            if settings['boundaries'][name].get('UseVelocityFunction', False)
+        ]
+
+        if velocity_function_boundaries:
+            if self.physics_model.Time != 'Transient':
+                raise ValueError(
+                    "Time-dependent velocity functions require a transient analysis."
+                )
+            solver_name = settings['solver']['SolverName']
+            if solver_name in ['SRFSimpleFoam', 'hisa']:
+                raise ValueError(
+                    "Time-dependent velocity functions are not available for solver '{}'".format(
+                        solver_name
+                    )
+                )
+            end_time = Units.Quantity(self.solver_obj.EndTime).getValueAs('s').Value
+            time_step = Units.Quantity(self.solver_obj.TimeStep).getValueAs('s').Value
+            if end_time <= 0:
+                raise ValueError("Solver end time must be positive to use a velocity function.")
+            if time_step <= 0:
+                raise ValueError("Solver time step must be positive to use a velocity function.")
+            self.velocity_function_times = self._build_time_samples(end_time, time_step)
+            if len(self.velocity_function_times) < 2:
+                self.velocity_function_times = [0.0, end_time]
+
         for bc_name in bc_names:
             bc = settings['boundaries'][bc_name]
-            if not bc['VelocityIsCartesian']:
-                velo_mag = bc['VelocityMag']
-                face = bc['DirectionFace'].split(':')
-                print(bc['ShapeRefs'])
-                if not face[0] and len(bc['ShapeRefs']):
-                    face = bc['ShapeRefs'][0][0].Name
-                if not face[0]:
-                    raise RuntimeError(str("No face specified for velocity direction in boundary '" + bc_name + "'"))
-                # See if entered face actually exists and is planar
-                try:
-                    selected_object = self.analysis_obj.Document.getObject(face[0])
-                    if hasattr(selected_object, "Shape"):
-                        elt = selected_object.Shape.getElement(face[1])
-                        if elt.ShapeType == 'Face' and CfdTools.isPlanar(elt):
-                            n = elt.normalAt(0.5, 0.5)
-                            if bc['ReverseNormal']:
-                               n = [-ni for ni in n]
-                            velocity = [ni*velo_mag for ni in n]
-                            bc['Ux'] = velocity[0]
-                            bc['Uy'] = velocity[1]
-                            bc['Uz'] = velocity[2]
-                        else:
-                            raise RuntimeError
-                    else:
-                        raise RuntimeError
-                except (SystemError, RuntimeError):
-                    if bc['DirectionFace']:
-                        raise RuntimeError(str(bc['DirectionFace']) + ", specified for velocity direction in boundary '" + bc_name + "', is not a valid, planar face.")
-                    else:
-                        raise RuntimeError(str("No face specified for velocity direction in boundary '" + bc_name + "'"))
+            use_velocity_function = bool(bc.get('UseVelocityFunction', False))
+            if use_velocity_function:
+                if bc['VelocityIsCartesian']:
+                    raise ValueError(
+                        "Velocity functions require magnitude and normal specification on boundary '{}'".format(
+                            bc_name
+                        )
+                    )
+                if bc['BoundaryType'] not in ['inlet', 'outlet'] or bc['BoundarySubType'] not in [
+                    'uniformVelocityInlet',
+                    'uniformVelocityOutlet',
+                ]:
+                    raise ValueError(
+                        "Velocity functions are only supported for uniform velocity inlet or outlet boundaries."
+                    )
+                expression = bc.get('VelocityFunction', '').strip()
+                if not expression:
+                    raise ValueError(
+                        "No velocity function specified for boundary '{}'".format(bc_name)
+                    )
+                direction = self._get_velocity_direction(bc, bc_name)
+                magnitudes = self._evaluate_velocity_function(expression, bc_name)
+                vectors = [
+                    [direction[i] * mag for i in range(3)]
+                    for mag in magnitudes
+                ]
+                bc['VelocityFunctionEnabled'] = True
+                bc['Ux'] = vectors[0][0]
+                bc['Uy'] = vectors[0][1]
+                bc['Uz'] = vectors[0][2]
+                bc['VelocityMag'] = magnitudes[0]
+                self.velocity_time_functions[bc_name] = list(
+                    zip(self.velocity_function_times, vectors)
+                )
+            else:
+                bc['VelocityFunctionEnabled'] = False
+                if not bc['VelocityIsCartesian']:
+                    velo_mag = bc['VelocityMag']
+                    direction = self._get_velocity_direction(bc, bc_name)
+                    velocity = [ni * velo_mag for ni in direction]
+                    bc['Ux'] = velocity[0]
+                    bc['Uy'] = velocity[1]
+                    bc['Uz'] = velocity[2]
             if settings['solver']['SolverName'] in ['simpleFoam', 'porousSimpleFoam', 'pimpleFoam', 'SRFSimpleFoam']:
                 bc['KinematicPressure'] = bc['Pressure']/settings['fluidProperties'][0]['Density']
 
@@ -460,6 +507,105 @@ class CfdCaseWriterFoam:
                     'BoundaryType': 'constraint',
                     'BoundarySubType': 'symmetry'
                 }
+
+    def _build_time_samples(self, end_time, time_step):
+        times = []
+        epsilon = max(end_time, time_step) * 1e-9
+        t = 0.0
+        while t < end_time - epsilon:
+            times.append(round(t, 12))
+            t += time_step
+        times.append(round(end_time, 12))
+        return times
+
+    def _evaluate_velocity_function(self, expression, bc_name):
+        if not self.velocity_function_times:
+            raise ValueError("Velocity function time samples are not defined.")
+        allowed_names = {'abs': abs, 'min': min, 'max': max}
+        allowed_names.update(
+            {name: getattr(math, name) for name in dir(math) if not name.startswith('_')}
+        )
+        values = []
+        for time_value in self.velocity_function_times:
+            local_dict = dict(allowed_names)
+            local_dict.update({'t': time_value, 'time': time_value})
+            try:
+                result = eval(expression, {"__builtins__": {}}, local_dict)
+            except Exception as exc:
+                raise ValueError(
+                    "Error evaluating velocity function '{}' for boundary '{}': {}".format(
+                        expression, bc_name, exc
+                    )
+                ) from exc
+            try:
+                values.append(float(result))
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    "Velocity function '{}' for boundary '{}' did not evaluate to a numeric value".format(
+                        expression, bc_name
+                    )
+                ) from exc
+        return values
+
+    def _get_velocity_direction(self, bc, bc_name):
+        direction_face = bc.get('DirectionFace', '')
+        face_tokens = direction_face.split(':') if direction_face else ['', '']
+        if len(face_tokens) != 2 or not face_tokens[0] or not face_tokens[1]:
+            shape_refs = bc.get('ShapeRefs', [])
+            if shape_refs:
+                ref = shape_refs[0]
+                if isinstance(ref, (list, tuple)) and len(ref) >= 2:
+                    obj = ref[0]
+                    subs = ref[1]
+                    if hasattr(obj, 'Name') and isinstance(subs, (list, tuple)) and subs:
+                        face_tokens = [obj.Name, subs[0]]
+        if len(face_tokens) != 2 or not face_tokens[0] or not face_tokens[1]:
+            raise RuntimeError(
+                "No face specified for velocity direction in boundary '{}'".format(bc_name)
+            )
+        try:
+            selected_object = self.analysis_obj.Document.getObject(face_tokens[0])
+            if not selected_object or not hasattr(selected_object, "Shape"):
+                raise RuntimeError
+            element = selected_object.Shape.getElement(face_tokens[1])
+            if element.ShapeType != 'Face' or not CfdTools.isPlanar(element):
+                raise RuntimeError
+            normal = Vector(element.normalAt(0.5, 0.5))
+            if bc.get('ReverseNormal', False):
+                normal = -normal
+            if normal.Length == 0:
+                raise RuntimeError
+            normal.normalize()
+            return [normal.x, normal.y, normal.z]
+        except Exception as exc:
+            direction_label = (
+                direction_face if direction_face else '{}:{}'.format(*face_tokens)
+            )
+            raise RuntimeError(
+                "{} specified for velocity direction in boundary '{}' is not a valid, planar face.".format(
+                    direction_label, bc_name
+                )
+            ) from exc
+
+    def writeVelocityFunctionData(self):
+        if not self.velocity_time_functions:
+            return
+        base_dir = os.path.join(self.case_folder, "constant", "boundaryData")
+        for boundary_name, entries in self.velocity_time_functions.items():
+            if not entries:
+                continue
+            patch_dir = os.path.join(base_dir, boundary_name)
+            os.makedirs(patch_dir, exist_ok=True)
+            file_path = os.path.join(patch_dir, "uniformValue")
+            with open(file_path, "w", encoding="utf-8") as fid:
+                fid.write("(\n")
+                for time_value, vector in entries:
+                    fid.write(
+                        "    ({:.12g} ({:.12g} {:.12g} {:.12g}))\n".format(
+                            time_value, vector[0], vector[1], vector[2]
+                        )
+                    )
+                fid.write(")\n")
 
     def parseFaces(self, shape_refs):
         pass

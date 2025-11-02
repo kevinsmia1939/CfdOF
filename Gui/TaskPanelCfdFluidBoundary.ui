@@ -1050,13 +1050,41 @@
                    </widget>
                   </item>
                   <item row="1" column="0">
+                   <widget class="QLabel" name="label_useFunction">
+                    <property name="text">
+                     <string>Time-dependent function</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item row="1" column="1">
+                   <widget class="QCheckBox" name="checkVelocityFunction">
+                    <property name="text">
+                     <string>Enable</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item row="2" column="0">
+                   <widget class="QLabel" name="label_velocityFunction">
+                    <property name="text">
+                     <string>Function</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item row="2" column="1">
+                   <widget class="QLineEdit" name="lineVelocityFunction">
+                    <property name="placeholderText">
+                     <string notr="true">5*sin(t)</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item row="3" column="0">
                    <widget class="QLabel" name="label_5">
                     <property name="text">
                      <string>Normal to face</string>
                     </property>
                    </widget>
                   </item>
-                  <item row="1" column="1">
+                  <item row="3" column="1">
                    <layout class="QHBoxLayout" name="layoutDirectionFace">
                     <item>
                      <widget class="QLineEdit" name="lineDirection">

@@ -88,6 +88,8 @@ class TaskPanelCfdFluidBoundary:
         setQuantity(self.form.inputCartY, self.obj.Uy)
         setQuantity(self.form.inputCartZ, self.obj.Uz)
         setQuantity(self.form.inputVelocityMag, self.obj.VelocityMag)
+        self.form.checkVelocityFunction.setChecked(getattr(self.obj, 'UseVelocityFunction', False))
+        self.form.lineVelocityFunction.setText(getattr(self.obj, 'VelocityFunction', ''))
         self.form.lineDirection.setText(self.obj.DirectionFace)
         self.form.checkReverse.setChecked(self.obj.ReverseNormal)
         setQuantity(self.form.inputPressure, self.obj.Pressure)
@@ -219,6 +221,7 @@ class TaskPanelCfdFluidBoundary:
         self.form.radioButtonSlavePeriodic.toggled.connect(self.updateUI)
         self.form.rb_rotational_periodic.toggled.connect(self.updateUI)
         self.form.rb_translational_periodic.toggled.connect(self.updateUI)
+        self.form.checkVelocityFunction.toggled.connect(self.updateUI)
 
         # Face list selection panel - modifies obj.ShapeRefs passed to it
         self.faceSelector = CfdFaceSelectWidget.CfdFaceSelectWidget(self.form.faceSelectWidget,
@@ -266,6 +269,17 @@ class TaskPanelCfdFluidBoundary:
 
         self.form.frameCart.setVisible(self.form.radioButtonCart.isChecked())
         self.form.frameMagNormal.setVisible(self.form.radioButtonMagNormal.isChecked())
+
+        function_supported = self.form.radioButtonMagNormal.isChecked()
+        self.form.label_useFunction.setVisible(function_supported)
+        self.form.checkVelocityFunction.setVisible(function_supported)
+        if not function_supported:
+            self.form.checkVelocityFunction.setChecked(False)
+        function_enabled = function_supported and self.form.checkVelocityFunction.isChecked()
+        self.form.label_velocityFunction.setVisible(function_enabled)
+        self.form.lineVelocityFunction.setVisible(function_enabled)
+        self.form.lineVelocityFunction.setEnabled(function_enabled)
+        self.form.inputVelocityMag.setEnabled(not function_enabled)
 
         method = self.form.buttonGroupPorous.checkedId()
         self.form.stackedWidgetPorous.setCurrentIndex(method)
@@ -422,6 +436,9 @@ class TaskPanelCfdFluidBoundary:
         storeIfChanged(self.obj, 'Uy', getQuantity(self.form.inputCartY))
         storeIfChanged(self.obj, 'Uz', getQuantity(self.form.inputCartZ))
         storeIfChanged(self.obj, 'VelocityMag', getQuantity(self.form.inputVelocityMag))
+        use_velocity_function = self.form.checkVelocityFunction.isChecked() and self.form.radioButtonMagNormal.isChecked()
+        storeIfChanged(self.obj, 'UseVelocityFunction', use_velocity_function)
+        storeIfChanged(self.obj, 'VelocityFunction', self.form.lineVelocityFunction.text())
         storeIfChanged(self.obj, 'DirectionFace', self.form.lineDirection.text())
         storeIfChanged(self.obj, 'ReverseNormal', self.form.checkReverse.isChecked())
         storeIfChanged(self.obj, 'MassFlowRate', getQuantity(self.form.inputMassFlowRate))

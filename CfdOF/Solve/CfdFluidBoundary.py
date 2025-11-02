@@ -408,6 +408,24 @@ class CfdFluidBoundary:
         )
         addObjectProperty(
             obj,
+            "UseVelocityFunction",
+            False,
+            "App::PropertyBool",
+            "Flow",
+            QT_TRANSLATE_NOOP("App::Property", "Use time-dependent velocity function"),
+        )
+        addObjectProperty(
+            obj,
+            "VelocityFunction",
+            "",
+            "App::PropertyString",
+            "Flow",
+            QT_TRANSLATE_NOOP(
+                "App::Property", "Velocity magnitude as a Python expression of time"
+            ),
+        )
+        addObjectProperty(
+            obj,
             "DirectionFace",
             "",
             "App::PropertyString",
