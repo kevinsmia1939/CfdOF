@@ -94,7 +94,7 @@ boundaryField
             (
 %(boundaries/%(0%)/VelocityFunctionTable%)
             );
-            value           uniform ( %(boundaries/%(0%)/Ux%) %(boundaries/%(0%)/Uy%) %(boundaries/%(0%)/Uz%) );
+            value           uniform %(boundaries/%(0%)/NormalVelocityValue%);
 %:default
             type            fixedValue;
             value           uniform ( %(boundaries/%(0%)/Ux%) %(boundaries/%(0%)/Uy%) %(boundaries/%(0%)/Uz%) );
@@ -190,7 +190,7 @@ boundaryField
             (
 %(boundaries/%(0%)/VelocityFunctionTable%)
             );
-            value           uniform (%(boundaries/%(0%)/Ux%) %(boundaries/%(0%)/Uy%) %(boundaries/%(0%)/Uz%));
+            value           uniform %(boundaries/%(0%)/NormalVelocityValue%);
 %:default
             type            fixedValue;
             value           uniform (%(boundaries/%(0%)/Ux%) %(boundaries/%(0%)/Uy%) %(boundaries/%(0%)/Uz%));
