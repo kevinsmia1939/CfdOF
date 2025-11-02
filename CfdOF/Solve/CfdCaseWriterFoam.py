@@ -412,10 +412,7 @@ class CfdCaseWriterFoam:
                 bc['Uy'] = vectors[0][1]
                 bc['Uz'] = vectors[0][2]
                 bc['VelocityMag'] = magnitudes[0]
-                bc['NormalVelocityValue'] = self._compute_normal_velocity_component(
-                    bc, vectors[0], bc_name
-                )
-                bc['VelocityFunctionTable'] = self._build_velocity_table(magnitudes)
+                bc['VelocityFunctionTable'] = self._build_velocity_table(vectors)
             else:
                 bc['VelocityFunctionEnabled'] = False
                 bc['VelocityFunctionTable'] = ''
@@ -426,13 +423,6 @@ class CfdCaseWriterFoam:
                     bc['Ux'] = velocity[0]
                     bc['Uy'] = velocity[1]
                     bc['Uz'] = velocity[2]
-                    bc['NormalVelocityValue'] = self._compute_normal_velocity_component(
-                        bc, velocity, bc_name
-                    )
-                else:
-                    bc['NormalVelocityValue'] = self._compute_normal_velocity_component(
-                        bc, [bc['Ux'], bc['Uy'], bc['Uz']], bc_name
-                    )
             if settings['solver']['SolverName'] in ['simpleFoam', 'porousSimpleFoam', 'pimpleFoam', 'SRFSimpleFoam']:
                 bc['KinematicPressure'] = bc['Pressure']/settings['fluidProperties'][0]['Density']
 
@@ -593,25 +583,21 @@ class CfdCaseWriterFoam:
                 )
             ) from exc
 
-    def _build_velocity_table(self, magnitudes):
+    def _build_velocity_table(self, vectors):
         if not self.velocity_function_times:
             return ''
         lines = []
         indent = ' ' * 12
-        for time_value, magnitude in zip(self.velocity_function_times, magnitudes):
+        for time_value, vector in zip(self.velocity_function_times, vectors):
+            if len(vector) != 3:
+                raise ValueError('Velocity function vector must have three components.')
+            components = ' '.join('{:.12g}'.format(component) for component in vector)
             lines.append(
-                "{}({:.12g} {:.12g})".format(
-                    indent, time_value, magnitude
+                '{}({:.12g} ({}))'.format(
+                    indent, time_value, components
                 )
             )
         return "\n".join(lines) + ("\n" if lines else '')
-
-    def _compute_normal_velocity_component(self, bc, velocity, bc_name):
-        try:
-            direction = self._get_velocity_direction(bc, bc_name)
-        except RuntimeError:
-            return (velocity[0]**2 + velocity[1]**2 + velocity[2]**2) ** 0.5
-        return sum(direction[i] * velocity[i] for i in range(3))
 
     def parseFaces(self, shape_refs):
         pass
