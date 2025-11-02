@@ -67,7 +67,6 @@ class CfdCaseWriterFoam:
 
         self.settings = None
         self.SnappySettings = None
-        self.velocity_time_functions = {}
         self.velocity_function_times = []
 
     def writeCase(self):
@@ -191,7 +190,6 @@ class CfdCaseWriterFoam:
         self.setupPatchNames()
 
         TemplateBuilder(self.case_folder, self.template_path, self.settings)
-        self.writeVelocityFunctionData()
 
         # Update Allrun permission - will fail silently on Windows
         file_name = os.path.join(self.case_folder, "Allrun")
@@ -352,7 +350,6 @@ class CfdCaseWriterFoam:
         # Copy keys so that we can delete while iterating
         settings = self.settings
         bc_names = list(settings['boundaries'].keys())
-        self.velocity_time_functions = {}
         self.velocity_function_times = []
         velocity_function_boundaries = [
             name
@@ -415,11 +412,10 @@ class CfdCaseWriterFoam:
                 bc['Uy'] = vectors[0][1]
                 bc['Uz'] = vectors[0][2]
                 bc['VelocityMag'] = magnitudes[0]
-                self.velocity_time_functions[bc_name] = list(
-                    zip(self.velocity_function_times, vectors)
-                )
+                bc['VelocityFunctionTable'] = self._build_velocity_table(vectors)
             else:
                 bc['VelocityFunctionEnabled'] = False
+                bc['VelocityFunctionTable'] = ''
                 if not bc['VelocityIsCartesian']:
                     velo_mag = bc['VelocityMag']
                     direction = self._get_velocity_direction(bc, bc_name)
@@ -587,25 +583,18 @@ class CfdCaseWriterFoam:
                 )
             ) from exc
 
-    def writeVelocityFunctionData(self):
-        if not self.velocity_time_functions:
-            return
-        base_dir = os.path.join(self.case_folder, "constant", "boundaryData")
-        for boundary_name, entries in self.velocity_time_functions.items():
-            if not entries:
-                continue
-            patch_dir = os.path.join(base_dir, boundary_name)
-            os.makedirs(patch_dir, exist_ok=True)
-            file_path = os.path.join(patch_dir, "uniformValue")
-            with open(file_path, "w", encoding="utf-8") as fid:
-                fid.write("(\n")
-                for time_value, vector in entries:
-                    fid.write(
-                        "    ({:.12g} ({:.12g} {:.12g} {:.12g}))\n".format(
-                            time_value, vector[0], vector[1], vector[2]
-                        )
-                    )
-                fid.write(")\n")
+    def _build_velocity_table(self, vectors):
+        if not self.velocity_function_times:
+            return ''
+        lines = []
+        indent = ' ' * 12
+        for time_value, vector in zip(self.velocity_function_times, vectors):
+            lines.append(
+                "{}({:.12g} ({:.12g} {:.12g} {:.12g}))".format(
+                    indent, time_value, vector[0], vector[1], vector[2]
+                )
+            )
+        return "\n".join(lines) + ("\n" if lines else '')
 
     def parseFaces(self, shape_refs):
         pass

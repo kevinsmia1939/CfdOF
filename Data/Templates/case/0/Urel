@@ -130,9 +130,11 @@ boundaryField
         {
 %{%(boundaries/%(0%)/VelocityFunctionEnabled%)
 %:True
-            type            timeVaryingUniformFixedValue;
-            fileName        "$FOAM_CASE/constant/boundaryData/%(0%)";
-            outOfBounds     clamp;
+            type            uniformFixedValue;
+            uniformValue    table
+            (
+%(boundaries/%(0%)/VelocityFunctionTable%)
+            );
             value           uniform (%(boundaries/%(0%)/Ux%) %(boundaries/%(0%)/Uy%) %(boundaries/%(0%)/Uz%));
 %:default
             type            fixedValue;
