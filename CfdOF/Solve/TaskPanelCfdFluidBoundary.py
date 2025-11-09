@@ -36,6 +36,27 @@ from CfdOF.Solve import CfdFluidBoundary
 
 translate = FreeCAD.Qt.translate
 
+VELOCITY_PROFILE_LABELS = [
+    translate("Boundary", "Constant (fixed value)"),
+    translate("Boundary", "Variable (time-dependent)")
+]
+
+UNIFORM_VALUE_TEMPLATES = {
+    'constant': "value (0 0 0);",
+    'ramp': "start 0;\nend 1;\nlevel (0 0 0);\nvalue (0 0 0);",
+    'table': "// time  (Ux Uy Uz)\n(\n    (0 (0 0 0))\n    (1 (0 0 0))\n);",
+    'uniformTable': "// time  magnitude\n(\n    (0 0)\n    (1 0)\n);",
+    'csvFile': "file ""uniformValue.csv"";\noutOfBounds clamp;",
+    'polynomial': "coeffs ((0 0 0) (0 0 0));",
+    'sine': "frequency 1;\namplitude 0;\nscale (0 1 0);\nlevel (0 0 0);",
+    'square': "frequency 1;\nscale (0 1 0);\nlevel (0 0 0);\ndutyCycle 0.5;",
+    'sawTooth': "frequency 1;\nscale (0 1 0);\nlevel (0 0 0);",
+    'triangular': "frequency 1;\nscale (0 1 0);\nlevel (0 0 0);",
+    'exp': "A (0 0 0);\nb 0;",
+    'scale': "scale 1;\nvalueFunction constant;",
+    'coded': "code\n#{\n    vector value = vector::zero;\n    return value;\n#};"
+}
+
 class TaskPanelCfdFluidBoundary:
     """ Task panel for adding fluid boundary """
     def __init__(self, obj, physics_model, material_objs):
@@ -102,6 +123,32 @@ class TaskPanelCfdFluidBoundary:
         setQuantity(self.form.inputVolFlowRate, self.obj.VolFlowRate)
         setQuantity(self.form.inputMassFlowRate, self.obj.MassFlowRate)
         self.form.cb_relative_srf.setChecked(self.obj.RelativeToFrame)
+
+        self.velocity_profile_values = list(CfdFluidBoundary.VELOCITY_PROFILE_TYPES)
+        self.velocity_profile_labels = list(VELOCITY_PROFILE_LABELS)
+        self.uniform_value_types = list(CfdFluidBoundary.UNIFORM_VALUE_TYPES)
+        self.uniform_value_templates = dict(UNIFORM_VALUE_TEMPLATES)
+        if len(self.velocity_profile_labels) != len(self.velocity_profile_values):
+            self.velocity_profile_labels = list(self.velocity_profile_values)
+        velocity_profile_value = getattr(self.obj, 'VelocityProfile', self.velocity_profile_values[0])
+        if velocity_profile_value not in self.velocity_profile_values:
+            velocity_profile_value = self.velocity_profile_values[0]
+        uniform_value_type = getattr(self.obj, 'UniformValueType', self.uniform_value_types[0])
+        if uniform_value_type not in self.uniform_value_types:
+            uniform_value_type = self.uniform_value_types[0]
+        coeffs_value = getattr(self.obj, 'UniformValueCoeffs', '')
+
+        self.form.comboVelocityProfile.clear()
+        self.form.comboVelocityProfile.addItems(self.velocity_profile_labels)
+        self.form.comboVelocityProfile.setCurrentIndex(self.velocity_profile_values.index(velocity_profile_value))
+
+        self.form.comboUniformValueType.clear()
+        self.form.comboUniformValueType.addItems(self.uniform_value_types)
+        self.form.comboUniformValueType.setCurrentIndex(self.uniform_value_types.index(uniform_value_type))
+
+        self._setting_uniform_coeffs_text = False
+        self.uniform_value_coeffs_user_modified = bool(str(coeffs_value).strip())
+        self.setUniformValueCoeffsText(str(coeffs_value), mark_user_modified=self.uniform_value_coeffs_user_modified)
 
         buttonId = indexOrDefault(CfdFluidBoundary.POROUS_METHODS, self.obj.PorousBaffleMethod, 0)
         selButton = self.form.buttonGroupPorous.button(buttonId)
@@ -219,6 +266,9 @@ class TaskPanelCfdFluidBoundary:
         self.form.radioButtonSlavePeriodic.toggled.connect(self.updateUI)
         self.form.rb_rotational_periodic.toggled.connect(self.updateUI)
         self.form.rb_translational_periodic.toggled.connect(self.updateUI)
+        self.form.comboVelocityProfile.currentIndexChanged.connect(self.updateUI)
+        self.form.comboUniformValueType.currentIndexChanged.connect(self.uniformValueTypeChanged)
+        self.form.plainTextUniformValueCoeffs.textChanged.connect(self.uniformValueCoeffsChanged)
 
         # Face list selection panel - modifies obj.ShapeRefs passed to it
         self.faceSelector = CfdFaceSelectWidget.CfdFaceSelectWidget(self.form.faceSelectWidget,
@@ -300,6 +350,85 @@ class TaskPanelCfdFluidBoundary:
                 self.form.translationalFrame.setVisible(True)
         else:
             self.form.periodicFrame.setVisible(False)
+
+        self.updateVelocityProfileControlsVisibility()
+
+    def updateVelocityProfileControlsVisibility(self):
+        type_index = self.form.comboBoundaryType.currentIndex()
+        if type_index < 0 or type_index >= len(CfdFluidBoundary.BOUNDARY_TYPES):
+            return
+        subtype_index = self.form.comboSubtype.currentIndex()
+        boundary_type = CfdFluidBoundary.BOUNDARY_TYPES[type_index]
+        boundary_subtypes = CfdFluidBoundary.SUBTYPES[type_index]
+        if subtype_index < 0 or subtype_index >= len(boundary_subtypes):
+            return
+        boundary_subtype = boundary_subtypes[subtype_index]
+
+        show_frame = (boundary_type in ['inlet', 'outlet'] and
+                      boundary_subtype in ['uniformVelocityInlet', 'uniformVelocityOutlet'])
+        self.form.frameVelocityProfile.setVisible(show_frame)
+        if not show_frame:
+            return
+
+        profile_value = self.getCurrentVelocityProfileValue()
+        show_variable_controls = profile_value == 'uniformFixedValue'
+
+        self.form.label_uniformValueType.setVisible(show_variable_controls)
+        self.form.comboUniformValueType.setVisible(show_variable_controls)
+        self.form.label_uniformValueCoeffs.setVisible(show_variable_controls)
+        self.form.plainTextUniformValueCoeffs.setVisible(show_variable_controls)
+        self.form.label_uniformValueHint.setVisible(show_variable_controls)
+
+        if show_variable_controls:
+            self.ensureUniformValueCoeffs()
+
+    def getCurrentVelocityProfileValue(self):
+        index = self.form.comboVelocityProfile.currentIndex()
+        if index < 0 or index >= len(self.velocity_profile_values):
+            return self.velocity_profile_values[0]
+        return self.velocity_profile_values[index]
+
+    def getCurrentUniformValueType(self):
+        index = self.form.comboUniformValueType.currentIndex()
+        if index < 0 or index >= len(self.uniform_value_types):
+            return self.uniform_value_types[0]
+        return self.uniform_value_types[index]
+
+    def ensureUniformValueCoeffs(self):
+        if self.uniform_value_coeffs_user_modified:
+            return
+        current_text = self.form.plainTextUniformValueCoeffs.toPlainText()
+        if current_text.strip():
+            return
+        template = self.uniform_value_templates.get(self.getCurrentUniformValueType(), '')
+        self.setUniformValueCoeffsText(template, mark_user_modified=False)
+
+    def setUniformValueCoeffsText(self, text, mark_user_modified=None):
+        if text is None:
+            text = ''
+        self._setting_uniform_coeffs_text = True
+        self.form.plainTextUniformValueCoeffs.setPlainText(text)
+        self._setting_uniform_coeffs_text = False
+        if mark_user_modified is None:
+            self.uniform_value_coeffs_user_modified = bool(self.form.plainTextUniformValueCoeffs.toPlainText().strip())
+        else:
+            self.uniform_value_coeffs_user_modified = mark_user_modified
+
+    def uniformValueTypeChanged(self, index):
+        if self.getCurrentVelocityProfileValue() != 'uniformFixedValue':
+            return
+        if index < 0 or index >= len(self.uniform_value_types):
+            return
+        if self.uniform_value_coeffs_user_modified:
+            return
+        template = self.uniform_value_templates.get(self.uniform_value_types[index], '')
+        self.setUniformValueCoeffsText(template, mark_user_modified=False)
+
+    def uniformValueCoeffsChanged(self):
+        if self._setting_uniform_coeffs_text:
+            return
+        text = self.form.plainTextUniformValueCoeffs.toPlainText()
+        self.uniform_value_coeffs_user_modified = bool(text.strip())
 
     def comboBoundaryTypeChanged(self):
         index = self.form.comboBoundaryType.currentIndex()
@@ -439,6 +568,9 @@ class TaskPanelCfdFluidBoundary:
         storeIfChanged(self.obj, 'RotationAxis', rotation_axis)
 
         storeIfChanged(self.obj, 'RelativeToFrame', self.form.cb_relative_srf.isChecked())
+        storeIfChanged(self.obj, 'VelocityProfile', self.getCurrentVelocityProfileValue())
+        storeIfChanged(self.obj, 'UniformValueType', self.getCurrentUniformValueType())
+        storeIfChanged(self.obj, 'UniformValueCoeffs', self.form.plainTextUniformValueCoeffs.toPlainText())
 
         # Pressure
         storeIfChanged(self.obj, 'Pressure', getQuantity(self.form.inputPressure))
