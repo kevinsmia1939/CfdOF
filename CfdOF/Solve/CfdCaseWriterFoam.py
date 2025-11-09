@@ -67,6 +67,19 @@ class CfdCaseWriterFoam:
         self.settings = None
         self.SnappySettings = None
 
+    @staticmethod
+    def formatUniformValueCoeffs(coeffs_text):
+        if coeffs_text is None:
+            coeffs_text = ''
+        coeffs_text = coeffs_text.replace('\r\n', '\n').replace('\r', '\n')
+        if not coeffs_text.strip():
+            return '            // specify coefficients here\n'
+        lines = coeffs_text.split('\n')
+        formatted_lines = []
+        for line in lines:
+            formatted_lines.append('            ' + line.rstrip())
+        return '\n'.join(formatted_lines) + '\n'
+
     def writeCase(self):
         """ writeCase() will collect case settings, and finally build a runnable case. """
         cfdMessage("Writing case to folder {}\n".format(self.working_dir))
@@ -426,6 +439,11 @@ class CfdCaseWriterFoam:
                         raise RuntimeError(
                             "Inlet type currently unsupported for calculating turbulence inlet conditions from "
                             "intensity and length scale.")
+
+            bc['VelocityProfile'] = bc.get('VelocityProfile', 'constant') or 'constant'
+            bc['UniformValueType'] = bc.get('UniformValueType', 'constant') or 'constant'
+            bc['UniformValueCoeffsFormatted'] = self.formatUniformValueCoeffs(
+                bc.get('UniformValueCoeffs', ''))
 
             if bc['DefaultBoundary']:
                 if settings['boundaries'].get('defaultFaces'):

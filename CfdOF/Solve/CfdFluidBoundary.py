@@ -283,6 +283,11 @@ BOUNDARY_THERMALTAB = [[0], [], [1], [2], [3, 0]]
 
 POROUS_METHODS = ['porousCoeff', 'porousScreen']
 
+VELOCITY_PROFILE_TYPES = ['constant', 'uniformFixedValue']
+
+UNIFORM_VALUE_TYPES = ['constant', 'ramp', 'table', 'uniformTable', 'csvFile', 'polynomial',
+                       'sine', 'square', 'sawTooth', 'triangular', 'exp', 'scale', 'coded']
+
 
 def makeCfdFluidBoundary(name="CfdFluidBoundary"):
     obj = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", name)
@@ -462,6 +467,35 @@ class CfdFluidBoundary:
             "App::PropertyBool",
             "Flow",
             QT_TRANSLATE_NOOP("App::Property", "Relative velocity"),
+        )
+
+        if addObjectProperty(
+            obj,
+            "VelocityProfile",
+            VELOCITY_PROFILE_TYPES,
+            "App::PropertyEnumeration",
+            "Flow",
+            QT_TRANSLATE_NOOP("App::Property", "Velocity profile type"),
+        ):
+            obj.VelocityProfile = 'constant'
+
+        if addObjectProperty(
+            obj,
+            "UniformValueType",
+            UNIFORM_VALUE_TYPES,
+            "App::PropertyEnumeration",
+            "Flow",
+            QT_TRANSLATE_NOOP("App::Property", "Time-varying velocity function"),
+        ):
+            obj.UniformValueType = 'constant'
+
+        addObjectProperty(
+            obj,
+            "UniformValueCoeffs",
+            "",
+            "App::PropertyString",
+            "Flow",
+            QT_TRANSLATE_NOOP("App::Property", "uniformValueCoeffs block contents"),
         )
 
         if addObjectProperty(
