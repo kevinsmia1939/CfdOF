@@ -756,6 +756,12 @@ class CfdCaseWriterFoam:
             else:
                 raise RuntimeError("Unrecognised method for porous baffle resistance")
             porous_zone_label = po_obj.Label if po_obj.Label else po_obj.Name
+            porous_zone_label = str(porous_zone_label).strip()
+            if porous_zone_label in ('', 'None'):
+                CfdTools.cfdWarning(
+                    "Porous zone '{}' has invalid label and will be ignored.".format(po_obj.Name)
+                )
+                continue
             porousZoneSettings[porous_zone_label] = pd
 
         settings['porousZonesPresent'] = len(porousZoneSettings) > 0

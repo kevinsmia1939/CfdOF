@@ -13,7 +13,6 @@ FoamFile
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 %{%(porousZones%)
-%{%(porousZones/%(0%)/PartNameList%)
 %(0%)
 {
 
@@ -24,8 +23,8 @@ FoamFile
 
     DarcyForchheimerCoeffs
     {
-        d   (%(porousZones/%(1%)/D%));
-        f   (%(porousZones/%(1%)/F%));
+        d   (%(porousZones/%(0%)/D%));
+        f   (%(porousZones/%(0%)/F%));
 
         coordinateSystem
         {
@@ -34,14 +33,13 @@ FoamFile
             coordinateRotation
             {
                 type    axesRotation;
-                e1      (%(porousZones/%(1%)/e1%));
-                e3      (%(porousZones/%(1%)/e3%));
+                e1      (%(porousZones/%(0%)/e1%));
+                e3      (%(porousZones/%(0%)/e3%));
             }
         }
     }
 }
 
-%}
 %}
 
 //************************************************************************ //
