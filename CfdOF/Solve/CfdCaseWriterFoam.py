@@ -28,6 +28,7 @@
 
 import os
 import os.path
+import re
 from FreeCAD import Units, Vector
 from CfdOF import CfdTools
 from CfdOF.TemplateBuilder import TemplateBuilder
@@ -762,7 +763,22 @@ class CfdCaseWriterFoam:
                     "Porous zone '{}' has invalid label and will be ignored.".format(po_obj.Name)
                 )
                 continue
-            porousZoneSettings[porous_zone_label] = pd
+
+            # OpenFOAM dictionary names and cellZone names should be word-compatible
+            porous_zone_label_word = re.sub(r'[^A-Za-z0-9_]', '_', porous_zone_label)
+            if len(porous_zone_label_word) == 0:
+                CfdTools.cfdWarning(
+                    "Porous zone '{}' has invalid label after sanitisation and will be ignored.".format(po_obj.Name)
+                )
+                continue
+            if porous_zone_label_word[0].isdigit():
+                porous_zone_label_word = 'zone_' + porous_zone_label_word
+            if porous_zone_label_word != porous_zone_label:
+                CfdTools.cfdWarning(
+                    "Porous zone label '{}' changed to '{}' for OpenFOAM compatibility.".format(
+                        porous_zone_label, porous_zone_label_word)
+                )
+            porousZoneSettings[porous_zone_label_word] = pd
 
         settings['porousZonesPresent'] = len(porousZoneSettings) > 0
 
