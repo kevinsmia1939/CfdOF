@@ -707,11 +707,20 @@ class CfdCaseWriterFoam:
 
     def processPorousZoneProperties(self):
         settings = self.settings
-        settings['porousZonesPresent'] = True
         porousZoneSettings = settings['porousZones']
-        for po in self.porous_zone_objs:
-            pd = {'PartNameList': tuple(r[0].Name for r in po.ShapeRefs)}
-            po = CfdTools.propsToDict(po)
+        for po_obj in self.porous_zone_objs:
+            po = CfdTools.propsToDict(po_obj)
+            zone_parts = tuple(
+                r[0].Name for r in po_obj.ShapeRefs
+                if r and len(r) > 0 and r[0] is not None and getattr(r[0], 'Name', None)
+            )
+            if len(zone_parts) == 0:
+                CfdTools.cfdWarning(
+                    "Porous zone '{}' has no valid shape references and will be ignored.".format(po_obj.Label)
+                )
+                continue
+
+            pd = {'PartNameList': zone_parts}
             if po['PorousCorrelation'] == 'DarcyForchheimer':
                 pd['D'] = (po['D1'], po['D2'], po['D3'])
                 pd['F'] = (po['F1'], po['F2'], po['F3'])
@@ -745,7 +754,10 @@ class CfdCaseWriterFoam:
                 # Currently assuming zero drag parallel to tube bundle (3rd principal dirn)
             else:
                 raise RuntimeError("Unrecognised method for porous baffle resistance")
-            porousZoneSettings[po['Label']] = pd
+            porous_zone_label = po_obj.Label if po_obj.Label else po_obj.Name
+            porousZoneSettings[porous_zone_label] = pd
+
+        settings['porousZonesPresent'] = len(porousZoneSettings) > 0
 
     def processInitialisationZoneProperties(self):
         settings = self.settings
