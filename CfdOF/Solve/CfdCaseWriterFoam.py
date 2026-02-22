@@ -271,7 +271,17 @@ class CfdCaseWriterFoam:
         mean_vel_supported = solver_settings['SolverName'] in ['simpleFoam', 'porousSimpleFoam', 'pimpleFoam']
         self.settings['meanVelocityForceEnabled'] = solver_settings.get('EnableMeanVelocityForce', False) and mean_vel_supported
         target_vel = solver_settings.get('TargetMeanVelocity', Vector(1, 0, 0))
-        solver_settings['t_TargetMeanVelocity'] = (target_vel.x, target_vel.y, target_vel.z)
+        if isinstance(target_vel, Vector):
+            t_target_vel = (target_vel.x, target_vel.y, target_vel.z)
+        elif isinstance(target_vel, (list, tuple)) and len(target_vel) == 3:
+            t_target_vel = (float(target_vel[0]), float(target_vel[1]), float(target_vel[2]))
+        else:
+            # Backward/edge-case compatibility for values persisted in string form
+            target_vel = str(target_vel).replace('(', ' ').replace(')', ' ').replace(',', ' ').split()
+            if len(target_vel) != 3:
+                raise ValueError("TargetMeanVelocity must contain exactly 3 components")
+            t_target_vel = (float(target_vel[0]), float(target_vel[1]), float(target_vel[2]))
+        solver_settings['t_TargetMeanVelocity'] = t_target_vel
 
     def processSystemSettings(self):
         installation_path = CfdTools.getFoamDir()
