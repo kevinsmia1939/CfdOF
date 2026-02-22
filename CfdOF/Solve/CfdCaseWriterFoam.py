@@ -713,10 +713,11 @@ class CfdCaseWriterFoam:
             zone_parts = tuple(
                 r[0].Name for r in po_obj.ShapeRefs
                 if r and len(r) > 0 and r[0] is not None and getattr(r[0], 'Name', None)
+                and str(r[0].Name).strip() not in ('', 'None')
             )
             if len(zone_parts) == 0:
                 CfdTools.cfdWarning(
-                    "Porous zone '{}' has no valid shape references and will be ignored.".format(po_obj.Label)
+                    "Porous zone '{}' has no valid shape references/cellZone names and will be ignored.".format(po_obj.Label)
                 )
                 continue
 
