@@ -134,7 +134,8 @@ class CfdCaseWriterFoam:
             'runChangeDictionary': False,
             'meanVelocityForceEnabled': False,
             'fvOptionsEnabled': False,
-            'systemFvOptionsEnabled': False
+            'systemFvOptionsEnabled': False,
+            'periodicsPresent': False
             }
 
 
@@ -828,6 +829,7 @@ class CfdCaseWriterFoam:
 
             if bcSubType in ['cyclic', 'cyclicAMI']:
                 settings['createPatchesForPeriodics'] = True
+                settings['periodicsPresent'] = True
                 if bc_obj.PeriodicMaster:
                     slave_bc_obj = None
                     slave_bc_id = -1

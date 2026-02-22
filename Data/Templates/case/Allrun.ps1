@@ -167,6 +167,16 @@ runParallel $NPROC renumberMesh -overwrite
 %{%(initialValues/PotentialFlow%)
 %:True
 # Initialise flow
+%{%(periodicsPresent%)
+%:True
+# potentialFoam initialisation can fail for fully/mostly periodic cases in some OpenFOAM versions
+%{%(solver/Parallel%)
+%:True
+echo "Skipping potentialFoam initialisation for periodic constraints"
+%:False
+echo "Skipping potentialFoam initialisation for periodic constraints"
+%}
+%:False
 %{%(bafflesPresent%)
 %:True
 # Baffle BC does not work with potentialFoam; do not initialise p
@@ -220,6 +230,16 @@ runCommand renumberMesh -overwrite
 %{%(initialValues/PotentialFlow%)
 %:True
 # Initialise flow
+%{%(periodicsPresent%)
+%:True
+# potentialFoam initialisation can fail for fully/mostly periodic cases in some OpenFOAM versions
+%{%(solver/Parallel%)
+%:True
+echo "Skipping potentialFoam initialisation for periodic constraints"
+%:False
+echo "Skipping potentialFoam initialisation for periodic constraints"
+%}
+%:False
 %{%(bafflesPresent%)
 %:True
 # Baffle BC does not work with potentialFoam; do not initialise p
