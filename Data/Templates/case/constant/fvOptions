@@ -13,6 +13,8 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
+%{%(porousZonesPresent%)
+%:True
 %{%(porousZones%)
 %(0%)
 {
@@ -46,6 +48,7 @@ FoamFile
     }
 }
 
+%}
 %}
 
 %{%(meanVelocityForceEnabled%)
