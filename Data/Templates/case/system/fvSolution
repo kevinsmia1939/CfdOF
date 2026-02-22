@@ -129,8 +129,13 @@ potentialFlow
 {
     nNonOrthogonalCorrectors 8;
 
+    // Needed for pressure reconstruction paths
     pRefValue 0;
     pRefCell 0;
+
+    // Needed for velocity potential solve
+    PhiRefValue 0;
+    PhiRefCell 0;
 }
 
 solvers
