@@ -189,6 +189,7 @@ runParallel $NPROC potentialFoam -initialiseUBCs -pName $PNAME -writep
 runParallel $NPROC potentialFoam -initialiseUBCs -pName $PNAME
 %}
 %}
+%}
 %{%(solver/SolverName%)
 %:buoyantSimpleFoam buoyantPimpleFoam interFoam multiphaseInterFoam
 # Remove phi with wrong units
@@ -250,6 +251,7 @@ runCommand potentialFoam -initialiseUBCs -pName $PNAME
 runCommand potentialFoam -initialiseUBCs -pName $PNAME -writep
 %:default
 runCommand potentialFoam -initialiseUBCs -pName $PNAME
+%}
 %}
 %}
 %{%(solver/SolverName%)
