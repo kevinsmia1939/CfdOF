@@ -129,8 +129,8 @@ potentialFlow
 {
     nNonOrthogonalCorrectors 8;
 
-    PhiRefValue 0;
-    PhiRefCell 0;
+    pRefValue 0;
+    pRefCell 0;
 }
 
 solvers
