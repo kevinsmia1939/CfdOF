@@ -1,4 +1,4 @@
-%{%(porousZonesPresent%)
+%{%(fvOptionsEnabled%)
 %:True
 %{%(solver/SolverName%)
 %:porousSimpleFoam
@@ -50,6 +50,22 @@ FoamFile
 %}
 %}
 
+%{%(meanVelocityForceEnabled%)
+%:True
+meanVelocityForce1
+{
+    type            meanVelocityForce;
+    active          yes;
+
+    meanVelocityForceCoeffs
+    {
+        selectionMode   all;
+        Ubar            ( %(solver/t_TargetMeanVelocity%) );
+        relaxation      %(solver/MeanVelocityRelaxation%);
+    }
+}
+
+%}
 //************************************************************************ //
 %}
 %}

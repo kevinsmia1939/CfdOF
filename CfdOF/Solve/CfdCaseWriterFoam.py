@@ -131,7 +131,10 @@ class CfdCaseWriterFoam:
             'meshDir': os.path.relpath(os.path.join(self.working_dir, self.mesh_obj.CaseName), self.case_folder),
             'solver': CfdTools.propsToDict(self.solver_obj),
             'system': {},
-            'runChangeDictionary': False
+            'runChangeDictionary': False,
+            'meanVelocityForceEnabled': False,
+            'fvOptionsEnabled': False,
+            'systemFvOptionsEnabled': False
             }
 
 
@@ -186,6 +189,8 @@ class CfdCaseWriterFoam:
 
         self.settings['createPatchesFromSnappyBaffles'] = False
         self.settings['createPatchesForPeriodics'] = False
+        self.settings['fvOptionsEnabled'] = self.settings['porousZonesPresent'] or self.settings['meanVelocityForceEnabled']
+        self.settings['systemFvOptionsEnabled'] = self.settings['scalarTransportFunctionsEnabled'] or self.settings['meanVelocityForceEnabled']
         cfdMessage("Matching boundary conditions ...\n")
         if self.progressCallback:
             self.progressCallback("Matching boundary conditions ...")
@@ -262,6 +267,11 @@ class CfdCaseWriterFoam:
             if solver_settings['ParallelCores'] < 2:
                 solver_settings['ParallelCores'] = 2
         solver_settings['SolverName'] = self.getSolverName()
+
+        mean_vel_supported = solver_settings['SolverName'] in ['simpleFoam', 'porousSimpleFoam', 'pimpleFoam']
+        self.settings['meanVelocityForceEnabled'] = solver_settings.get('EnableMeanVelocityForce', False) and mean_vel_supported
+        target_vel = solver_settings.get('TargetMeanVelocity', Vector(1, 0, 0))
+        solver_settings['t_TargetMeanVelocity'] = (target_vel.x, target_vel.y, target_vel.z)
 
     def processSystemSettings(self):
         installation_path = CfdTools.getFoamDir()
@@ -791,7 +801,7 @@ class CfdCaseWriterFoam:
             bcSubType = bc_obj.BoundarySubType
             patchType = CfdTools.getPatchType(bcType, bcSubType)
 
-            if not bcType == 'baffle' and not bcSubType == 'cyclicAMI':
+            if not bcType == 'baffle' and bcSubType not in ['cyclic', 'cyclicAMI']:
                 settings['createPatches'][bc_obj.Label] = {
                     'PatchNamesList': '"patch_'+str(bc_id+1)+'_.*"',
                     'PatchType': patchType
@@ -806,7 +816,7 @@ class CfdCaseWriterFoam:
                     'PatchNamesList': '"'+bc_obj.Name+'_[^_]*"',
                     'PatchNamesListSlave': '"'+bc_obj.Name+'_.*_slave"'}
 
-            if bcSubType == 'cyclicAMI':
+            if bcSubType in ['cyclic', 'cyclicAMI']:
                 settings['createPatchesForPeriodics'] = True
                 if bc_obj.PeriodicMaster:
                     slave_bc_obj = None
@@ -822,6 +832,7 @@ class CfdCaseWriterFoam:
                     settings['createPeriodics'][bc_obj.Label] = {
                         'PeriodicMaster': bc_obj.PeriodicMaster,
                         'PeriodicPartner': slave_bc_obj.Label if bc_obj.PeriodicMaster else slave_bc_obj.PeriodicPartner,
+                        'PeriodicPatchType': bcSubType,
                         'RotationalPeriodic': slave_bc_obj.RotationalPeriodic,
                         'PeriodicCentreOfRotation': tuple(p for p in slave_bc_obj.PeriodicCentreOfRotation),
                         'PeriodicCentreOfRotationAxis': tuple(p for p in slave_bc_obj.PeriodicCentreOfRotationAxis),

@@ -1,4 +1,4 @@
-%{%(scalarTransportFunctionsEnabled%)
+%{%(systemFvOptionsEnabled%)
 %:True
 %[_header%]
 FoamFile
@@ -34,5 +34,21 @@ FoamFile
 
 %}
 
+%{%(meanVelocityForceEnabled%)
+%:True
+meanVelocityForce1
+{
+    type            meanVelocityForce;
+    active          yes;
+
+    meanVelocityForceCoeffs
+    {
+        selectionMode   all;
+        Ubar            ( %(solver/t_TargetMeanVelocity%) );
+        relaxation      %(solver/MeanVelocityRelaxation%);
+    }
+}
+
+%}
 // ************************************************************************* //
 %}

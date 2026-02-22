@@ -79,7 +79,11 @@ SUBNAMES = [
         translate("Subnames", "Extrapolated"),
     ],
     [translate("Subnames", "Ambient pressure"), translate("Subnames", "Far-field")],
-    [translate("Subnames", "Symmetry"), translate("Subnames", "Periodic")],
+    [
+        translate("Subnames", "Symmetry"),
+        translate("Subnames", "Periodic (cyclic)"),
+        translate("Subnames", "Periodic (AMI)"),
+    ],
     [translate("Subnames", "Porous Baffle")],
 ]
 
@@ -95,7 +99,7 @@ SUBTYPES = [
     ],
     ["staticPressureOutlet", "uniformVelocityOutlet", "outFlowOutlet"],
     ["totalPressureOpening", "farField"],
-    ["symmetry", "cyclicAMI"],
+    ["symmetry", "cyclic", "cyclicAMI"],
     ["porousBaffle"],
 ]
 
@@ -133,6 +137,9 @@ SUBTYPES_HELPTEXT = [
     [
         translate("Subtypes", "Symmetry of flow quantities about boundary face"),
         translate(
+            "Subtypes", "Periodicity between conformal boundary faces"
+        ),
+        translate(
             "Subtypes", "Rotationally or translationally periodic flows between two boundary faces"
         ),
     ],
@@ -160,7 +167,8 @@ BOUNDARY_UI = [[[False, [], False, False, False, True, None, False],  # No slip
                [[True, [1], False, True, True, True, [2], False],  # Opening
                 [True, [0, 1], False, True, False, True, [2], False]],  # Far-field
                [[False, [], False, False, False, False, None, False],  # Symmetry plane
-                [False, [], False, False, False, False, None, True]],  # Periodic
+                [False, [], False, False, False, False, None, True],  # Periodic (cyclic)
+                [False, [], False, False, False, False, None, True]],  # Periodic (AMI)
                [[True, [5], False, False, False, False, None, False]]]  # Permeable screen
 
 # For each turbulence model: Name, label, help text, displayed rows
