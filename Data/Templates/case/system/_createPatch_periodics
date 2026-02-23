@@ -4,9 +4,11 @@
         name %(0%)_master;
         patchInfo
         {
-            type cyclicAMI;
+            type %(createPeriodics/%(0%)/PeriodicPatchType%);
             neighbourPatch %(0%)_slave;
 
+%{%(createPeriodics/%(0%)/PeriodicPatchType%)
+%:cyclicAMI
 %{%(createPeriodics/%(0%)/RotationalPeriodic%)
 %:True
             transform rotational;
@@ -15,6 +17,7 @@
 %:False
             transform translational;
             separationVector ( %(createPeriodics/%(0%)/PeriodicSeparationVector%) );
+%}
 %}
         }
 
@@ -25,9 +28,11 @@
         name %(0%)_slave;
         patchInfo
         {
-            type cyclicAMI;
+            type %(createPeriodics/%(0%)/PeriodicPatchType%);
             neighbourPatch %(0%)_master;
 
+%{%(createPeriodics/%(0%)/PeriodicPatchType%)
+%:cyclicAMI
 %{%(createPeriodics/%(0%)/RotationalPeriodic%)
 %:True
             transform rotational;
@@ -36,6 +41,7 @@
 %:False
             transform translational;
             separationVector ( %(createPeriodics/%(0%)/PeriodicSeparationVector%) );
+%}
 %}
         }
 

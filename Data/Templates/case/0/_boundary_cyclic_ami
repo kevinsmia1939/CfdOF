@@ -2,12 +2,12 @@
 %:True
     %(0%)_master
     {
-        type        cyclicAMI;
+        type        %(boundaries/%(0%)/BoundarySubType%);
     }
 
     %(0%)_slave
     {
-        type        cyclicAMI;
+        type        %(boundaries/%(0%)/BoundarySubType%);
     }
 
 %}

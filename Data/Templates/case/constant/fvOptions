@@ -1,4 +1,4 @@
-%{%(porousZonesPresent%)
+%{%(fvOptionsEnabled%)
 %:True
 %{%(solver/SolverName%)
 %:porousSimpleFoam
@@ -13,8 +13,9 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
+%{%(porousZonesPresent%)
+%:True
 %{%(porousZones%)
-%{%(porousZones/%(0%)/PartNameList%)
 %(0%)
 {
     type            explicitPorositySource;
@@ -29,8 +30,8 @@ FoamFile
 
         DarcyForchheimerCoeffs
         {
-            d   d [0 -2 0 0 0 0 0] (%(porousZones/%(1%)/D%));
-            f   f [0 -1 0 0 0 0 0] (%(porousZones/%(1%)/F%));
+            d   d [0 -2 0 0 0 0 0] (%(porousZones/%(0%)/D%));
+            f   f [0 -1 0 0 0 0 0] (%(porousZones/%(0%)/F%));
 
             coordinateSystem
             {
@@ -39,8 +40,8 @@ FoamFile
                 coordinateRotation
                 {
                     type    axesRotation;
-                    e1      (%(porousZones/%(1%)/e1%));
-                    e3      (%(porousZones/%(1%)/e3%));
+                    e1      (%(porousZones/%(0%)/e1%));
+                    e3      (%(porousZones/%(0%)/e3%));
                 }
             }
         }
@@ -50,6 +51,23 @@ FoamFile
 %}
 %}
 
+%{%(meanVelocityForceEnabled%)
+%:True
+meanVelocityForce1
+{
+    type            meanVelocityForce;
+    active          yes;
+
+    meanVelocityForceCoeffs
+    {
+        selectionMode   all;
+        fields          (U);
+        Ubar            ( %(solver/t_TargetMeanVelocity%) );
+        relaxation      %(solver/MeanVelocityRelaxation%);
+    }
+}
+
+%}
 //************************************************************************ //
 %}
 %}

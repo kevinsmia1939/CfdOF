@@ -136,7 +136,7 @@ class TaskPanelCfdFluidBoundary:
         boundary_patches = CfdTools.getCfdBoundaryGroup(self.analysis_obj)
         periodic_patches = []
         for patch in boundary_patches:
-            if patch.BoundarySubType == 'cyclicAMI' and patch.Label != self.obj.Label:
+            if patch.BoundarySubType in ['cyclic', 'cyclicAMI'] and patch.Label != self.obj.Label:
                 periodic_patches.append(patch.Label)
 
         self.form.comboBoxPeriodicPartner.addItems(periodic_patches)
@@ -293,15 +293,19 @@ class TaskPanelCfdFluidBoundary:
             CfdTools.enableLayoutRows(self.form.layoutThermal, [0, 1] + [rowi+2 for rowi in panel_numbers])
 
         periodic_enabled = CfdFluidBoundary.BOUNDARY_UI[type_index][subtype_index][7]
+        periodic_ami = CfdFluidBoundary.SUBTYPES[type_index][subtype_index] == 'cyclicAMI'
         if periodic_enabled:
             self.form.periodicFrame.setVisible(True)
             self.form.frameSlave.setVisible(not self.form.radioButtonMasterPeriodic.isChecked())
-            if self.form.rb_rotational_periodic.isChecked():
+            if periodic_ami and self.form.rb_rotational_periodic.isChecked():
                 self.form.rotationalFrame.setVisible(True)
                 self.form.translationalFrame.setVisible(False)
-            else:
+            elif periodic_ami:
                 self.form.rotationalFrame.setVisible(False)
                 self.form.translationalFrame.setVisible(True)
+            else:
+                self.form.rotationalFrame.setVisible(False)
+                self.form.translationalFrame.setVisible(False)
         else:
             self.form.periodicFrame.setVisible(False)
 

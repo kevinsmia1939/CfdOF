@@ -167,6 +167,16 @@ runParallel $NPROC renumberMesh -overwrite
 %{%(initialValues/PotentialFlow%)
 %:True
 # Initialise flow
+%{%(periodicsPresent%)
+%:True
+# potentialFoam initialisation can fail for fully/mostly periodic cases in some OpenFOAM versions
+%{%(solver/Parallel%)
+%:True
+echo "Skipping potentialFoam initialisation for periodic constraints"
+%:False
+echo "Skipping potentialFoam initialisation for periodic constraints"
+%}
+%:False
 %{%(bafflesPresent%)
 %:True
 # Baffle BC does not work with potentialFoam; do not initialise p
@@ -177,6 +187,7 @@ runParallel $NPROC potentialFoam -initialiseUBCs -pName $PNAME
 runParallel $NPROC potentialFoam -initialiseUBCs -pName $PNAME -writep
 %:default
 runParallel $NPROC potentialFoam -initialiseUBCs -pName $PNAME
+%}
 %}
 %}
 %{%(solver/SolverName%)
@@ -220,6 +231,16 @@ runCommand renumberMesh -overwrite
 %{%(initialValues/PotentialFlow%)
 %:True
 # Initialise flow
+%{%(periodicsPresent%)
+%:True
+# potentialFoam initialisation can fail for fully/mostly periodic cases in some OpenFOAM versions
+%{%(solver/Parallel%)
+%:True
+echo "Skipping potentialFoam initialisation for periodic constraints"
+%:False
+echo "Skipping potentialFoam initialisation for periodic constraints"
+%}
+%:False
 %{%(bafflesPresent%)
 %:True
 # Baffle BC does not work with potentialFoam; do not initialise p
@@ -230,6 +251,7 @@ runCommand potentialFoam -initialiseUBCs -pName $PNAME
 runCommand potentialFoam -initialiseUBCs -pName $PNAME -writep
 %:default
 runCommand potentialFoam -initialiseUBCs -pName $PNAME
+%}
 %}
 %}
 %{%(solver/SolverName%)

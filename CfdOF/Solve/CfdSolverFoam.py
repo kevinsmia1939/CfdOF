@@ -206,6 +206,31 @@ class CfdSolverFoam(object):
             QT_TRANSLATE_NOOP("App::Property", "Output time interval"),
         )
 
+        addObjectProperty(
+            obj,
+            "EnableMeanVelocityForce",
+            False,
+            "App::PropertyBool",
+            "DrivingForce",
+            QT_TRANSLATE_NOOP("App::Property", "Enable mean velocity forcing"),
+        )
+        addObjectProperty(
+            obj,
+            "TargetMeanVelocity",
+            FreeCAD.Vector(1, 0, 0),
+            "App::PropertyVector",
+            "DrivingForce",
+            QT_TRANSLATE_NOOP("App::Property", "Target mean velocity vector [m/s]"),
+        )
+        addObjectProperty(
+            obj,
+            "MeanVelocityRelaxation",
+            0.05,
+            "App::PropertyFloat",
+            "DrivingForce",
+            QT_TRANSLATE_NOOP("App::Property", "Relaxation used by mean velocity forcing"),
+        )
+
         self.residual_plotter = TimePlot(
             title="Simulation residuals", y_label="Residual", is_log=True
         )

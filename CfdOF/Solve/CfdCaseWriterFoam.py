@@ -28,6 +28,7 @@
 
 import os
 import os.path
+import re
 from FreeCAD import Units, Vector
 from CfdOF import CfdTools
 from CfdOF.TemplateBuilder import TemplateBuilder
@@ -131,7 +132,11 @@ class CfdCaseWriterFoam:
             'meshDir': os.path.relpath(os.path.join(self.working_dir, self.mesh_obj.CaseName), self.case_folder),
             'solver': CfdTools.propsToDict(self.solver_obj),
             'system': {},
-            'runChangeDictionary': False
+            'runChangeDictionary': False,
+            'meanVelocityForceEnabled': False,
+            'fvOptionsEnabled': False,
+            'systemFvOptionsEnabled': False,
+            'periodicsPresent': False
             }
 
 
@@ -186,6 +191,8 @@ class CfdCaseWriterFoam:
 
         self.settings['createPatchesFromSnappyBaffles'] = False
         self.settings['createPatchesForPeriodics'] = False
+        self.settings['fvOptionsEnabled'] = self.settings['porousZonesPresent'] or self.settings['meanVelocityForceEnabled']
+        self.settings['systemFvOptionsEnabled'] = self.settings['scalarTransportFunctionsEnabled'] or self.settings['meanVelocityForceEnabled']
         cfdMessage("Matching boundary conditions ...\n")
         if self.progressCallback:
             self.progressCallback("Matching boundary conditions ...")
@@ -262,6 +269,21 @@ class CfdCaseWriterFoam:
             if solver_settings['ParallelCores'] < 2:
                 solver_settings['ParallelCores'] = 2
         solver_settings['SolverName'] = self.getSolverName()
+
+        mean_vel_supported = solver_settings['SolverName'] in ['simpleFoam', 'porousSimpleFoam', 'pimpleFoam']
+        self.settings['meanVelocityForceEnabled'] = solver_settings.get('EnableMeanVelocityForce', False) and mean_vel_supported
+        target_vel = solver_settings.get('TargetMeanVelocity', Vector(1, 0, 0))
+        if isinstance(target_vel, Vector):
+            t_target_vel = (target_vel.x, target_vel.y, target_vel.z)
+        elif isinstance(target_vel, (list, tuple)) and len(target_vel) == 3:
+            t_target_vel = (float(target_vel[0]), float(target_vel[1]), float(target_vel[2]))
+        else:
+            # Backward/edge-case compatibility for values persisted in string form
+            target_vel = str(target_vel).replace('(', ' ').replace(')', ' ').replace(',', ' ').split()
+            if len(target_vel) != 3:
+                raise ValueError("TargetMeanVelocity must contain exactly 3 components")
+            t_target_vel = (float(target_vel[0]), float(target_vel[1]), float(target_vel[2]))
+        solver_settings['t_TargetMeanVelocity'] = t_target_vel
 
     def processSystemSettings(self):
         installation_path = CfdTools.getFoamDir()
@@ -686,11 +708,21 @@ class CfdCaseWriterFoam:
 
     def processPorousZoneProperties(self):
         settings = self.settings
-        settings['porousZonesPresent'] = True
         porousZoneSettings = settings['porousZones']
-        for po in self.porous_zone_objs:
-            pd = {'PartNameList': tuple(r[0].Name for r in po.ShapeRefs)}
-            po = CfdTools.propsToDict(po)
+        for po_obj in self.porous_zone_objs:
+            po = CfdTools.propsToDict(po_obj)
+            zone_parts = tuple(
+                r[0].Name for r in po_obj.ShapeRefs
+                if r and len(r) > 0 and r[0] is not None and getattr(r[0], 'Name', None)
+                and str(r[0].Name).strip() not in ('', 'None')
+            )
+            if len(zone_parts) == 0:
+                CfdTools.cfdWarning(
+                    "Porous zone '{}' has no valid shape references/cellZone names and will be ignored.".format(po_obj.Label)
+                )
+                continue
+
+            pd = {'PartNameList': zone_parts}
             if po['PorousCorrelation'] == 'DarcyForchheimer':
                 pd['D'] = (po['D1'], po['D2'], po['D3'])
                 pd['F'] = (po['F1'], po['F2'], po['F3'])
@@ -724,7 +756,31 @@ class CfdCaseWriterFoam:
                 # Currently assuming zero drag parallel to tube bundle (3rd principal dirn)
             else:
                 raise RuntimeError("Unrecognised method for porous baffle resistance")
-            porousZoneSettings[po['Label']] = pd
+            porous_zone_label = po_obj.Label if po_obj.Label else po_obj.Name
+            porous_zone_label = str(porous_zone_label).strip()
+            if porous_zone_label in ('', 'None'):
+                CfdTools.cfdWarning(
+                    "Porous zone '{}' has invalid label and will be ignored.".format(po_obj.Name)
+                )
+                continue
+
+            # OpenFOAM dictionary names and cellZone names should be word-compatible
+            porous_zone_label_word = re.sub(r'[^A-Za-z0-9_]', '_', porous_zone_label)
+            if len(porous_zone_label_word) == 0:
+                CfdTools.cfdWarning(
+                    "Porous zone '{}' has invalid label after sanitisation and will be ignored.".format(po_obj.Name)
+                )
+                continue
+            if porous_zone_label_word[0].isdigit():
+                porous_zone_label_word = 'zone_' + porous_zone_label_word
+            if porous_zone_label_word != porous_zone_label:
+                CfdTools.cfdWarning(
+                    "Porous zone label '{}' changed to '{}' for OpenFOAM compatibility.".format(
+                        porous_zone_label, porous_zone_label_word)
+                )
+            porousZoneSettings[porous_zone_label_word] = pd
+
+        settings['porousZonesPresent'] = len(porousZoneSettings) > 0
 
     def processInitialisationZoneProperties(self):
         settings = self.settings
@@ -791,7 +847,7 @@ class CfdCaseWriterFoam:
             bcSubType = bc_obj.BoundarySubType
             patchType = CfdTools.getPatchType(bcType, bcSubType)
 
-            if not bcType == 'baffle' and not bcSubType == 'cyclicAMI':
+            if not bcType == 'baffle' and bcSubType not in ['cyclic', 'cyclicAMI']:
                 settings['createPatches'][bc_obj.Label] = {
                     'PatchNamesList': '"patch_'+str(bc_id+1)+'_.*"',
                     'PatchType': patchType
@@ -806,8 +862,9 @@ class CfdCaseWriterFoam:
                     'PatchNamesList': '"'+bc_obj.Name+'_[^_]*"',
                     'PatchNamesListSlave': '"'+bc_obj.Name+'_.*_slave"'}
 
-            if bcSubType == 'cyclicAMI':
+            if bcSubType in ['cyclic', 'cyclicAMI']:
                 settings['createPatchesForPeriodics'] = True
+                settings['periodicsPresent'] = True
                 if bc_obj.PeriodicMaster:
                     slave_bc_obj = None
                     slave_bc_id = -1
@@ -822,6 +879,7 @@ class CfdCaseWriterFoam:
                     settings['createPeriodics'][bc_obj.Label] = {
                         'PeriodicMaster': bc_obj.PeriodicMaster,
                         'PeriodicPartner': slave_bc_obj.Label if bc_obj.PeriodicMaster else slave_bc_obj.PeriodicPartner,
+                        'PeriodicPatchType': bcSubType,
                         'RotationalPeriodic': slave_bc_obj.RotationalPeriodic,
                         'PeriodicCentreOfRotation': tuple(p for p in slave_bc_obj.PeriodicCentreOfRotation),
                         'PeriodicCentreOfRotationAxis': tuple(p for p in slave_bc_obj.PeriodicCentreOfRotationAxis),
