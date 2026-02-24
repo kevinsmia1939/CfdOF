@@ -1581,10 +1581,18 @@ def addObjectProperty(obj, prop: str, init_val, type: str, *args):
         added = obj.addProperty(
             type, prop, *args
         )  # 3rd parameter  is property group, 4th parameter is property tooltip
+    existing_quantity = None
+    if type == "App::PropertyQuantity" and not added:
+        # Preserve quantity magnitude when reinitialising existing properties.
+        # onDocumentRestored() reruns initProperties(), and reapplying only the
+        # unit would reset values such as "0.001 s" back to "0.0 s".
+        existing_quantity = str(getattr(obj, prop))
     if type == "App::PropertyQuantity":
-        # Set the unit so that the quantity will be accepted
-        # Has to be repeated on load as unit gets lost
+        # Set the unit so that the quantity will be accepted.
+        # Has to be repeated on load as unit gets lost.
         setattr(obj, prop, Units.Unit(init_val))
+        if existing_quantity is not None:
+            setattr(obj, prop, existing_quantity)
     if added:
         setattr(obj, prop, init_val)
     elif type == "App::PropertyEnumeration":
