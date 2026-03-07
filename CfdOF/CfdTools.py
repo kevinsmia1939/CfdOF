@@ -242,6 +242,10 @@ def getScalarTransportFunctionsGroup(analysis_object):
     return getModelsOfType(analysis_object, 'CfdScalarTransportFunction')
 
 
+def getFvOptionsGroup(analysis_object):
+    return getModelsOfType(analysis_object, 'CfdFvOptions')
+
+
 # Mesh
 def getMeshRefinementObjs(mesh_obj):
     return getModelsOfType(mesh_obj, 'CfdMeshRefinement')
