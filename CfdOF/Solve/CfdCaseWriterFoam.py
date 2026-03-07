@@ -60,6 +60,7 @@ class CfdCaseWriterFoam:
             raise RuntimeError("No initial conditions object was found in analysis " + analysis_obj.Label)
         self.reporting_functions = CfdTools.getReportingFunctionsGroup(analysis_obj)
         self.scalar_transport_objs = CfdTools.getScalarTransportFunctionsGroup(analysis_obj)
+        self.fv_options_objs = CfdTools.getFvOptionsGroup(analysis_obj)
         self.porous_zone_objs = CfdTools.getPorousZoneObjects(analysis_obj)
         self.initialisation_zone_objs = CfdTools.getInitialisationZoneObjects(analysis_obj)
         self.zone_objs = CfdTools.getZoneObjects(analysis_obj)
@@ -114,6 +115,8 @@ class CfdCaseWriterFoam:
             'reportingFunctionsEnabled': False,
             'scalarTransportFunctions': dict((st.Label, CfdTools.propsToDict(st)) for st in self.scalar_transport_objs),
             'scalarTransportFunctionsEnabled': False,
+            'fvOptions': dict((fv.Label, CfdTools.propsToDict(fv)) for fv in self.fv_options_objs),
+            'fvOptionsPresent': False,
             'dynamicMesh': {},
             'dynamicMeshEnabled': False,
             'MovingMeshRegions': {},
@@ -179,6 +182,10 @@ class CfdCaseWriterFoam:
         if self.scalar_transport_objs:
             cfdMessage('Scalar transport functions present\n')
             self.processScalarTransportFunctions()
+
+        if self.fv_options_objs:
+            cfdMessage('fvOptions present\n')
+            self.processFvOptions()
 
         if self.dynamic_mesh_refinement_obj:
             cfdMessage('Dynamic mesh adaptation rule present\n')
@@ -644,6 +651,15 @@ class CfdCaseWriterFoam:
             if settings['solver']['SolverName'] in ['simpleFoam', 'porousSimpleFoam', 'pimpleFoam']:
                 stf['InjectionRate'] = stf['InjectionRate']/settings['fluidProperties'][0]['Density']
                 stf['DiffusivityFixedValue'] = stf['DiffusivityFixedValue']/settings['fluidProperties'][0]['Density']
+
+
+    def processFvOptions(self):
+        settings = self.settings
+        settings['fvOptionsPresent'] = True
+        for name in settings['fvOptions']:
+            fvo = settings['fvOptions'][name]
+            fvo['DirectionTuple'] = tuple(fvo['Direction'])
+            fvo['UbarTuple'] = tuple(fvo['Ubar'])
 
     # Mesh related
     def processDynamicMeshRefinement(self):

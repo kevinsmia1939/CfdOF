@@ -1,8 +1,5 @@
-%{%(porousZonesPresent%)
+%{%(fvOptionsPresent%) %(porousZonesPresent%)
 %:True
-%{%(solver/SolverName%)
-%:porousSimpleFoam
-%:default
 %[_header%]
 FoamFile
 {
@@ -12,6 +9,36 @@ FoamFile
     object      fvOptions;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+%{%(fvOptions%)
+%{%(fvOptions/%(0%)/SourceName%)
+%(0%)
+{
+    type            meanVelocityForce;
+%{%(fvOptions/%(1%)/Active%)
+%:True
+    active          yes;
+%:default
+    active          no;
+%}
+
+    meanVelocityForceCoeffs
+    {
+        selectionMode   all;
+        fields          (U);
+        direction       (%(fvOptions/%(1%)/DirectionTuple%));
+        Ubar            (%(fvOptions/%(1%)/UbarTuple%));
+        relaxation      %(fvOptions/%(1%)/Relaxation%);
+    }
+}
+
+%}
+%}
+%{%(porousZonesPresent%)
+%:True
+%{%(solver/SolverName%)
+%:porousSimpleFoam
+%:default
 
 %{%(porousZones%)
 %{%(porousZones/%(0%)/PartNameList%)
@@ -49,7 +76,8 @@ FoamFile
 
 %}
 %}
+%}
+%}
 
 //************************************************************************ //
-%}
 %}
