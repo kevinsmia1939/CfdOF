@@ -15,12 +15,12 @@ FoamFile
 %(0%)
 {
     type            meanVelocityForce;
-    active          %{%(fvOptions/%(1%)/Active%)
+%{%(fvOptions/%(1%)/Active%)
 %:True
-yes
+    active          yes;
 %:default
-no
-%};
+    active          no;
+%}
 
     meanVelocityForceCoeffs
     {
