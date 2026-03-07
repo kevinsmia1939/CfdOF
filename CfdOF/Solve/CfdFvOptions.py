@@ -72,7 +72,7 @@ class CfdFvOptions:
         addObjectProperty(
             obj,
             "Direction",
-            FreeCAD.Vector(0, 1, 0),
+            FreeCAD.Vector(0, 0, 0),
             "App::PropertyVector",
             "fvOptions",
             QT_TRANSLATE_NOOP("App::Property", "Direction vector for mean velocity force"),
@@ -81,7 +81,7 @@ class CfdFvOptions:
         addObjectProperty(
             obj,
             "Ubar",
-            FreeCAD.Vector(0, 0.05, 0),
+            FreeCAD.Vector(0, 0, 0),
             "App::PropertyVector",
             "fvOptions",
             QT_TRANSLATE_NOOP("App::Property", "Target mean velocity"),
