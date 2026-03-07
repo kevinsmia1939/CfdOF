@@ -20,7 +20,7 @@ FoamFile
 yes
 %:default
 no
-%};
+%}
 
     meanVelocityForceCoeffs
     {
