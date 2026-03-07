@@ -69,6 +69,7 @@ class CfdOFWorkbench(Workbench):
             CommandDynamicMeshInterfaceRefinement, CommandDynamicMeshShockRefinement
         from CfdOF.PostProcess.CfdReportingFunction import CommandCfdReportingFunction
         from CfdOF.Solve.CfdScalarTransportFunction import CommandCfdScalarTransportFunction
+        from CfdOF.Solve.CfdFvOptions import CommandCfdFvOptions
         from CfdOF.CfdOpenPreferencesPage import CommandCfdOpenPreferencesPage
         from CfdOF.CfdReloadWorkbench import CommandCfdReloadWorkbench
         from CfdOF.CfdTestCommands import CommandCfdRunTests, CommandCfdUpdateTestData, CommandCfdCleanTests
@@ -88,6 +89,7 @@ class CfdOFWorkbench(Workbench):
         FreeCADGui.addCommand('CfdOF_SolverControl', CommandCfdSolverFoam())
         FreeCADGui.addCommand('CfdOF_ReportingFunctions', CommandCfdReportingFunction())
         FreeCADGui.addCommand('CfdOF_ScalarTransportFunctions', CommandCfdScalarTransportFunction())
+        FreeCADGui.addCommand('CfdOF_FvOptions', CommandCfdFvOptions())
         FreeCADGui.addCommand('CfdOF_OpenPreferences', CommandCfdOpenPreferencesPage())
         FreeCADGui.addCommand('CfdOF_ReloadWorkbench', CommandCfdReloadWorkbench())
         FreeCADGui.addCommand('CfdOF_RunTests', CommandCfdRunTests())
@@ -105,6 +107,7 @@ class CfdOFWorkbench(Workbench):
                   'CfdOF_FluidBoundary', 'CfdOF_InitialiseInternal',
                   'CfdOF_InitialisationZone', 'CfdOF_PorousZone',
                   'CfdOF_ReportingFunctions', 'CfdOF_ScalarTransportFunctions',
+                  'CfdOF_FvOptions',
                   'CfdOF_SolverControl',
                   ('M', 'CfdOF_OpenPreferences',),
                   ('M', QT_TRANSLATE_NOOP("Workbench", "Development"),
