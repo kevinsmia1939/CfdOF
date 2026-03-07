@@ -39,6 +39,7 @@ class CommandCfdFvOptions:
         FreeCADGui.doCommand("from CfdOF.Solve import CfdFvOptions")
         FreeCADGui.doCommand("from CfdOF import CfdTools")
         FreeCADGui.doCommand("CfdTools.getActiveAnalysis().addObject(CfdFvOptions.makeCfdFvOptions())")
+        FreeCADGui.ActiveDocument.setEdit(FreeCAD.ActiveDocument.ActiveObject.Name)
 
 
 class CfdFvOptions:
@@ -138,12 +139,30 @@ class ViewProviderCfdFvOptions:
         return
 
     def doubleClicked(self, vobj):
+        doc = FreeCADGui.getDocument(vobj.Object.Document)
+        if not doc.getInEdit():
+            doc.setEdit(vobj.Object.Name)
+        else:
+            FreeCAD.Console.PrintError('Task dialog already active\n')
+            FreeCADGui.Control.showTaskView()
         return True
 
     def setEdit(self, vobj, mode):
-        return False
+        analysis_object = CfdTools.getParentAnalysisObject(self.Object)
+        if analysis_object is None:
+            CfdTools.cfdErrorBox("fvOptions object must have a parent analysis object")
+            return False
+
+        from CfdOF.Solve import TaskPanelCfdFvOptions
+        import importlib
+        importlib.reload(TaskPanelCfdFvOptions)
+        taskd = TaskPanelCfdFvOptions.TaskPanelCfdFvOptions(self.Object)
+        taskd.obj = vobj.Object
+        FreeCADGui.Control.showDialog(taskd)
+        return True
 
     def unsetEdit(self, vobj, mode):
+        FreeCADGui.Control.closeDialog()
         return
 
     def __getstate__(self):
