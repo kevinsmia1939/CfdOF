@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>TaskPanelCfdFvOptions</class>
+ <widget class="QWidget" name="TaskPanelCfdFvOptions">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>460</width>
+    <height>280</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>fvOptions</string>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <property name="leftMargin">
+    <number>8</number>
+   </property>
+   <property name="topMargin">
+    <number>8</number>
+   </property>
+   <property name="rightMargin">
+    <number>8</number>
+   </property>
+   <property name="bottomMargin">
+    <number>8</number>
+   </property>
+   <item>
+    <widget class="QLabel" name="labelTitle">
+     <property name="font">
+      <font>
+       <weight>75</weight>
+       <bold>true</bold>
+      </font>
+     </property>
+     <property name="text">
+      <string>Mean velocity force fvOptions</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <layout class="QGridLayout" name="gridLayout">
+     <item row="0" column="0">
+      <widget class="QLabel" name="labelSourceName">
+       <property name="text">
+        <string>Source name</string>
+       </property>
+      </widget>
+     </item>
+     <item row="0" column="1" colspan="3">
+      <widget class="QLineEdit" name="inputSourceName"/>
+     </item>
+     <item row="1" column="0">
+      <widget class="QLabel" name="labelActive">
+       <property name="text">
+        <string>Active</string>
+       </property>
+      </widget>
+     </item>
+     <item row="1" column="1" colspan="3">
+      <widget class="QCheckBox" name="checkActive">
+       <property name="text">
+        <string>Enable source</string>
+       </property>
+      </widget>
+     </item>
+     <item row="2" column="0">
+      <widget class="QLabel" name="labelDirection">
+       <property name="text">
+        <string>Direction</string>
+       </property>
+      </widget>
+     </item>
+     <item row="2" column="1">
+      <widget class="Gui::InputField" name="inputDirectionX">
+       <property name="text">
+        <string notr="true">0</string>
+       </property>
+       <property name="unit" stdset="0">
+        <string notr="true">1</string>
+       </property>
+      </widget>
+     </item>
+     <item row="2" column="2">
+      <widget class="Gui::InputField" name="inputDirectionY">
+       <property name="text">
+        <string notr="true">1</string>
+       </property>
+       <property name="unit" stdset="0">
+        <string notr="true">1</string>
+       </property>
+      </widget>
+     </item>
+     <item row="2" column="3">
+      <widget class="Gui::InputField" name="inputDirectionZ">
+       <property name="text">
+        <string notr="true">0</string>
+       </property>
+       <property name="unit" stdset="0">
+        <string notr="true">1</string>
+       </property>
+      </widget>
+     </item>
+     <item row="3" column="0">
+      <widget class="QLabel" name="labelUbar">
+       <property name="text">
+        <string>Ubar (m/s)</string>
+       </property>
+      </widget>
+     </item>
+     <item row="3" column="1">
+      <widget class="Gui::InputField" name="inputUbarX">
+       <property name="text">
+        <string notr="true">0</string>
+       </property>
+       <property name="unit" stdset="0">
+        <string notr="true">m/s</string>
+       </property>
+      </widget>
+     </item>
+     <item row="3" column="2">
+      <widget class="Gui::InputField" name="inputUbarY">
+       <property name="text">
+        <string notr="true">0.05</string>
+       </property>
+       <property name="unit" stdset="0">
+        <string notr="true">m/s</string>
+       </property>
+      </widget>
+     </item>
+     <item row="3" column="3">
+      <widget class="Gui::InputField" name="inputUbarZ">
+       <property name="text">
+        <string notr="true">0</string>
+       </property>
+       <property name="unit" stdset="0">
+        <string notr="true">m/s</string>
+       </property>
+      </widget>
+     </item>
+     <item row="4" column="0">
+      <widget class="QLabel" name="labelRelaxation">
+       <property name="text">
+        <string>Relaxation</string>
+       </property>
+      </widget>
+     </item>
+     <item row="4" column="1" colspan="3">
+      <widget class="Gui::InputField" name="inputRelaxation">
+       <property name="text">
+        <string notr="true">0.2</string>
+       </property>
+       <property name="unit" stdset="0">
+        <string notr="true">1</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <spacer name="verticalSpacer">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>20</width>
+       <height>40</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
