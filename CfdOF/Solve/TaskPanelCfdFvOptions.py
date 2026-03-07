@@ -24,15 +24,15 @@ class TaskPanelCfdFvOptions:
         self.form.inputSourceName.setText(self.obj.SourceName)
         self.form.checkActive.setChecked(self.obj.Active)
 
-        setQuantity(self.form.inputDirectionX, '{} 1'.format(self.obj.Direction.x))
-        setQuantity(self.form.inputDirectionY, '{} 1'.format(self.obj.Direction.y))
-        setQuantity(self.form.inputDirectionZ, '{} 1'.format(self.obj.Direction.z))
+        setQuantity(self.form.inputDirectionX, str(self.obj.Direction.x))
+        setQuantity(self.form.inputDirectionY, str(self.obj.Direction.y))
+        setQuantity(self.form.inputDirectionZ, str(self.obj.Direction.z))
 
         setQuantity(self.form.inputUbarX, '{} m/s'.format(self.obj.Ubar.x))
         setQuantity(self.form.inputUbarY, '{} m/s'.format(self.obj.Ubar.y))
         setQuantity(self.form.inputUbarZ, '{} m/s'.format(self.obj.Ubar.z))
 
-        setQuantity(self.form.inputRelaxation, '{} 1'.format(self.obj.Relaxation))
+        setQuantity(self.form.inputRelaxation, str(self.obj.Relaxation))
 
     @staticmethod
     def _input_value(input_field, unit):
