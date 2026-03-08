@@ -38,21 +38,21 @@
       <item row="1" column="1">
        <widget class="QLineEdit" name="inputUbarX">
         <property name="placeholderText">
-         <string>e.g. 1000 mm/s</string>
+         <string>mm/s</string>
         </property>
        </widget>
       </item>
       <item row="1" column="2">
        <widget class="QLineEdit" name="inputUbarY">
         <property name="placeholderText">
-         <string>e.g. 0 mm/s</string>
+         <string>mm/s</string>
         </property>
        </widget>
       </item>
       <item row="1" column="3">
        <widget class="QLineEdit" name="inputUbarZ">
         <property name="placeholderText">
-         <string>e.g. 0 mm/s</string>
+         <string>mm/s</string>
         </property>
        </widget>
       </item>
