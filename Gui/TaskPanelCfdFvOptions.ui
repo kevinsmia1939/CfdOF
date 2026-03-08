@@ -68,7 +68,7 @@
      <item row="2" column="0">
       <widget class="QLabel" name="labelDirection">
        <property name="text">
-        <string>Direction</string>
+        <string>Direction (X,Y,Z)</string>
        </property>
       </widget>
      </item>
