@@ -31,18 +31,30 @@
       <item row="1" column="0">
        <widget class="QLabel" name="labelUbar">
         <property name="text">
-         <string>Ubar</string>
+         <string>Ubar (mm/s)</string>
         </property>
        </widget>
       </item>
       <item row="1" column="1">
-       <widget class="QLineEdit" name="inputUbarX"/>
+       <widget class="QLineEdit" name="inputUbarX">
+        <property name="placeholderText">
+         <string>e.g. 1000 mm/s</string>
+        </property>
+       </widget>
       </item>
       <item row="1" column="2">
-       <widget class="QLineEdit" name="inputUbarY"/>
+       <widget class="QLineEdit" name="inputUbarY">
+        <property name="placeholderText">
+         <string>e.g. 0 mm/s</string>
+        </property>
+       </widget>
       </item>
       <item row="1" column="3">
-       <widget class="QLineEdit" name="inputUbarZ"/>
+       <widget class="QLineEdit" name="inputUbarZ">
+        <property name="placeholderText">
+         <string>e.g. 0 mm/s</string>
+        </property>
+       </widget>
       </item>
       <item row="2" column="0">
        <widget class="QLabel" name="labelRelaxation">
