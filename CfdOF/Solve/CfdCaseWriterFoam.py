@@ -194,7 +194,6 @@ class CfdCaseWriterFoam:
 
         self.settings['fvOptionsFilePresent'] = (
             self.settings['fvOptionsPresent'] or
-            self.settings['porousZonesPresent'] or
             self.settings['scalarTransportFunctionsEnabled']
         )
 
