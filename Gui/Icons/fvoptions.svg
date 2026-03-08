@@ -1,9 +1,98 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
-  <rect x="6" y="8" width="52" height="48" rx="4" fill="#2a2a2a"/>
-  <rect x="10" y="12" width="44" height="40" rx="2" fill="#f2f2f2"/>
-  <path d="M18 24h28" stroke="#005f9e" stroke-width="4" stroke-linecap="round"/>
-  <path d="M18 32h20" stroke="#009e73" stroke-width="4" stroke-linecap="round"/>
-  <path d="M18 40h24" stroke="#d55e00" stroke-width="4" stroke-linecap="round"/>
-  <path d="M42 32l8 0" stroke="#009e73" stroke-width="4" stroke-linecap="round"/>
-  <path d="M46 28l6 4-6 4" fill="none" stroke="#009e73" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="64"
+   height="64"
+   viewBox="0 0 64 64"
+   version="1.1"
+   id="svg6"
+   sodipodi:docname="fvoptions.svg"
+   inkscape:version="1.4.3 (0d15f75042, 2025-12-25)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs6" />
+  <sodipodi:namedview
+     id="namedview6"
+     pagecolor="#505050"
+     bordercolor="#eeeeee"
+     borderopacity="1"
+     inkscape:showpageshadow="0"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#505050"
+     showguides="true"
+     inkscape:zoom="4.6569611"
+     inkscape:cx="28.452031"
+     inkscape:cy="13.850234"
+     inkscape:window-width="1920"
+     inkscape:window-height="1052"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg6">
+    <sodipodi:guide
+       position="32,54.71244"
+       orientation="1,0"
+       id="guide6"
+       inkscape:locked="false" />
+    <sodipodi:guide
+       position="0,32"
+       orientation="0,-1"
+       id="guide7"
+       inkscape:locked="false" />
+    <sodipodi:guide
+       position="0,48"
+       orientation="0,-1"
+       id="guide8"
+       inkscape:locked="false" />
+    <sodipodi:guide
+       position="-8.2671938,16"
+       orientation="0,-1"
+       id="guide9"
+       inkscape:locked="false" />
+  </sodipodi:namedview>
+  <rect
+     style="fill:#4172e6;stroke:none;stroke-width:4.40705;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none"
+     id="rect6"
+     width="53.219456"
+     height="6.5766959"
+     x="5.3902721"
+     y="12.711652"
+     ry="3.288348" />
+  <rect
+     style="fill:#4172e6;stroke:none;stroke-width:4.40705;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none"
+     id="rect6-7"
+     width="53.219456"
+     height="6.5766959"
+     x="5.3902721"
+     y="28.711653"
+     ry="3.288348" />
+  <rect
+     style="fill:#4172e6;stroke:none;stroke-width:4.40705;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none"
+     id="rect6-7-9"
+     width="53.219456"
+     height="6.5766959"
+     x="5.3902721"
+     y="44.711651"
+     ry="3.288348" />
+  <circle
+     style="fill:#9cb7f7;stroke:#000000;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;fill-opacity:1;stroke-opacity:1"
+     id="path7"
+     cx="21.048849"
+     cy="16"
+     r="6.7691517" />
+  <circle
+     style="fill:#9cb7f7;stroke:#000000;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;fill-opacity:1;stroke-opacity:1"
+     id="path7-2"
+     cx="40.769154"
+     cy="32"
+     r="6.7691517" />
+  <circle
+     style="fill:#9cb7f7;stroke:#000000;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;fill-opacity:1;stroke-opacity:1"
+     id="path7-2-1"
+     cx="32"
+     cy="48"
+     r="6.7691517" />
 </svg>
