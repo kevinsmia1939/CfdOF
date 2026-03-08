@@ -20,25 +20,13 @@
        </widget>
       </item>
       <item row="0" column="1">
-       <widget class="QDoubleSpinBox" name="inputDirectionX">
-        <property name="decimals"><number>6</number></property>
-        <property name="minimum"><double>-1000000.000000000000000</double></property>
-        <property name="maximum"><double>1000000.000000000000000</double></property>
-       </widget>
+       <widget class="QLineEdit" name="inputDirectionX"/>
       </item>
       <item row="0" column="2">
-       <widget class="QDoubleSpinBox" name="inputDirectionY">
-        <property name="decimals"><number>6</number></property>
-        <property name="minimum"><double>-1000000.000000000000000</double></property>
-        <property name="maximum"><double>1000000.000000000000000</double></property>
-       </widget>
+       <widget class="QLineEdit" name="inputDirectionY"/>
       </item>
       <item row="0" column="3">
-       <widget class="QDoubleSpinBox" name="inputDirectionZ">
-        <property name="decimals"><number>6</number></property>
-        <property name="minimum"><double>-1000000.000000000000000</double></property>
-        <property name="maximum"><double>1000000.000000000000000</double></property>
-       </widget>
+       <widget class="QLineEdit" name="inputDirectionZ"/>
       </item>
       <item row="1" column="0">
        <widget class="QLabel" name="labelUbar">
@@ -48,25 +36,13 @@
        </widget>
       </item>
       <item row="1" column="1">
-       <widget class="QDoubleSpinBox" name="inputUbarX">
-        <property name="decimals"><number>6</number></property>
-        <property name="minimum"><double>-1000000.000000000000000</double></property>
-        <property name="maximum"><double>1000000.000000000000000</double></property>
-       </widget>
+       <widget class="QLineEdit" name="inputUbarX"/>
       </item>
       <item row="1" column="2">
-       <widget class="QDoubleSpinBox" name="inputUbarY">
-        <property name="decimals"><number>6</number></property>
-        <property name="minimum"><double>-1000000.000000000000000</double></property>
-        <property name="maximum"><double>1000000.000000000000000</double></property>
-       </widget>
+       <widget class="QLineEdit" name="inputUbarY"/>
       </item>
       <item row="1" column="3">
-       <widget class="QDoubleSpinBox" name="inputUbarZ">
-        <property name="decimals"><number>6</number></property>
-        <property name="minimum"><double>-1000000.000000000000000</double></property>
-        <property name="maximum"><double>1000000.000000000000000</double></property>
-       </widget>
+       <widget class="QLineEdit" name="inputUbarZ"/>
       </item>
       <item row="2" column="0">
        <widget class="QLabel" name="labelRelaxation">
@@ -76,13 +52,7 @@
        </widget>
       </item>
       <item row="2" column="1" colspan="3">
-       <widget class="QDoubleSpinBox" name="inputRelaxation">
-        <property name="decimals"><number>6</number></property>
-        <property name="minimum"><double>0.000000000000000</double></property>
-        <property name="maximum"><double>1.000000000000000</double></property>
-        <property name="singleStep"><double>0.010000000000000</double></property>
-        <property name="value"><double>0.200000000000000</double></property>
-       </widget>
+       <widget class="QLineEdit" name="inputRelaxation"/>
       </item>
      </layout>
     </widget>
