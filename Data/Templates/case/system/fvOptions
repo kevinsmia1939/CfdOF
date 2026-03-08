@@ -1,4 +1,4 @@
-%{%(fvOptionsPresent%) %(porousZonesPresent%)
+%{%(fvOptionsPresent%) %(porousZonesPresent%) %(scalarTransportFunctionsEnabled%)
 %:True
 %[_header%]
 FoamFile
@@ -76,6 +76,32 @@ no
 
 %}
 %}
+%}
+%}
+%{%(scalarTransportFunctionsEnabled%)
+%:True
+%{%(scalarTransportFunctions%)
+%(0%)
+{
+    type            semiImplicitSource;
+    selectionMode   points;
+    points
+    (
+        ( %(scalarTransportFunctions/%(0%)/InjectionPoint%) )
+    );
+
+    volumeMode      absolute;
+    sources
+    {
+        %(scalarTransportFunctions/%(0%)/FieldName%)
+        {
+            explicit %(scalarTransportFunctions/%(0%)/InjectionRate%);
+            implicit 0;
+        }
+    }
+
+}
+
 %}
 %}
 
