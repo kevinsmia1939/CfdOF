@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>fvOptions</string>
+   <string>Mean velocity force</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <property name="leftMargin">
@@ -35,7 +35,7 @@
       </font>
      </property>
      <property name="text">
-      <string>fvOptions</string>
+      <string>Mean velocity force</string>
      </property>
     </widget>
    </item>
@@ -44,7 +44,7 @@
      <item row="0" column="0">
       <widget class="QLabel" name="labelOptionType">
        <property name="text">
-        <string>Option type</string>
+        <string>Force type</string>
        </property>
       </widget>
      </item>
@@ -54,7 +54,7 @@
      <item row="1" column="0">
       <widget class="QLabel" name="labelSourceName">
        <property name="text">
-        <string>Source name</string>
+        <string>Force name</string>
        </property>
       </widget>
      </item>
@@ -71,7 +71,7 @@
      <item row="2" column="1" colspan="3">
       <widget class="QCheckBox" name="checkActive">
        <property name="text">
-        <string>Enable source</string>
+        <string>Enable mean velocity force</string>
        </property>
       </widget>
      </item>

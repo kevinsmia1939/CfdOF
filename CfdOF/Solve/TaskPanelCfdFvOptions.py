@@ -13,7 +13,7 @@ if FreeCAD.GuiUp:
 
 
 class TaskPanelCfdFvOptions:
-    """Task panel for Cfd fvOptions object"""
+    """Task panel for mean velocity force object"""
 
     def __init__(self, obj):
         self.obj = obj
