@@ -664,6 +664,8 @@ class CfdCaseWriterFoam:
         settings['fvOptionsPresent'] = True
         for name in settings['fvOptions']:
             fvo = settings['fvOptions'][name]
+            if 'FvOptionType' not in fvo:
+                fvo['FvOptionType'] = 'meanVelocityForce'
             fvo['DirectionTuple'] = tuple(fvo['Direction'])
             fvo['UbarTuple'] = tuple(fvo['Ubar'])
 

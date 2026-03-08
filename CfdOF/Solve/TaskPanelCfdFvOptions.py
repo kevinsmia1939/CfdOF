@@ -5,7 +5,8 @@ import os
 
 import FreeCAD
 from CfdOF import CfdTools
-from CfdOF.CfdTools import setQuantity, storeIfChanged
+from CfdOF.CfdTools import indexOrDefault, setQuantity, storeIfChanged
+from CfdOF.Solve import CfdFvOptions
 
 if FreeCAD.GuiUp:
     import FreeCADGui
@@ -23,6 +24,11 @@ class TaskPanelCfdFvOptions:
     def load(self):
         self.form.inputSourceName.setText(self.obj.SourceName)
         self.form.checkActive.setChecked(self.obj.Active)
+        self.form.comboFvOptionType.clear()
+        self.form.comboFvOptionType.addItems(CfdFvOptions.FV_OPTION_NAMES)
+        self.form.comboFvOptionType.setCurrentIndex(
+            indexOrDefault(CfdFvOptions.FV_OPTION_NAMES, self.obj.FvOptionType, 0)
+        )
 
         setQuantity(self.form.inputDirectionX, str(self.obj.Direction.x))
         setQuantity(self.form.inputDirectionY, str(self.obj.Direction.y))
@@ -45,6 +51,7 @@ class TaskPanelCfdFvOptions:
 
         storeIfChanged(self.obj, 'SourceName', self.form.inputSourceName.text())
         storeIfChanged(self.obj, 'Active', self.form.checkActive.isChecked())
+        storeIfChanged(self.obj, 'FvOptionType', self.form.comboFvOptionType.currentText())
 
         direction = FreeCAD.Vector(
             self._input_value(self.form.inputDirectionX, '1'),

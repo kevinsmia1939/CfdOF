@@ -55,6 +55,8 @@ FoamFile
 %}
 
 %{%(fvOptions%)
+%{%(fvOptions/%(0%)/FvOptionType%)
+%:meanVelocityForce
 %(0%)
 {
     type            meanVelocityForce;
@@ -76,6 +78,7 @@ FoamFile
     }
 }
 
+%}
 %}
 %{%(scalarTransportFunctionsEnabled%)
 %:True

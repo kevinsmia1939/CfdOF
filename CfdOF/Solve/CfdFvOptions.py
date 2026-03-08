@@ -14,6 +14,10 @@ from CfdOF.CfdTools import addObjectProperty
 
 QT_TRANSLATE_NOOP = FreeCAD.Qt.QT_TRANSLATE_NOOP
 
+FV_OPTION_NAMES = [
+    "meanVelocityForce",
+]
+
 
 def makeCfdFvOptions(name="FvOptions"):
     obj = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", name)
@@ -67,6 +71,15 @@ class CfdFvOptions:
             "App::PropertyBool",
             "fvOptions",
             QT_TRANSLATE_NOOP("App::Property", "Activate the source term"),
+        )
+
+        addObjectProperty(
+            obj,
+            "FvOptionType",
+            FV_OPTION_NAMES,
+            "App::PropertyEnumeration",
+            "fvOptions",
+            QT_TRANSLATE_NOOP("App::Property", "Type of fvOption source"),
         )
 
         addObjectProperty(
