@@ -26,7 +26,7 @@ class CommandCfdMeanVelocityForce:
         pass
 
     def GetResources(self):
-        icon_path = os.path.join(CfdTools.getModulePath(), "Gui", "Icons", "solver.svg")
+        icon_path = os.path.join(CfdTools.getModulePath(), "Gui", "Icons", "meanvelocityforce.svg")
         return {
             'Pixmap': icon_path,
             'MenuText': QT_TRANSLATE_NOOP("CfdOF_MeanVelocityForce", "Mean velocity force"),
@@ -104,7 +104,7 @@ class ViewProviderCfdMeanVelocityForce:
         vobj.Proxy = self
 
     def getIcon(self):
-        icon_path = os.path.join(CfdTools.getModulePath(), "Gui", "Icons", "solver.svg")
+        icon_path = os.path.join(CfdTools.getModulePath(), "Gui", "Icons", "meanvelocityforce.svg")
         return icon_path
 
     def attach(self, vobj):
