@@ -50,6 +50,23 @@ FoamFile
 %}
 %}
 
+%{%(meanVelocityForceEnabled%)
+%:True
+momentumSource
+{
+    type            meanVelocityForce;
+    active          yes;
+    meanVelocityForceCoeffs
+    {
+        selectionMode   all;
+        fields          (U);
+        direction       (%(meanVelocityForce/Direction%));
+        Ubar            (%(meanVelocityForce/Ubar%));
+        relaxation      %(meanVelocityForce/Relaxation%);
+    }
+}
+
+%}
 //************************************************************************ //
 %}
 %}
