@@ -194,7 +194,11 @@ class CfdCaseWriterFoam:
 
         self.settings['fvOptionsFilePresent'] = (
             self.settings['fvOptionsPresent'] or
-            self.settings['scalarTransportFunctionsEnabled']
+            self.settings['scalarTransportFunctionsEnabled'] or
+            (
+                self.settings['porousZonesPresent'] and
+                self.settings['solver']['SolverName'] != 'porousSimpleFoam'
+            )
         )
 
         self.settings['createPatchesFromSnappyBaffles'] = False
