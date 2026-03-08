@@ -229,12 +229,7 @@ class TemplateBuilder(object):
                         raise ValueError("File name parameter " + filename_param + "evaluates to nothing")
                 processed = self.process(replace, filename if filename else curr_file, [v] + params)
                 if filename:
-                    # Allow inline brace closures like "%};" without treating ';' as a filename.
-                    # Such punctuation should be emitted literally after processed content.
-                    if filename.strip() == ';':
-                        replacement += processed + ';'
-                    else:
-                        self.writeToFile(filename, processed)
+                    self.writeToFile(filename, processed)
                 else:
                     replacement += processed
             replace = replacement
