@@ -211,7 +211,7 @@ class TemplateBuilder(object):
             keys = replace[:delim]
             # Make any replacements in keys
             keys = self.process(keys, curr_file, params)
-            keys = keys.split(' ')
+            keys = keys.split()
             replace = replace[delim+1:]
             # Extract trailing filename parameter if any
             trailing_nl = self.findAtCurrentLevel(contents, '\n', end+2)

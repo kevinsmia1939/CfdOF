@@ -1,8 +1,5 @@
-%{%(porousZonesPresent%)
+%{%(fvOptionsFilePresent%)
 %:True
-%{%(solver/SolverName%)
-%:porousSimpleFoam
-%:default
 %[_header%]
 FoamFile
 {
@@ -13,43 +10,55 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-%{%(porousZones%)
-%{%(porousZones/%(0%)/PartNameList%)
+%{%(fvOptions%)
 %(0%)
 {
-    type            explicitPorositySource;
+    type            meanVelocityForce;
+    selectionMode   all;
+%{%(fvOptions/%(0%)/Active%)
+%:True
     active          yes;
+%:default
+    active          no;
+%}
 
-    explicitPorositySourceCoeffs
+    meanVelocityForceCoeffs
     {
-        selectionMode   cellZone;
-        cellZone        %(0%);
+        selectionMode   all;
+        fields          (U);
+        direction       (%(fvOptions/%(0%)/DirectionTuple%));
+        Ubar            (%(fvOptions/%(0%)/UbarTuple%));
+        relaxation      %(fvOptions/%(0%)/Relaxation%);
+    }
+}
 
-        type            DarcyForchheimer;
+%}
+%{%(scalarTransportFunctionsEnabled%)
+%:True
+%{%(scalarTransportFunctions%)
+%(0%)
+{
+    type            semiImplicitSource;
+    selectionMode   points;
+    points
+    (
+        ( %(scalarTransportFunctions/%(0%)/InjectionPoint%) )
+    );
 
-        DarcyForchheimerCoeffs
+    volumeMode      absolute;
+    sources
+    {
+        %(scalarTransportFunctions/%(0%)/FieldName%)
         {
-            d   d [0 -2 0 0 0 0 0] (%(porousZones/%(1%)/D%));
-            f   f [0 -1 0 0 0 0 0] (%(porousZones/%(1%)/F%));
-
-            coordinateSystem
-            {
-                type    cartesian;
-                origin  (0 0 0);
-                coordinateRotation
-                {
-                    type    axesRotation;
-                    e1      (%(porousZones/%(1%)/e1%));
-                    e3      (%(porousZones/%(1%)/e3%));
-                }
-            }
+            explicit %(scalarTransportFunctions/%(0%)/InjectionRate%);
+            implicit 0;
         }
     }
+
 }
 
 %}
 %}
 
 //************************************************************************ //
-%}
 %}
