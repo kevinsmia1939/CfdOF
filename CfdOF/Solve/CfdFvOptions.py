@@ -19,7 +19,7 @@ FV_OPTION_NAMES = [
 ]
 
 
-def makeCfdFvOptions(name="FvOptions"):
+def makeCfdFvOptions(name="MeanVelocityForce"):
     obj = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", name)
     CfdFvOptions(obj)
     if FreeCAD.GuiUp:
@@ -31,14 +31,14 @@ class CommandCfdFvOptions:
     def GetResources(self):
         icon_path = os.path.join(CfdTools.getModulePath(), "Gui", "Icons", "fvoptions.svg")
         return {'Pixmap': icon_path,
-                'MenuText': QT_TRANSLATE_NOOP("CfdOF_FvOptions", "Cfd fvOptions"),
-                'ToolTip': QT_TRANSLATE_NOOP("CfdOF_FvOptions", "Create a fvOptions")}
+                'MenuText': QT_TRANSLATE_NOOP("CfdOF_FvOptions", "Mean velocity force"),
+                'ToolTip': QT_TRANSLATE_NOOP("CfdOF_FvOptions", "Create a mean velocity force")}
 
     def IsActive(self):
         return CfdTools.getActiveAnalysis() is not None
 
     def Activated(self):
-        FreeCAD.ActiveDocument.openTransaction("Create CfdFvOptions object")
+        FreeCAD.ActiveDocument.openTransaction("Create mean velocity force object")
         FreeCADGui.doCommand("")
         FreeCADGui.doCommand("from CfdOF.Solve import CfdFvOptions")
         FreeCADGui.doCommand("from CfdOF import CfdTools")
@@ -61,7 +61,7 @@ class CfdFvOptions:
             "momentumSource",
             "App::PropertyString",
             "fvOptions",
-            QT_TRANSLATE_NOOP("App::Property", "Name of the fvOptions source"),
+            QT_TRANSLATE_NOOP("App::Property", "Name of the mean velocity force source"),
         )
 
         addObjectProperty(
@@ -79,7 +79,7 @@ class CfdFvOptions:
             FV_OPTION_NAMES,
             "App::PropertyEnumeration",
             "fvOptions",
-            QT_TRANSLATE_NOOP("App::Property", "Type of fvOption source"),
+            QT_TRANSLATE_NOOP("App::Property", "Type of mean velocity force source"),
         )
 
         addObjectProperty(
@@ -163,7 +163,7 @@ class ViewProviderCfdFvOptions:
     def setEdit(self, vobj, mode):
         analysis_object = CfdTools.getParentAnalysisObject(self.Object)
         if analysis_object is None:
-            CfdTools.cfdErrorBox("fvOptions object must have a parent analysis object")
+            CfdTools.cfdErrorBox("Mean velocity force object must have a parent analysis object")
             return False
 
         from CfdOF.Solve import TaskPanelCfdFvOptions
