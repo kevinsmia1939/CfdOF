@@ -11,11 +11,10 @@ FoamFile
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 %{%(fvOptions%)
-%{%(fvOptions/%(0%)/SourceName%)
 %(0%)
 {
     type            meanVelocityForce;
-%{%(fvOptions/%(1%)/Active%)
+%{%(fvOptions/%(0%)/Active%)
 %:True
     active          yes;
 %:default
@@ -26,13 +25,12 @@ FoamFile
     {
         selectionMode   all;
         fields          (U);
-        direction       (%(fvOptions/%(1%)/DirectionTuple%));
-        Ubar            (%(fvOptions/%(1%)/UbarTuple%));
-        relaxation      %(fvOptions/%(1%)/Relaxation%);
+        direction       (%(fvOptions/%(0%)/DirectionTuple%));
+        Ubar            (%(fvOptions/%(0%)/UbarTuple%));
+        relaxation      %(fvOptions/%(0%)/Relaxation%);
     }
 }
 
-%}
 %}
 %{%(porousZonesPresent%)
 %:True
