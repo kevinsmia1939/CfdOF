@@ -117,6 +117,7 @@ class CfdCaseWriterFoam:
             'scalarTransportFunctionsEnabled': False,
             'fvOptions': dict((fv.Label, CfdTools.propsToDict(fv)) for fv in self.fv_options_objs),
             'fvOptionsPresent': False,
+            'fvOptionsFilePresent': False,
             'dynamicMesh': {},
             'dynamicMeshEnabled': False,
             'MovingMeshRegions': {},
@@ -190,6 +191,11 @@ class CfdCaseWriterFoam:
         if self.dynamic_mesh_refinement_obj:
             cfdMessage('Dynamic mesh adaptation rule present\n')
             self.processDynamicMeshRefinement()
+
+        self.settings['fvOptionsFilePresent'] = (
+            self.settings['fvOptionsPresent'] or
+            self.settings['scalarTransportFunctionsEnabled']
+        )
 
         self.settings['createPatchesFromSnappyBaffles'] = False
         self.settings['createPatchesForPeriodics'] = False

@@ -1,4 +1,4 @@
-%{%(fvOptionsPresent%) %(porousZonesPresent%)
+%{%(fvOptionsFilePresent%)
 %:True
 %[_header%]
 FoamFile
@@ -11,11 +11,10 @@ FoamFile
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 %{%(fvOptions%)
-%{%(fvOptions/%(0%)/SourceName%)
 %(0%)
 {
     type            meanVelocityForce;
-%{%(fvOptions/%(1%)/Active%)
+%{%(fvOptions/%(0%)/Active%)
 %:True
     active          yes;
 %:default
@@ -26,56 +25,37 @@ FoamFile
     {
         selectionMode   all;
         fields          (U);
-        direction       (%(fvOptions/%(1%)/DirectionTuple%));
-        Ubar            (%(fvOptions/%(1%)/UbarTuple%));
-        relaxation      %(fvOptions/%(1%)/Relaxation%);
+        direction       (%(fvOptions/%(0%)/DirectionTuple%));
+        Ubar            (%(fvOptions/%(0%)/UbarTuple%));
+        relaxation      %(fvOptions/%(0%)/Relaxation%);
     }
 }
 
 %}
-%}
-%{%(porousZonesPresent%)
+%{%(scalarTransportFunctionsEnabled%)
 %:True
-%{%(solver/SolverName%)
-%:porousSimpleFoam
-%:default
-
-%{%(porousZones%)
-%{%(porousZones/%(0%)/PartNameList%)
+%{%(scalarTransportFunctions%)
 %(0%)
 {
-    type            explicitPorositySource;
-    active          yes;
+    type            semiImplicitSource;
+    selectionMode   points;
+    points
+    (
+        ( %(scalarTransportFunctions/%(0%)/InjectionPoint%) )
+    );
 
-    explicitPorositySourceCoeffs
+    volumeMode      absolute;
+    sources
     {
-        selectionMode   cellZone;
-        cellZone        %(0%);
-
-        type            DarcyForchheimer;
-
-        DarcyForchheimerCoeffs
+        %(scalarTransportFunctions/%(0%)/FieldName%)
         {
-            d   d [0 -2 0 0 0 0 0] (%(porousZones/%(1%)/D%));
-            f   f [0 -1 0 0 0 0 0] (%(porousZones/%(1%)/F%));
-
-            coordinateSystem
-            {
-                type    cartesian;
-                origin  (0 0 0);
-                coordinateRotation
-                {
-                    type    axesRotation;
-                    e1      (%(porousZones/%(1%)/e1%));
-                    e3      (%(porousZones/%(1%)/e3%));
-                }
-            }
+            explicit %(scalarTransportFunctions/%(0%)/InjectionRate%);
+            implicit 0;
         }
     }
+
 }
 
-%}
-%}
 %}
 %}
 
