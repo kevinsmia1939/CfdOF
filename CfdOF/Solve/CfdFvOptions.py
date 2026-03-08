@@ -28,7 +28,7 @@ class CommandCfdFvOptions:
         icon_path = os.path.join(CfdTools.getModulePath(), "Gui", "Icons", "fvoptions.svg")
         return {'Pixmap': icon_path,
                 'MenuText': QT_TRANSLATE_NOOP("CfdOF_FvOptions", "Cfd fvOptions"),
-                'ToolTip': QT_TRANSLATE_NOOP("CfdOF_FvOptions", "Create a fvOptions momentum source")}
+                'ToolTip': QT_TRANSLATE_NOOP("CfdOF_FvOptions", "Create a fvOptions")}
 
     def IsActive(self):
         return CfdTools.getActiveAnalysis() is not None
