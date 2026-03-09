@@ -1,8 +1,5 @@
 %{%(fvOptionsPresent%)
 %:True
-%{%(solver/SolverName%)
-%:porousSimpleFoam
-%:default
 %[_header%]
 FoamFile
 {
@@ -15,6 +12,9 @@ FoamFile
 
 %{%(porousZonesPresent%)
 %:True
+%{%(solver/SolverName%)
+%:porousSimpleFoam
+%:default
 %{%(porousZones%)
 %{%(porousZones/%(0%)/PartNameList%)
 %(0%)
@@ -52,6 +52,7 @@ FoamFile
 %}
 %}
 %}
+%}
 
 %{%(meanVelocityForceEnabled%)
 %:True
@@ -71,5 +72,4 @@ momentumSource
 
 %}
 //************************************************************************ //
-%}
 %}
