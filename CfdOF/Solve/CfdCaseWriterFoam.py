@@ -117,7 +117,7 @@ class CfdCaseWriterFoam:
             'scalarTransportFunctionsEnabled': False,
             'meanVelocityForce': CfdTools.propsToDict(self.mean_velocity_force_obj) if self.mean_velocity_force_obj else {},
             'meanVelocityForceEnabled': self.mean_velocity_force_obj is not None,
-            'fvOptionsPresent': self.mean_velocity_force_obj is not None,
+            'fvOptionsPresent': (self.mean_velocity_force_obj is not None) or (len(self.porous_zone_objs) > 0),
             'dynamicMesh': {},
             'dynamicMeshEnabled': False,
             'MovingMeshRegions': {},
