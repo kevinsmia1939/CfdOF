@@ -117,7 +117,7 @@ class CfdCaseWriterFoam:
             'scalarTransportFunctionsEnabled': False,
             'meanVelocityForce': CfdTools.propsToDict(self.mean_velocity_force_obj) if self.mean_velocity_force_obj else {},
             'meanVelocityForceEnabled': self.mean_velocity_force_obj is not None,
-            'fvOptionsPresent': (self.mean_velocity_force_obj is not None) or (len(self.porous_zone_objs) > 0),
+            'fvOptionsPresent': (self.mean_velocity_force_obj is not None),
             'dynamicMesh': {},
             'dynamicMeshEnabled': False,
             'MovingMeshRegions': {},
@@ -691,7 +691,6 @@ class CfdCaseWriterFoam:
     def processPorousZoneProperties(self):
         settings = self.settings
         settings['porousZonesPresent'] = True
-        settings['fvOptionsPresent'] = True
         porousZoneSettings = settings['porousZones']
         for po in self.porous_zone_objs:
             pd = {'PartNameList': tuple(r[0].Name for r in po.ShapeRefs)}
