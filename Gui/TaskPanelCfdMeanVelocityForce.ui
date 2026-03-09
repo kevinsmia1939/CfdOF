@@ -15,44 +15,56 @@
       <item row="0" column="0">
        <widget class="QLabel" name="labelDirection">
         <property name="text">
-         <string>Direction (X,Y,Z)</string>
+         <string>Direction</string>
         </property>
        </widget>
       </item>
       <item row="0" column="1">
-       <widget class="QLineEdit" name="inputDirectionX"/>
+       <widget class="Gui::InputField" name="inputDirectionX">
+        <property name="unit" stdset="0">
+         <string notr="true">1</string>
+        </property>
+       </widget>
       </item>
       <item row="0" column="2">
-       <widget class="QLineEdit" name="inputDirectionY"/>
+       <widget class="Gui::InputField" name="inputDirectionY">
+        <property name="unit" stdset="0">
+         <string notr="true">1</string>
+        </property>
+       </widget>
       </item>
       <item row="0" column="3">
-       <widget class="QLineEdit" name="inputDirectionZ"/>
+       <widget class="Gui::InputField" name="inputDirectionZ">
+        <property name="unit" stdset="0">
+         <string notr="true">1</string>
+        </property>
+       </widget>
       </item>
       <item row="1" column="0">
        <widget class="QLabel" name="labelUbar">
         <property name="text">
-         <string>Ubar (X,Y,Z)</string>
+         <string>Ubar (mm/s)</string>
         </property>
        </widget>
       </item>
       <item row="1" column="1">
-       <widget class="QLineEdit" name="inputUbarX">
-        <property name="placeholderText">
-         <string>mm/s</string>
+       <widget class="Gui::InputField" name="inputUbarX">
+        <property name="unit" stdset="0">
+         <string notr="true">mm/s</string>
         </property>
        </widget>
       </item>
       <item row="1" column="2">
-       <widget class="QLineEdit" name="inputUbarY">
-        <property name="placeholderText">
-         <string>mm/s</string>
+       <widget class="Gui::InputField" name="inputUbarY">
+        <property name="unit" stdset="0">
+         <string notr="true">mm/s</string>
         </property>
        </widget>
       </item>
       <item row="1" column="3">
-       <widget class="QLineEdit" name="inputUbarZ">
-        <property name="placeholderText">
-         <string>mm/s</string>
+       <widget class="Gui::InputField" name="inputUbarZ">
+        <property name="unit" stdset="0">
+         <string notr="true">mm/s</string>
         </property>
        </widget>
       </item>
@@ -64,7 +76,11 @@
        </widget>
       </item>
       <item row="2" column="1" colspan="3">
-       <widget class="QLineEdit" name="inputRelaxation"/>
+       <widget class="Gui::InputField" name="inputRelaxation">
+        <property name="unit" stdset="0">
+         <string notr="true">1</string>
+        </property>
+       </widget>
       </item>
      </layout>
     </widget>
@@ -84,6 +100,13 @@
    </item>
   </layout>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>Gui::InputField</class>
+   <extends>QLineEdit</extends>
+   <header>Gui/InputField.h</header>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections/>
 </ui>
