@@ -703,26 +703,30 @@ class CfdCaseWriterFoam:
         return refs
 
     def exportZoneStlSurfaces(self):
-        zone_refs = [r for zo in self.zone_objs for r in zo.ShapeRefs]
-        zone_refs += self.getCellZoneShapeRefs()
-
-        # Avoid duplicate exports when the same solid is referenced by multiple objects
         exported_names = set()
-        for r in zone_refs:
-            sel_obj = r[0]
-            if sel_obj.Name in exported_names:
-                continue
-            exported_names.add(sel_obj.Name)
 
-            path = os.path.join(self.working_dir,
-                                self.solver_obj.InputCaseName,
-                                "constant",
-                                "triSurface")
-            if not os.path.exists(path):
-                os.makedirs(path)
-            shape = sel_obj.Shape
-            CfdMeshTools.writeSurfaceMeshFromShape(shape, path, sel_obj.Name, self.mesh_obj)
-            print("Successfully wrote stl surface\n")
+        for zo in self.zone_objs:
+            for r in zo.ShapeRefs:
+                self.exportZoneStlSurface(r, exported_names)
+
+        for r in self.getCellZoneShapeRefs():
+            self.exportZoneStlSurface(r, exported_names)
+
+    def exportZoneStlSurface(self, shape_ref, exported_names):
+        sel_obj = shape_ref[0]
+        if sel_obj.Name in exported_names:
+            return
+        exported_names.add(sel_obj.Name)
+
+        path = os.path.join(self.working_dir,
+                            self.solver_obj.InputCaseName,
+                            "constant",
+                            "triSurface")
+        if not os.path.exists(path):
+            os.makedirs(path)
+        shape = sel_obj.Shape
+        CfdMeshTools.writeSurfaceMeshFromShape(shape, path, sel_obj.Name, self.mesh_obj)
+        print("Successfully wrote stl surface\n")
 
     def processPorousZoneProperties(self):
         settings = self.settings
