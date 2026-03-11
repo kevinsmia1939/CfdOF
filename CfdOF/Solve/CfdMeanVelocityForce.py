@@ -13,6 +13,9 @@ from CfdOF.CfdTools import addObjectProperty
 QT_TRANSLATE_NOOP = FreeCAD.Qt.QT_TRANSLATE_NOOP
 
 
+SELECTION_MODES = ["all", "cellZone"]
+
+
 def makeCfdMeanVelocityForce(name="MeanVelocityForce"):
     obj = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", name)
     CfdMeanVelocityForce(obj)
@@ -78,6 +81,22 @@ class CfdMeanVelocityForce:
             "App::PropertyFloat",
             "Mean velocity force",
             QT_TRANSLATE_NOOP("App::Property", "Relaxation factor for mean velocity force"),
+        )
+        addObjectProperty(
+            obj,
+            "SelectionMode",
+            SELECTION_MODES,
+            "App::PropertyEnumeration",
+            "Mean velocity force",
+            QT_TRANSLATE_NOOP("App::Property", "Selection mode for mean velocity force"),
+        )
+        addObjectProperty(
+            obj,
+            "CellZone",
+            "",
+            "App::PropertyString",
+            "Mean velocity force",
+            QT_TRANSLATE_NOOP("App::Property", "Cell zone label used when selection mode is cellZone"),
         )
 
     def onDocumentRestored(self, obj):

@@ -59,11 +59,19 @@ FoamFile
 momentumSource
 {
     type            meanVelocityForce;
-    selectionMode   all;
+    selectionMode   %(meanVelocityForce/SelectionMode%);
+%{%(meanVelocityForce/SelectionMode%)
+%:cellZone
+    cellZone        %(meanVelocityForce/CellZone%);
+%}
     active          yes;
     meanVelocityForceCoeffs
     {
-        selectionMode   all;
+        selectionMode   %(meanVelocityForce/SelectionMode%);
+%{%(meanVelocityForce/SelectionMode%)
+%:cellZone
+        cellZone        %(meanVelocityForce/CellZone%);
+%}
         fields          (U);
         direction       (%(meanVelocityForce/Direction%));
         Ubar            (%(meanVelocityForce/Ubar%));

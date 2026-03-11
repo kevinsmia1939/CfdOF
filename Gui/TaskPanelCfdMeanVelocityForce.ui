@@ -82,6 +82,26 @@
         </property>
        </widget>
       </item>
+      <item row="3" column="0">
+       <widget class="QLabel" name="labelSelectionMode">
+        <property name="text">
+         <string>Selection mode</string>
+        </property>
+       </widget>
+      </item>
+      <item row="3" column="1" colspan="3">
+       <widget class="QComboBox" name="comboSelectionMode"/>
+      </item>
+      <item row="4" column="0">
+       <widget class="QLabel" name="labelCellZone">
+        <property name="text">
+         <string>Cell zone</string>
+        </property>
+       </widget>
+      </item>
+      <item row="4" column="1" colspan="3">
+       <widget class="QLineEdit" name="inputCellZone"/>
+      </item>
      </layout>
     </widget>
    </item>
