@@ -138,11 +138,14 @@ class CfdCaseWriterFoam:
             'runChangeDictionary': False
             }
 
-        if self.mean_velocity_force_obj and self.mean_velocity_force_obj.SelectionMode == 'cellZone':
-            mean_velocity_force_refs = tuple(r[0].Name for r in self.mean_velocity_force_obj.ShapeRefs)
-            if not mean_velocity_force_refs:
-                raise RuntimeError("Mean velocity force selection mode cellZone requires at least one selected solid")
-            self.settings['zones']['MeanVelocityForceZone'] = {'PartNameList': mean_velocity_force_refs}
+        for source in self.getCellZoneSelectionSources():
+            source_refs = tuple(r[0].Name for r in source.ShapeRefs)
+            if not source_refs:
+                raise RuntimeError(
+                    "{} selection mode cellZone requires at least one selected solid".format(source.Label)
+                )
+            zone_name = source.CellZone if source.CellZone else source.Label
+            self.settings['zones'][zone_name] = {'PartNameList': source_refs}
             self.settings['zonesPresent'] = True
 
 
@@ -681,21 +684,44 @@ class CfdCaseWriterFoam:
             settings['dynamicMesh']['Type'] = 'interface'
 
     # Zones
+    def getCellZoneSelectionSources(self):
+        """Objects that define a cell zone from selected solid references."""
+        sources = []
+        for obj in self.analysis_obj.Group:
+            if not hasattr(obj, 'PropertiesList'):
+                continue
+            required = ['SelectionMode', 'ShapeRefs', 'CellZone']
+            if all(prop in obj.PropertiesList for prop in required) and obj.SelectionMode == 'cellZone':
+                sources.append(obj)
+        return sources
+
+    def getCellZoneShapeRefs(self):
+        """Collect ShapeRefs from all cell-zone-capable sources."""
+        refs = []
+        for source in self.getCellZoneSelectionSources():
+            refs += list(source.ShapeRefs)
+        return refs
+
     def exportZoneStlSurfaces(self):
         zone_refs = [r for zo in self.zone_objs for r in zo.ShapeRefs]
-        if self.mean_velocity_force_obj and self.mean_velocity_force_obj.SelectionMode == 'cellZone':
-            zone_refs += list(self.mean_velocity_force_obj.ShapeRefs)
+        zone_refs += self.getCellZoneShapeRefs()
 
+        # Avoid duplicate exports when the same solid is referenced by multiple objects
+        exported_names = set()
         for r in zone_refs:
+            sel_obj = r[0]
+            if sel_obj.Name in exported_names:
+                continue
+            exported_names.add(sel_obj.Name)
+
             path = os.path.join(self.working_dir,
                                 self.solver_obj.InputCaseName,
                                 "constant",
                                 "triSurface")
             if not os.path.exists(path):
                 os.makedirs(path)
-            sel_obj = r[0]
             shape = sel_obj.Shape
-            CfdMeshTools.writeSurfaceMeshFromShape(shape, path, r[0].Name, self.mesh_obj)
+            CfdMeshTools.writeSurfaceMeshFromShape(shape, path, sel_obj.Name, self.mesh_obj)
             print("Successfully wrote stl surface\n")
 
     def processPorousZoneProperties(self):
