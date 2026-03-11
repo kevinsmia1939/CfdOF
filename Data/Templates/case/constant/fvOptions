@@ -54,31 +54,33 @@ FoamFile
 %}
 %}
 
-%{%(meanVelocityForceEnabled%)
+%{%(meanVelocityForcesEnabled%)
 %:True
-momentumSource
+%{%(meanVelocityForces%)
+%(0%)
 {
     type            meanVelocityForce;
-    selectionMode   %(meanVelocityForce/SelectionMode%);
-%{%(meanVelocityForce/SelectionMode%)
+    selectionMode   %(meanVelocityForces/%(0%)/SelectionMode%);
+%{%(meanVelocityForces/%(0%)/SelectionMode%)
 %:cellZone
-    cellZone        %(meanVelocityForce/CellZone%);
+    cellZone        %(meanVelocityForces/%(0%)/CellZone%);
 %}
     active          yes;
     meanVelocityForceCoeffs
     {
-        selectionMode   %(meanVelocityForce/SelectionMode%);
-%{%(meanVelocityForce/SelectionMode%)
+        selectionMode   %(meanVelocityForces/%(0%)/SelectionMode%);
+%{%(meanVelocityForces/%(0%)/SelectionMode%)
 %:cellZone
-        cellZone        %(meanVelocityForce/CellZone%);
+        cellZone        %(meanVelocityForces/%(0%)/CellZone%);
 %}
         fields          (U);
-        direction       (%(meanVelocityForce/Direction%));
-        Ubar            (%(meanVelocityForce/Ubar%));
-        relaxation      %(meanVelocityForce/Relaxation%);
+        direction       (%(meanVelocityForces/%(0%)/Direction%));
+        Ubar            (%(meanVelocityForces/%(0%)/Ubar%));
+        relaxation      %(meanVelocityForces/%(0%)/Relaxation%);
     }
 }
 
+%}
 %}
 //************************************************************************ //
 %}
