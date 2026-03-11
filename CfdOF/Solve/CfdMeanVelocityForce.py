@@ -29,7 +29,7 @@ class CommandCfdMeanVelocityForce:
         pass
 
     def GetResources(self):
-        icon_path = os.path.join(CfdTools.getModulePath(), "Gui", "Icons", "meanvelocityforce.svg")
+        icon_path = os.path.join(CfdTools.getModulePath(), "Gui", "Icons", "meanvelocityforce_cellzone.svg")
         return {
             'Pixmap': icon_path,
             'MenuText': QT_TRANSLATE_NOOP("CfdOF_MeanVelocityForce", "Mean velocity force"),
@@ -84,6 +84,14 @@ class CfdMeanVelocityForce:
         )
         addObjectProperty(
             obj,
+            "ShapeRefs",
+            [],
+            "App::PropertyLinkSubListGlobal",
+            "Mean velocity force",
+            QT_TRANSLATE_NOOP("App::Property", "Solid objects used to define a cellZone"),
+        )
+        addObjectProperty(
+            obj,
             "SelectionMode",
             SELECTION_MODES,
             "App::PropertyEnumeration",
@@ -121,10 +129,10 @@ class CfdMeanVelocityForce:
 class ViewProviderCfdMeanVelocityForce:
     def __init__(self, vobj):
         vobj.Proxy = self
+        self.taskd = None
 
     def getIcon(self):
-        icon_path = os.path.join(CfdTools.getModulePath(), "Gui", "Icons", "meanvelocityforce.svg")
-        icon_path = os.path.join(CfdTools.getModulePath(), "Gui", "Icons", "solver.svg")
+        icon_path = os.path.join(CfdTools.getModulePath(), "Gui", "Icons", "meanvelocityforce_cellzone.svg")
         return icon_path
 
     def attach(self, vobj):
@@ -160,12 +168,15 @@ class ViewProviderCfdMeanVelocityForce:
         from CfdOF.Solve import TaskPanelCfdMeanVelocityForce
         import importlib
         importlib.reload(TaskPanelCfdMeanVelocityForce)
-        taskd = TaskPanelCfdMeanVelocityForce.TaskPanelCfdMeanVelocityForce(self.Object)
-        taskd.obj = vobj.Object
-        FreeCADGui.Control.showDialog(taskd)
+        self.taskd = TaskPanelCfdMeanVelocityForce.TaskPanelCfdMeanVelocityForce(self.Object)
+        self.taskd.obj = vobj.Object
+        FreeCADGui.Control.showDialog(self.taskd)
         return True
 
     def unsetEdit(self, vobj, mode):
+        if self.taskd:
+            self.taskd.closing()
+            self.taskd = None
         FreeCADGui.Control.closeDialog()
         return
 

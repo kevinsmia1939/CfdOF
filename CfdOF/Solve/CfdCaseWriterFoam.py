@@ -138,6 +138,13 @@ class CfdCaseWriterFoam:
             'runChangeDictionary': False
             }
 
+        if self.mean_velocity_force_obj and self.mean_velocity_force_obj.SelectionMode == 'cellZone':
+            mean_velocity_force_refs = tuple(r[0].Name for r in self.mean_velocity_force_obj.ShapeRefs)
+            if not mean_velocity_force_refs:
+                raise RuntimeError("Mean velocity force selection mode cellZone requires at least one selected solid")
+            self.settings['zones']['MeanVelocityForceZone'] = {'PartNameList': mean_velocity_force_refs}
+            self.settings['zonesPresent'] = True
+
 
         mr_objs = CfdTools.getMeshRefinementObjs(self.mesh_obj)
         for mr_id, mr_obj in enumerate(mr_objs):
@@ -675,18 +682,21 @@ class CfdCaseWriterFoam:
 
     # Zones
     def exportZoneStlSurfaces(self):
-        for zo in self.zone_objs:
-            for r in zo.ShapeRefs:
-                path = os.path.join(self.working_dir,
-                                    self.solver_obj.InputCaseName,
-                                    "constant",
-                                    "triSurface")
-                if not os.path.exists(path):
-                    os.makedirs(path)
-                sel_obj = r[0]
-                shape = sel_obj.Shape
-                CfdMeshTools.writeSurfaceMeshFromShape(shape, path, r[0].Name, self.mesh_obj)
-                print("Successfully wrote stl surface\n")
+        zone_refs = [r for zo in self.zone_objs for r in zo.ShapeRefs]
+        if self.mean_velocity_force_obj and self.mean_velocity_force_obj.SelectionMode == 'cellZone':
+            zone_refs += list(self.mean_velocity_force_obj.ShapeRefs)
+
+        for r in zone_refs:
+            path = os.path.join(self.working_dir,
+                                self.solver_obj.InputCaseName,
+                                "constant",
+                                "triSurface")
+            if not os.path.exists(path):
+                os.makedirs(path)
+            sel_obj = r[0]
+            shape = sel_obj.Shape
+            CfdMeshTools.writeSurfaceMeshFromShape(shape, path, r[0].Name, self.mesh_obj)
+            print("Successfully wrote stl surface\n")
 
     def processPorousZoneProperties(self):
         settings = self.settings
