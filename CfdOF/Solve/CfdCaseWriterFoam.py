@@ -60,7 +60,7 @@ class CfdCaseWriterFoam:
             raise RuntimeError("No initial conditions object was found in analysis " + analysis_obj.Label)
         self.reporting_functions = CfdTools.getReportingFunctionsGroup(analysis_obj)
         self.scalar_transport_objs = CfdTools.getScalarTransportFunctionsGroup(analysis_obj)
-        self.mean_velocity_force_obj = CfdTools.getMeanVelocityForceObject(analysis_obj)
+        self.mean_velocity_force_objs = CfdTools.getMeanVelocityForceObjects(analysis_obj)
         self.porous_zone_objs = CfdTools.getPorousZoneObjects(analysis_obj)
         self.initialisation_zone_objs = CfdTools.getInitialisationZoneObjects(analysis_obj)
         self.zone_objs = CfdTools.getZoneObjects(analysis_obj)
@@ -115,9 +115,9 @@ class CfdCaseWriterFoam:
             'reportingFunctionsEnabled': False,
             'scalarTransportFunctions': dict((st.Label, CfdTools.propsToDict(st)) for st in self.scalar_transport_objs),
             'scalarTransportFunctionsEnabled': False,
-            'meanVelocityForce': CfdTools.propsToDict(self.mean_velocity_force_obj) if self.mean_velocity_force_obj else {},
-            'meanVelocityForceEnabled': self.mean_velocity_force_obj is not None,
-            'fvOptionsPresent': (self.mean_velocity_force_obj is not None),
+            'meanVelocityForces': dict((mvf.Name, CfdTools.propsToDict(mvf)) for mvf in self.mean_velocity_force_objs),
+            'meanVelocityForcesEnabled': len(self.mean_velocity_force_objs) > 0,
+            'fvOptionsPresent': (len(self.mean_velocity_force_objs) > 0),
             'dynamicMesh': {},
             'dynamicMeshEnabled': False,
             'MovingMeshRegions': {},
@@ -137,6 +137,19 @@ class CfdCaseWriterFoam:
             'system': {},
             'runChangeDictionary': False
             }
+
+        for mean_velocity_force in self.mean_velocity_force_objs:
+            if mean_velocity_force.SelectionMode != 'cellZone':
+                continue
+
+            source_refs = tuple(r[0].Name for r in mean_velocity_force.ShapeRefs)
+            if not source_refs:
+                raise RuntimeError(
+                    "{} selection mode cellZone requires at least one selected solid".format(mean_velocity_force.Label)
+                )
+            zone_name = mean_velocity_force.CellZone if mean_velocity_force.CellZone else mean_velocity_force.Label
+            self.settings['zones'][zone_name] = {'PartNameList': source_refs}
+            self.settings['zonesPresent'] = True
 
 
         mr_objs = CfdTools.getMeshRefinementObjs(self.mesh_obj)
@@ -172,6 +185,7 @@ class CfdCaseWriterFoam:
         CfdTools.clearCase(self.case_folder)
 
         self.exportZoneStlSurfaces()
+        self.exportMeanVelocityForceCellZoneStlSurfaces()
         if self.porous_zone_objs:
             self.processPorousZoneProperties()
         self.processInitialisationZoneProperties()
@@ -674,19 +688,55 @@ class CfdCaseWriterFoam:
             settings['dynamicMesh']['Type'] = 'interface'
 
     # Zones
+    def getMeanVelocityForceCellZoneShapeRefs(self):
+        """Collect ShapeRefs from mean velocity force objects using cellZone selection."""
+        refs = []
+        for mean_velocity_force in self.mean_velocity_force_objs:
+            if mean_velocity_force.SelectionMode == 'cellZone':
+                refs += list(mean_velocity_force.ShapeRefs)
+        return refs
+
     def exportZoneStlSurfaces(self):
+        exported_names = set()
+
         for zo in self.zone_objs:
             for r in zo.ShapeRefs:
+                sel_obj = r[0]
+                if sel_obj.Name in exported_names:
+                    continue
+                exported_names.add(sel_obj.Name)
+
                 path = os.path.join(self.working_dir,
                                     self.solver_obj.InputCaseName,
                                     "constant",
                                     "triSurface")
                 if not os.path.exists(path):
                     os.makedirs(path)
-                sel_obj = r[0]
                 shape = sel_obj.Shape
-                CfdMeshTools.writeSurfaceMeshFromShape(shape, path, r[0].Name, self.mesh_obj)
+                CfdMeshTools.writeSurfaceMeshFromShape(shape, path, sel_obj.Name, self.mesh_obj)
                 print("Successfully wrote stl surface\n")
+
+    def exportMeanVelocityForceCellZoneStlSurfaces(self):
+        exported_names = set()
+        for zo in self.zone_objs:
+            for r in zo.ShapeRefs:
+                exported_names.add(r[0].Name)
+
+        for r in self.getMeanVelocityForceCellZoneShapeRefs():
+            sel_obj = r[0]
+            if sel_obj.Name in exported_names:
+                continue
+            exported_names.add(sel_obj.Name)
+
+            path = os.path.join(self.working_dir,
+                                self.solver_obj.InputCaseName,
+                                "constant",
+                                "triSurface")
+            if not os.path.exists(path):
+                os.makedirs(path)
+            shape = sel_obj.Shape
+            CfdMeshTools.writeSurfaceMeshFromShape(shape, path, sel_obj.Name, self.mesh_obj)
+            print("Successfully wrote stl surface\n")
 
     def processPorousZoneProperties(self):
         settings = self.settings

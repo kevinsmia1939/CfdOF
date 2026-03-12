@@ -242,6 +242,10 @@ def getScalarTransportFunctionsGroup(analysis_object):
     return getModelsOfType(analysis_object, 'CfdScalarTransportFunction')
 
 
+def getMeanVelocityForceObjects(analysis_object):
+    return getModelsOfType(analysis_object, 'CfdMeanVelocityForce')
+
+
 def getMeanVelocityForceObject(analysis_object):
     return getModelOfType(analysis_object, 'CfdMeanVelocityForce')
 
