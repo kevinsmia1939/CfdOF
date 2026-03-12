@@ -716,15 +716,11 @@ class CfdCaseWriterFoam:
                 CfdMeshTools.writeSurfaceMeshFromShape(shape, path, sel_obj.Name, self.mesh_obj)
                 print("Successfully wrote stl surface\n")
 
-    def getZoneShapeRefNames(self):
-        names = set()
+    def exportMeanVelocityForceCellZoneStlSurfaces(self):
+        exported_names = set()
         for zo in self.zone_objs:
             for r in zo.ShapeRefs:
-                names.add(r[0].Name)
-        return names
-
-    def exportMeanVelocityForceCellZoneStlSurfaces(self):
-        exported_names = self.getZoneShapeRefNames()
+                exported_names.add(r[0].Name)
 
         for r in self.getMeanVelocityForceCellZoneShapeRefs():
             sel_obj = r[0]
