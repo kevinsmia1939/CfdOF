@@ -185,6 +185,7 @@ class CfdCaseWriterFoam:
         CfdTools.clearCase(self.case_folder)
 
         self.exportZoneStlSurfaces()
+        self.exportMeanVelocityForceCellZoneStlSurfaces()
         if self.porous_zone_objs:
             self.processPorousZoneProperties()
         self.processInitialisationZoneProperties()
@@ -714,6 +715,16 @@ class CfdCaseWriterFoam:
                 shape = sel_obj.Shape
                 CfdMeshTools.writeSurfaceMeshFromShape(shape, path, sel_obj.Name, self.mesh_obj)
                 print("Successfully wrote stl surface\n")
+
+    def getZoneShapeRefNames(self):
+        names = set()
+        for zo in self.zone_objs:
+            for r in zo.ShapeRefs:
+                names.add(r[0].Name)
+        return names
+
+    def exportMeanVelocityForceCellZoneStlSurfaces(self):
+        exported_names = self.getZoneShapeRefNames()
 
         for r in self.getMeanVelocityForceCellZoneShapeRefs():
             sel_obj = r[0]
