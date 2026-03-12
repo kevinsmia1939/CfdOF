@@ -185,6 +185,7 @@ class CfdCaseWriterFoam:
         CfdTools.clearCase(self.case_folder)
 
         self.exportZoneStlSurfaces()
+        self.exportMeanVelocityForceCellZoneStlSurfaces()
         if self.porous_zone_objs:
             self.processPorousZoneProperties()
         self.processInitialisationZoneProperties()
