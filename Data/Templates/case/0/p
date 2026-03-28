@@ -16,6 +16,10 @@ FoamFile
 dimensions      [0 2 -2 0 0 0 0];
 
 internalField   uniform %(initialValues/KinematicPressure%);
+%:buoyantBoussinesqSimpleFoam buoyantBoussinesqPimpleFoam
+dimensions      [0 2 -2 0 0 0 0];
+
+internalField   uniform %(initialValues/KinematicPressure%);
 %:default
 dimensions      [1 -1 -2 0 0 0 0];
 
@@ -27,7 +31,7 @@ boundaryField
 %[0/_boundary_MMR_scalar%]
 
 %{%(solver/SolverName%)
-%:buoyantSimpleFoam buoyantPimpleFoam
+%:buoyantSimpleFoam buoyantPimpleFoam buoyantBoussinesqSimpleFoam buoyantBoussinesqPimpleFoam
 %{%(boundaries%)
 %{%(boundaries/%(0%)/BoundaryType%)
 %:constraint

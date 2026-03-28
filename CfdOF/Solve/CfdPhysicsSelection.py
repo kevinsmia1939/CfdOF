@@ -129,7 +129,7 @@ class CfdPhysicsModel:
         if addObjectProperty(
             obj,
             "Flow",
-            ["Isothermal", "NonIsothermal", "HighMachCompressible"],
+            ["Isothermal", "NonIsothermal", "NonIsothermalBoussinesq", "HighMachCompressible"],
             "App::PropertyEnumeration",
             "Physics modelling",
             QT_TRANSLATE_NOOP("App::Property", "Flow algorithm"),
@@ -141,7 +141,7 @@ class CfdPhysicsModel:
                 obj.Flow = "Isothermal"
             elif prev_flow == "Compressible":
                 obj.Flow = "NonIsothermal"
-            else:
+            elif prev_flow in ["Isothermal", "NonIsothermal", "NonIsothermalBoussinesq", "HighMachCompressible"]:
                 obj.Flow = prev_flow
 
         if addObjectProperty(

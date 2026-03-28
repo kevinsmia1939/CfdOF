@@ -1,5 +1,5 @@
 %{%(solver/SolverName%)
-%:buoyantSimpleFoam buoyantPimpleFoam interFoam multiphaseInterFoam
+%:buoyantSimpleFoam buoyantPimpleFoam buoyantBoussinesqSimpleFoam buoyantBoussinesqPimpleFoam interFoam multiphaseInterFoam
 %[_header%]
 FoamFile
 {
@@ -10,9 +10,16 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
+%{%(solver/SolverName%)
+%:buoyantBoussinesqSimpleFoam buoyantBoussinesqPimpleFoam
+dimensions      [0 2 -2 0 0 0 0];
+
+internalField   uniform %(initialValues/KinematicPressure%);
+%:default
 dimensions      [1 -1 -2 0 0 0 0];
 
 internalField   uniform %(initialValues/Pressure%);
+%}
 
 boundaryField
 {
@@ -28,14 +35,24 @@ boundaryField
     %(0%)
     {
         type        totalPressure;
+%{%(solver/SolverName%)
+%:buoyantBoussinesqSimpleFoam buoyantBoussinesqPimpleFoam
+        p0          uniform %(boundaries/%(0%)/KinematicPressure%);
+%:default
         p0          uniform %(boundaries/%(0%)/Pressure%);
+%}
         value       $internalField;
     }
 %:staticPressureInlet
     %(0%)
     {
         type        fixedValue;
+%{%(solver/SolverName%)
+%:buoyantBoussinesqSimpleFoam buoyantBoussinesqPimpleFoam
+        value       uniform %(boundaries/%(0%)/KinematicPressure%);
+%:default
         value       uniform %(boundaries/%(0%)/Pressure%);
+%}
     }
 %:default
 %[0/_boundary_fixedFluxPressure%]
@@ -46,8 +63,11 @@ boundaryField
     %(0%)
     {
 %{%(solver/SolverName%)
-%:buoyantSimpleFoam
+%:buoyantSimpleFoam buoyantBoussinesqSimpleFoam
         type        fixedValue;
+%:buoyantBoussinesqPimpleFoam
+        type        totalPressure;
+        p0          uniform %(boundaries/%(0%)/KinematicPressure%);
 %:default
         type        totalPressure;
         p0          uniform %(boundaries/%(0%)/Pressure%);
@@ -61,7 +81,12 @@ boundaryField
     %(0%)
     {
         type        totalPressure;
+%{%(solver/SolverName%)
+%:buoyantBoussinesqSimpleFoam buoyantBoussinesqPimpleFoam
+        p0          uniform %(boundaries/%(0%)/KinematicPressure%);
+%:default
         p0          uniform %(boundaries/%(0%)/Pressure%);
+%}
         value       $internalField;
     }
 %:constraint

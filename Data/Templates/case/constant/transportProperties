@@ -1,5 +1,5 @@
 %{%(solver/SolverName%)
-%:simpleFoam porousSimpleFoam SRFSimpleFoam pimpleFoam interFoam multiphaseInterFoam
+%:simpleFoam porousSimpleFoam SRFSimpleFoam pimpleFoam interFoam multiphaseInterFoam buoyantBoussinesqSimpleFoam buoyantBoussinesqPimpleFoam
 %[_header%]
 FoamFile
 {
@@ -15,6 +15,14 @@ FoamFile
 transportModel  Newtonian;
 
 nu              [0 2 -1 0 0 0 0] %(fluidProperties/0/KinematicViscosity%);
+%:buoyantBoussinesqSimpleFoam buoyantBoussinesqPimpleFoam
+transportModel  Newtonian;
+
+nu              [0 2 -1 0 0 0 0] %(fluidProperties/0/KinematicViscosity%);
+beta            [0 0 0 -1 0 0 0] %(fluidProperties/0/ThermalExpansion%);
+TRef            [0 0 0 1 0 0 0] %(fluidProperties/0/ThermalReferenceTemperature%);
+Pr              [0 0 0 0 0 0 0] %(fluidProperties/0/Pr%);
+Prt             [0 0 0 0 0 0 0] 0.85;
 %:interFoam
 phases
 (

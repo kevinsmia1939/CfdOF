@@ -244,6 +244,11 @@ class CfdCaseWriterFoam:
                         solver = 'buoyantPimpleFoam'
                     else:
                         solver = 'buoyantSimpleFoam'
+                elif self.physics_model.Flow == 'NonIsothermalBoussinesq':
+                    if self.physics_model.Time == 'Transient':
+                        solver = 'buoyantBoussinesqPimpleFoam'
+                    else:
+                        solver = 'buoyantBoussinesqSimpleFoam'
                 elif self.physics_model.Flow == 'HighMachCompressible':
                     solver = 'hisa'
                 else:
@@ -326,8 +331,13 @@ class CfdCaseWriterFoam:
 
             # Check compatibility between physics and material type
             flow_type = self.physics_model.Flow
-            if ((flow_type == 'Isothermal') != (mat_type == 'Isothermal')) or \
-               (flow_type == 'HighMachCompressible' and mat_type != 'Compressible'):
+            flow_mat_compatible = (
+                (flow_type == 'Isothermal' and mat_type == 'Isothermal') or
+                (flow_type == 'NonIsothermal' and mat_type in ['Incompressible', 'Compressible']) or
+                (flow_type == 'NonIsothermalBoussinesq' and mat_type == 'Boussinesq') or
+                (flow_type == 'HighMachCompressible' and mat_type == 'Compressible')
+            )
+            if not flow_mat_compatible:
                 raise ValueError("The material type of object '{}' is not compatible with the selected flow physics. "
                                  "Please modify the material properties.".format(mp['Name']))
 
@@ -344,6 +354,15 @@ class CfdCaseWriterFoam:
                 mp['MolarMass'] = Units.Quantity(mp['MolarMass']).getValueAs("kg/mol").Value*1000
             if 'Cp' in mp:
                 mp['Cp'] = Units.Quantity(mp['Cp']).getValueAs("J/kg/K").Value
+            if 'ThermalConductivity' in mp:
+                mp['ThermalConductivity'] = Units.Quantity(mp['ThermalConductivity']).getValueAs("W/m/K").Value
+                if 'DynamicViscosity' in mp and 'Cp' in mp and mp['ThermalConductivity'] > 0:
+                    mp['Pr'] = mp['DynamicViscosity'] * mp['Cp'] / mp['ThermalConductivity']
+            if 'ThermalExpansion' in mp:
+                mp['ThermalExpansion'] = Units.Quantity(mp['ThermalExpansion']).getValueAs("1/K").Value
+            if 'ThermalReferenceTemperature' in mp:
+                mp['ThermalReferenceTemperature'] = Units.Quantity(
+                    mp['ThermalReferenceTemperature']).getValueAs("K").Value
             if 'SutherlandTemperature' in mp:
                 mp['SutherlandTemperature'] = Units.Quantity(mp['SutherlandTemperature']).getValueAs("K").Value
                 if 'SutherlandRefViscosity' in mp and 'SutherlandRefTemperature' in mp:
@@ -400,7 +419,8 @@ class CfdCaseWriterFoam:
                         raise RuntimeError(str(bc['DirectionFace']) + ", specified for velocity direction in boundary '" + bc_name + "', is not a valid, planar face.")
                     else:
                         raise RuntimeError(str("No face specified for velocity direction in boundary '" + bc_name + "'"))
-            if settings['solver']['SolverName'] in ['simpleFoam', 'porousSimpleFoam', 'pimpleFoam', 'SRFSimpleFoam']:
+            if settings['solver']['SolverName'] in ['simpleFoam', 'porousSimpleFoam', 'pimpleFoam', 'SRFSimpleFoam',
+                                                    'buoyantBoussinesqSimpleFoam', 'buoyantBoussinesqPimpleFoam']:
                 bc['KinematicPressure'] = bc['Pressure']/settings['fluidProperties'][0]['Density']
 
             if bc['PorousBaffleMethod'] == 'porousScreen':
@@ -496,7 +516,8 @@ class CfdCaseWriterFoam:
         """ Do any required computations before case build. Boundary conditions must be processed first. """
         settings = self.settings
         initial_values = settings['initialValues']
-        if settings['solver']['SolverName'] in ['simpleFoam', 'porousSimpleFoam', 'pimpleFoam', 'SRFSimpleFoam']:
+        if settings['solver']['SolverName'] in ['simpleFoam', 'porousSimpleFoam', 'pimpleFoam', 'SRFSimpleFoam',
+                                                'buoyantBoussinesqSimpleFoam', 'buoyantBoussinesqPimpleFoam']:
             mat_prop = settings['fluidProperties'][0]
             initial_values['KinematicPressure'] = initial_values['Pressure'] / mat_prop['Density']
         if settings['solver']['SolverName'] in ['interFoam', 'multiphaseInterFoam']:
@@ -520,7 +541,9 @@ class CfdCaseWriterFoam:
                 raise RuntimeError("Selected solver does not support potential flow velocity initialisation.")
             
         if initial_values['PotentialFlow'] or initial_values['PotentialFlowP']:
-            if settings['solver']['SolverName'] in ['buoyantSimpleFoam', 'buoyantPimpleFoam', 'hisa']:
+            if settings['solver']['SolverName'] in ['buoyantSimpleFoam', 'buoyantPimpleFoam',
+                                                    'buoyantBoussinesqSimpleFoam', 'buoyantBoussinesqPimpleFoam',
+                                                    'hisa']:
                 for bc in settings['boundaries']:
                     if settings['boundaries'][bc]['BoundarySubType'] == 'massFlowRateInlet':
                         raise RuntimeError("Selected solver does not support potential flow initialisation with "

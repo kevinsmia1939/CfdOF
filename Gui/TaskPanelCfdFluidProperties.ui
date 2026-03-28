@@ -115,6 +115,30 @@
         </layout>
        </widget>
       </item>
+      <item row="8" column="0">
+       <widget class="QFrame" name="frame_boussinesq">
+        <property name="frameShape">
+         <enum>QFrame::NoFrame</enum>
+        </property>
+        <property name="frameShadow">
+         <enum>QFrame::Raised</enum>
+        </property>
+        <layout class="QFormLayout" name="formLayout_4">
+         <property name="leftMargin">
+          <number>0</number>
+         </property>
+         <property name="topMargin">
+          <number>0</number>
+         </property>
+         <property name="rightMargin">
+          <number>0</number>
+         </property>
+         <property name="bottomMargin">
+          <number>0</number>
+         </property>
+        </layout>
+       </widget>
+      </item>
       <item row="1" column="0" colspan="2">
        <widget class="QLineEdit" name="material_name"/>
       </item>

@@ -139,7 +139,7 @@ runCommand changeDictionary
 %{%(initialValues/PotentialFlow%)
 %:True
 %{%(solver/SolverName%)
-%:buoyantSimpleFoam buoyantPimpleFoam interFoam multiphaseInterFoam
+%:buoyantSimpleFoam buoyantPimpleFoam buoyantBoussinesqSimpleFoam buoyantBoussinesqPimpleFoam interFoam multiphaseInterFoam
 $PNAME = "p_rgh"
 %:default
 $PNAME = "p"
@@ -185,7 +185,7 @@ runParallel $NPROC potentialFoam -initialiseUBCs -pName $PNAME
 %}
 %}
 %{%(solver/SolverName%)
-%:buoyantSimpleFoam buoyantPimpleFoam interFoam multiphaseInterFoam
+%:buoyantSimpleFoam buoyantPimpleFoam buoyantBoussinesqSimpleFoam buoyantBoussinesqPimpleFoam interFoam multiphaseInterFoam
 # Remove phi with wrong units
 rm -ErrorAction SilentlyContinue processor*/0/phi
 %}
@@ -238,7 +238,7 @@ runCommand potentialFoam -initialiseUBCs -pName $PNAME
 %}
 %}
 %{%(solver/SolverName%)
-%:buoyantSimpleFoam buoyantPimpleFoam interFoam multiphaseInterFoam
+%:buoyantSimpleFoam buoyantPimpleFoam buoyantBoussinesqSimpleFoam buoyantBoussinesqPimpleFoam interFoam multiphaseInterFoam
 # Remove phi with wrong units
 rm -ErrorAction SilentlyContinue 0/phi
 %}

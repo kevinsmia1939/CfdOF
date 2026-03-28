@@ -41,7 +41,9 @@ ALL_FIELDS = {'Isothermal': ['Density', 'DynamicViscosity'],
               'Incompressible': ['MolarMass', 'DensityPolynomial', 'CpPolynomial', 'DynamicViscosityPolynomial',
                     'ThermalConductivityPolynomial'],
               'Compressible': ['MolarMass', 'Cp', 'SutherlandTemperature', 'SutherlandRefTemperature',
-                    'SutherlandRefViscosity']}
+                    'SutherlandRefViscosity'],
+              'Boussinesq': ['Density', 'DynamicViscosity', 'ThermalExpansion', 'ThermalReferenceTemperature',
+                    'Cp', 'ThermalConductivity']}
 
 class TaskPanelCfdFluidProperties:
     """ Task Panel for FluidMaterial objects """
@@ -57,6 +59,8 @@ class TaskPanelCfdFluidProperties:
         self.form.compressibleCheckBox.setVisible(self.physics_obj.Flow == "NonIsothermal")
         # Make sure it is checked in the default case since object was initialised with Isothermal
         self.form.compressibleCheckBox.setChecked(self.material.get('Type') != "Incompressible")
+        self.form.compressibleCheckBox.setEnabled(self.physics_obj.Flow not in
+                                                  ["NonIsothermalBoussinesq", "Isothermal"])
         if hasattr(self.form.compressibleCheckBox, "checkStateChanged"):
             self.form.compressibleCheckBox.checkStateChanged.connect(self.updateUI)
         else:
@@ -85,12 +89,13 @@ class TaskPanelCfdFluidProperties:
         #Hide unless materially edited
 
     def createUI(self):
-        layouts = {'Isothermal': self.form.frame_isothermal.layout(), 
-                   'Incompressible': self.form.frame_incompressible.layout(), 
-                   'Compressible': self.form.frame_compressible.layout()}
+        layouts = {'Isothermal': self.form.frame_isothermal.layout(),
+                   'Incompressible': self.form.frame_incompressible.layout(),
+                   'Compressible': self.form.frame_compressible.layout(),
+                   'Boussinesq': self.form.frame_boussinesq.layout()}
 
-        self.all_text_boxes = {'Isothermal': {}, 'Incompressible': {}, 'Compressible': {}}
-        for k in ['Isothermal', 'Incompressible', 'Compressible']:
+        self.all_text_boxes = {'Isothermal': {}, 'Incompressible': {}, 'Compressible': {}, 'Boussinesq': {}}
+        for k in ['Isothermal', 'Incompressible', 'Compressible', 'Boussinesq']:
             layout = layouts[k]
             fields = ALL_FIELDS[k]
             text_boxes = self.all_text_boxes[k]
@@ -122,6 +127,8 @@ class TaskPanelCfdFluidProperties:
     def updateUI(self):
         if self.physics_obj.Flow == 'Isothermal':
             material_type = 'Isothermal'
+        elif self.physics_obj.Flow == 'NonIsothermalBoussinesq':
+            material_type = 'Boussinesq'
         else:
             if self.physics_obj.Flow == 'NonIsothermal' and not self.form.compressibleCheckBox.isChecked():
                 material_type = 'Incompressible'
@@ -133,6 +140,7 @@ class TaskPanelCfdFluidProperties:
         self.form.frame_isothermal.setVisible(self.material['Type'] == 'Isothermal')
         self.form.frame_incompressible.setVisible(self.material['Type'] == 'Incompressible')
         self.form.frame_compressible.setVisible(self.material['Type'] == 'Compressible')
+        self.form.frame_boussinesq.setVisible(self.material['Type'] == 'Boussinesq')
         self.populateMaterialsList()
 
     def populateMaterialsList(self):

@@ -54,10 +54,12 @@ class TaskPanelCfdPhysicsSelection:
         self.form.radioButtonFreeSurface.toggled.connect(self.updateUI)
         if hasattr(self.form.checkBoxIsothermal, "checkStateChanged"):
             self.form.checkBoxIsothermal.checkStateChanged.connect(self.updateUI)
+            self.form.checkBoxBoussinesq.checkStateChanged.connect(self.updateUI)
             self.form.viscousCheckBox.checkStateChanged.connect(self.updateUI)
             self.form.srfCheckBox.checkStateChanged.connect(self.updateUI)
         else:
             self.form.checkBoxIsothermal.stateChanged.connect(self.updateUI)
+            self.form.checkBoxBoussinesq.stateChanged.connect(self.updateUI)
             self.form.viscousCheckBox.stateChanged.connect(self.updateUI)
             self.form.srfCheckBox.stateChanged.connect(self.updateUI)
         self.form.radioButtonLaminar.toggled.connect(self.updateUI)
@@ -84,6 +86,7 @@ class TaskPanelCfdPhysicsSelection:
         # Flow
         self.form.checkBoxIsothermal.setChecked(self.obj.Flow == 'Isothermal')
         self.form.checkBoxHighMach.setChecked(self.obj.Flow == 'HighMachCompressible')
+        self.form.checkBoxBoussinesq.setChecked(self.obj.Flow == 'NonIsothermalBoussinesq')
 
         # Turbulence
         if self.obj.Turbulence == 'Inviscid':
@@ -168,6 +171,15 @@ class TaskPanelCfdPhysicsSelection:
         if self.form.checkBoxIsothermal.isChecked():
             self.form.checkBoxHighMach.setChecked(False)
 
+        # Boussinesq approximation capability
+        boussinesq_capable = (not self.form.checkBoxIsothermal.isChecked() and
+                              not self.form.checkBoxHighMach.isChecked())
+        self.form.checkBoxBoussinesq.setEnabled(boussinesq_capable)
+        if not boussinesq_capable:
+            self.form.checkBoxBoussinesq.setChecked(False)
+        if self.form.checkBoxBoussinesq.isChecked():
+            self.form.checkBoxHighMach.setEnabled(False)
+
         # Viscous 
         if self.form.viscousCheckBox.isChecked():
             self.form.turbulenceFrame.setVisible(True)
@@ -218,6 +230,8 @@ class TaskPanelCfdPhysicsSelection:
         elif not self.form.checkBoxIsothermal.isChecked():
             if self.form.checkBoxHighMach.isChecked():
                 storeIfChanged(self.obj, 'Flow', 'HighMachCompressible')
+            elif self.form.checkBoxBoussinesq.isChecked():
+                storeIfChanged(self.obj, 'Flow', 'NonIsothermalBoussinesq')
             else:
                 storeIfChanged(self.obj, 'Flow', 'NonIsothermal')
 

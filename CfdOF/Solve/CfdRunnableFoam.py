@@ -240,6 +240,8 @@ class CfdRunnableFoam(CfdRunnable):
                 self.pResiduals.append(float(split[7].split(',')[0]))
             if "h," in split and self.niter > len(self.EResiduals):
                 self.EResiduals.append(float(split[7].split(',')[0]))
+            if "T," in split and self.niter > len(self.EResiduals):
+                self.EResiduals.append(float(split[7].split(',')[0]))
             # HiSA coupled residuals
             if "Residual:" in split and self.niter > len(self.rhoResiduals):
                 self.rhoResiduals.append(float(split[4]))

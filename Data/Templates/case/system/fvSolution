@@ -69,6 +69,8 @@ SIMPLE
 %{%(solver/SolverName%)
 %:buoyantSimpleFoam
         h %(solver/ConvergenceTol%);
+%:buoyantBoussinesqSimpleFoam
+        T %(solver/ConvergenceTol%);
 %}
         "(k|epsilon|omega|f|v2|nuTilda|gammaInt|ReThetat)" %(solver/ConvergenceTol%);
     }
@@ -107,6 +109,12 @@ PIMPLE
 %{%(solver/SolverName%)
 %:buoyantPimpleFoam
         h
+        {
+            tolerance   %(solver/ConvergenceTol%);
+            relTol      0;
+        }
+%:buoyantBoussinesqPimpleFoam
+        T
         {
             tolerance   %(solver/ConvergenceTol%);
             relTol      0;
@@ -239,6 +247,22 @@ solvers
     }
 
 %}
+%:buoyantBoussinesqSimpleFoam buoyantBoussinesqPimpleFoam
+    T
+    {
+        solver           smoothSolver;
+        smoother         symGaussSeidel;
+        tolerance        1e-8;
+        relTol           0.1;
+        nSweeps          1;
+    }
+
+    TFinal
+    {
+        $T;
+        relTol           0;
+    }
+
 %}
 %{%(physics/Turbulence%)
 %:RANS DES LES
@@ -336,6 +360,8 @@ relaxationFactors
 %{%(solver/SolverName%)
 %:buoyantSimpleFoam
         h               0.7;
+%:buoyantBoussinesqSimpleFoam
+        T               0.9;
 %}
 %{%(physics/Turbulence%)
 %:RANS DES
@@ -370,6 +396,8 @@ relaxationFactors
 %:buoyantSimpleFoam
         p_rgh           0.3;
         rho             0.5;
+%:buoyantBoussinesqSimpleFoam
+        p_rgh           0.3;
 %}
     }
 %:Transient
@@ -381,6 +409,9 @@ relaxationFactors
 %:buoyantPimpleFoam
         h               0.7;
         hFinal          1;
+%:buoyantBoussinesqPimpleFoam
+        T               0.9;
+        TFinal          1;
 %}
 %{%(physics/Turbulence%)
 %:RANS DES LES
