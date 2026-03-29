@@ -83,7 +83,8 @@ boundaryField
 %:fixedWall translatingWall rotatingWall partialSlipWall
     %(0%)
     {
-        type        compressible::alphatWallFunction;
+        type        alphatJayatillekeWallFunction;
+        Prt         0.85;
         value       uniform 0;
     }
 %:slipWall
@@ -91,7 +92,8 @@ boundaryField
 %:roughWall
     %(0%)
     {
-        type        compressible::alphatWallFunction;
+        type        alphatJayatillekeWallFunction;
+        Prt         0.85;
         value       uniform 0;
     }
 %}
