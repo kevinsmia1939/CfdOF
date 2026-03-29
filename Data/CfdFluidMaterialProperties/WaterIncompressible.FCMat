@@ -1,8 +1,10 @@
+; SPDX-FileCopyrightText: 2016 CSIR, South Africa
+; SPDX-FileCopyrightText: 2021 Oliver Oxtoby
 ; WaterIncompressible
 ;
 ; FreeCAD Material card: see https://www.freecad.org/wiki/Material
 
-[FCdMat]
+[FCMat]
 Name = Water
 Type = Incompressible
 Description = Temperature-dependent properties for pure water

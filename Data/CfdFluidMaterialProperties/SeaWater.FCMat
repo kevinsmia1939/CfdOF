@@ -1,8 +1,10 @@
+; SPDX-FileCopyrightText: 2016 CSIR, South Africa
+; SPDX-FileCopyrightText: 2021 Oliver Oxtoby
 ; SeaWater
 ;
 ; FreeCAD Material card: see https://www.freecad.org/wiki/Material
 
-[FCdMat]
+[FCMat]
 Name = SeaWater
 Type = Isothermal
 Description = Sea water (30%) at 20 Degrees Celsius and 1 atm

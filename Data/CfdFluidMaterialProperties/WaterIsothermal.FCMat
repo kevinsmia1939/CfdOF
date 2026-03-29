@@ -1,8 +1,10 @@
+; SPDX-FileCopyrightText: 2016 CSIR, South Africa
+; SPDX-FileCopyrightText: 2021 Oliver Oxtoby
 ; WaterIsothermal
 ;
 ; FreeCAD Material card: see https://www.freecad.org/wiki/Material
 
-[FCdMat]
+[FCMat]
 Name = Water
 Type = Isothermal
 Description = Standard distilled water properties at 20 Degrees Celsius and 1 atm
