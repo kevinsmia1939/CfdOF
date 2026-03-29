@@ -1,0 +1,16 @@
+; SPDX-FileCopyrightText: 2016 CSIR, South Africa
+; SPDX-FileCopyrightText: 2021 Oliver Oxtoby
+; AirBoussinesq
+;
+; FreeCAD Material card: see https://www.freecad.org/wiki/Material
+
+[FCMat]
+Name = Air
+Type = Boussinesq
+Description = Air properties for Boussinesq approximation at 20 Degrees Celsius and 1 atm
+Density = 1.204 kg/m^3
+DynamicViscosity = 1.825e-5 kg/m/s
+ThermalExpansion = 3.41e-3 1/K
+ThermalReferenceTemperature = 293.15 K
+Cp = 1005 J/kg/K
+ThermalConductivity = 0.0257 W/m/K
