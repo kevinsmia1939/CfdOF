@@ -69,7 +69,7 @@ which can be automatically installed (see below for instructions).
 
 - [Latest release version of FreeCAD (at least version 0.20.0 / git commit 29177)](https://www.freecad.org/downloads.php)
  or [latest development version (prerelease)](https://github.com/FreeCAD/FreeCAD-Bundle/releases/tag/weekly-builds)
-- OpenFOAM [Foundation versions 9-13](http://openfoam.org/download/) or [OpenCFD versions 2006-2506](http://openfoam.com/download)
+- OpenFOAM [Foundation versions 9-13](http://openfoam.org/download/) or [OpenCFD versions 2006-2512](http://openfoam.com/download)
 - [Paraview](http://www.paraview.org/)
 - [cfMesh (customised version updated to compile with latest OpenFOAM versions)](https://sourceforge.net/projects/cfmesh-cfdof/)
 - [HiSA (High Speed Aerodynamic Solver)](https://hisa.gitlab.io)
@@ -327,7 +327,8 @@ and the [Council for Scientific and Industrial Research](https://www.csir.co.za)
 * Thomas Schrader (2017-) <info@schraderundschrader.de>
 * Michael Hindley (2016)
 * Mark Mackenzie (2022-) [Forum: @markrmau]
-* Muez Abdalla (2025) [Github: @muezabdalla]
+* Muez Abdalla (2025-) [Github: @muezabdalla]
+* Kavin Teenakul (2026-) <andythe_great@protonmail.com>
 * Katy Akmal (2022) [Forum: @KAKM]
 * Adrian Insaurralde (2022)
 * Klaus Sembritzki (2017)
