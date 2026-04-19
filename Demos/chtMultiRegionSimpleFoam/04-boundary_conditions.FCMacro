@@ -1,0 +1,70 @@
+import FreeCAD
+from CfdOF.Solve import CfdFluidBoundary
+from CfdOF import CfdTools
+
+# --- Fluid inlet (Face at X=0, Y=0..20mm, Z=0..5mm) ---
+inlet = CfdFluidBoundary.makeCfdFluidBoundary()
+CfdTools.getActiveAnalysis().addObject(inlet)
+inlet.Label = 'inlet'
+inlet.BoundaryType = 'inlet'
+inlet.BoundarySubType = 'uniformVelocityInlet'
+inlet.Ux = '0.01 m/s'
+inlet.Uy = '0 m/s'
+inlet.Uz = '0 m/s'
+inlet.VelocityIsCartesian = True
+inlet.ThermalBoundaryType = 'fixedValue'
+inlet.Temperature = '300 K'
+inlet.ShapeRefs = [(FreeCAD.ActiveDocument.getObject('FluidBox'), ('Face1',))]
+FreeCAD.ActiveDocument.recompute()
+
+# --- Fluid outlet (Face at X=100mm) ---
+outlet = CfdFluidBoundary.makeCfdFluidBoundary()
+CfdTools.getActiveAnalysis().addObject(outlet)
+outlet.Label = 'outlet'
+outlet.BoundaryType = 'outlet'
+outlet.BoundarySubType = 'staticPressureOutlet'
+outlet.Pressure = '101325 Pa'
+outlet.ThermalBoundaryType = 'zeroGradient'
+outlet.ShapeRefs = [(FreeCAD.ActiveDocument.getObject('FluidBox'), ('Face2',))]
+FreeCAD.ActiveDocument.recompute()
+
+# --- Fluid top wall (Face at Z=20mm top) - adiabatic no-slip ---
+topWall = CfdFluidBoundary.makeCfdFluidBoundary()
+CfdTools.getActiveAnalysis().addObject(topWall)
+topWall.Label = 'topWall'
+topWall.BoundaryType = 'wall'
+topWall.BoundarySubType = 'fixedWall'
+topWall.ThermalBoundaryType = 'zeroGradient'
+topWall.ShapeRefs = [(FreeCAD.ActiveDocument.getObject('FluidBox'), ('Face6',))]
+FreeCAD.ActiveDocument.recompute()
+
+# --- Fluid side walls (Z faces) - symmetry ---
+sideWalls = CfdFluidBoundary.makeCfdFluidBoundary()
+CfdTools.getActiveAnalysis().addObject(sideWalls)
+sideWalls.Label = 'fluidSideWalls'
+sideWalls.BoundaryType = 'constraint'
+sideWalls.BoundarySubType = 'symmetry'
+sideWalls.ShapeRefs = [(FreeCAD.ActiveDocument.getObject('FluidBox'), ('Face3', 'Face4'))]
+FreeCAD.ActiveDocument.recompute()
+
+# --- Solid bottom (hot wall, Z=-5mm face) - fixed temperature 400K ---
+hotWall = CfdFluidBoundary.makeCfdFluidBoundary()
+CfdTools.getActiveAnalysis().addObject(hotWall)
+hotWall.Label = 'hotWall'
+hotWall.BoundaryType = 'wall'
+hotWall.BoundarySubType = 'fixedWall'
+hotWall.ThermalBoundaryType = 'fixedValue'
+hotWall.Temperature = '400 K'
+hotWall.ShapeRefs = [(FreeCAD.ActiveDocument.getObject('SolidBox'), ('Face5',))]
+FreeCAD.ActiveDocument.recompute()
+
+# --- Solid other walls (inlet end, outlet end, side walls) - adiabatic ---
+solidOtherWalls = CfdFluidBoundary.makeCfdFluidBoundary()
+CfdTools.getActiveAnalysis().addObject(solidOtherWalls)
+solidOtherWalls.Label = 'solidOtherWalls'
+solidOtherWalls.BoundaryType = 'wall'
+solidOtherWalls.BoundarySubType = 'fixedWall'
+solidOtherWalls.ThermalBoundaryType = 'zeroGradient'
+solidOtherWalls.ShapeRefs = [
+    (FreeCAD.ActiveDocument.getObject('SolidBox'), ('Face1', 'Face2', 'Face3', 'Face4'))]
+FreeCAD.ActiveDocument.recompute()

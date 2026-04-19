@@ -1,0 +1,12 @@
+; SPDX-FileCopyrightText: 2024 CfdOF contributors
+; AluminiumSolid
+;
+; FreeCAD Material card: see https://www.freecad.org/wiki/Material
+
+[FCMat]
+Name = Aluminium (solid)
+Type = Solid
+Description = Aluminium solid thermal properties for CHT simulation
+Density = 2712 kg/m^3
+ThermalConductivity = 204 W/m/K
+SpecificHeat = 900 J/kg/K

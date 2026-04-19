@@ -1,0 +1,23 @@
+import FreeCAD
+import Part
+
+# Create new document
+App.newDocument()
+
+# Fluid domain: 100mm x 20mm x 5mm channel (flow in X direction)
+fluidBox = App.ActiveDocument.addObject("Part::Box", "FluidBox")
+fluidBox.Label = "FluidBox"
+fluidBox.Length = "100 mm"
+fluidBox.Width  = "5 mm"
+fluidBox.Height = "20 mm"
+fluidBox.Placement = App.Placement(App.Vector(0, 0, 0), App.Rotation())
+
+# Solid domain: 100mm x 5mm x 5mm aluminium plate below the fluid
+solidBox = App.ActiveDocument.addObject("Part::Box", "SolidBox")
+solidBox.Label = "SolidBox"
+solidBox.Length = "100 mm"
+solidBox.Width  = "5 mm"
+solidBox.Height = "5 mm"
+solidBox.Placement = App.Placement(App.Vector(0, 0, -5), App.Rotation())
+
+App.ActiveDocument.recompute()

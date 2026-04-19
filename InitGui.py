@@ -59,6 +59,7 @@ class CfdOFWorkbench(Workbench):
         from CfdOF.Mesh.CfdMeshRefinement import CommandMeshRegion
         from CfdOF.Solve.CfdPhysicsSelection import CommandCfdPhysicsSelection
         from CfdOF.Solve.CfdFluidMaterial import CommandCfdFluidMaterial
+        from CfdOF.Solve.CfdSolidMaterial import CommandCfdSolidMaterial
         from CfdOF.Solve.CfdSolverFoam import CommandCfdSolverFoam
         from CfdOF.Solve.CfdInitialiseFlowField import CommandCfdInitialiseInternalFlowField
         from CfdOF.Solve.CfdFluidBoundary import CommandCfdFluidBoundary
@@ -81,6 +82,7 @@ class CfdOFWorkbench(Workbench):
         FreeCADGui.addCommand('CfdOF_GroupDynamicMeshRefinement', CommandGroupDynamicMeshRefinement())
         FreeCADGui.addCommand('CfdOF_PhysicsModel', CommandCfdPhysicsSelection())
         FreeCADGui.addCommand('CfdOF_FluidMaterial', CommandCfdFluidMaterial())
+        FreeCADGui.addCommand('CfdOF_SolidMaterial', CommandCfdSolidMaterial())
         FreeCADGui.addCommand('CfdOF_FluidBoundary', CommandCfdFluidBoundary())
         FreeCADGui.addCommand('CfdOF_InitialiseInternal', CommandCfdInitialiseInternalFlowField())
         FreeCADGui.addCommand('CfdOF_PorousZone', CommandCfdPorousZone())
@@ -102,7 +104,7 @@ class CfdOFWorkbench(Workbench):
                   ('M', QT_TRANSLATE_NOOP("Workbench", "Dynamic mesh refinement"),
                    ['CfdOF_DynamicMeshInterfaceRefinement','CfdOF_DynamicMeshShockRefinement',]),
                   ('T', 'CfdOF_GroupDynamicMeshRefinement',),
-                  'CfdOF_PhysicsModel', 'CfdOF_FluidMaterial',
+                  'CfdOF_PhysicsModel', 'CfdOF_FluidMaterial', 'CfdOF_SolidMaterial',
                   'CfdOF_FluidBoundary', 'CfdOF_InitialiseInternal',
                   'CfdOF_InitialisationZone', 'CfdOF_PorousZone', 'CfdOF_MeanVelocityForce',
                   'CfdOF_ReportingFunctions', 'CfdOF_ScalarTransportFunctions',

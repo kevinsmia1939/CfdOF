@@ -1,15 +1,20 @@
 %{%(solver/SolverName%)
 %:chtMultiRegionSimpleFoam chtMultiRegionFoam
-%:default
 %[_header%]
 FoamFile
 {
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      momentumTransport;
+    object      regionProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-#include "turbulenceProperties"
+regions
+(
+    fluid   ( %(multiRegionFluidNames/0%) )
+    solid   ( %(multiRegionSolidNames/0%) )
+);
+
+// ************************************************************************* //
 %}

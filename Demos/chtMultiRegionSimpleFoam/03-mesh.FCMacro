@@ -1,0 +1,32 @@
+import FreeCAD
+from CfdOF.Mesh import CfdMesh, CfdMeshRefinement
+from CfdOF import CfdTools
+
+# Create combined geometry for meshing (compound of fluid + solid boxes)
+import Part
+fluidBox = App.ActiveDocument.getObject('FluidBox')
+solidBox = App.ActiveDocument.getObject('SolidBox')
+
+combined = App.ActiveDocument.addObject("Part::Compound", "CombinedGeom")
+combined.Links = [fluidBox, solidBox]
+App.ActiveDocument.recompute()
+
+# Create mesh from the combined geometry
+from CfdOF.Mesh import CfdMesh
+CfdMesh.makeCfdMesh('CombinedGeom_Mesh')
+App.ActiveDocument.ActiveObject.Part = App.ActiveDocument.CombinedGeom
+CfdTools.getActiveAnalysis().addObject(App.ActiveDocument.ActiveObject)
+App.ActiveDocument.CombinedGeom_Mesh.CharacteristicLengthMax = '3.0 mm'
+App.ActiveDocument.CombinedGeom_Mesh.MeshUtility = 'gmsh'
+
+# Fluid cell zone: mesh refinement internal zone defines the fluid region geometry
+fluidZone = CfdMeshRefinement.makeCfdMeshRefinement(App.ActiveDocument.CombinedGeom_Mesh, 'fluid')
+fluidZone.Label = 'fluid'
+fluidZone.Internal = True
+fluidZone.ShapeRefs = [(App.ActiveDocument.getObject('FluidBox'), ('',))]
+
+# Solid region geometry: assigned directly on the CfdSolidMaterial object.
+# No separate CfdMeshRefinement zone is needed for the solid.
+App.ActiveDocument.SolidProperties.ShapeRefs = [(App.ActiveDocument.getObject('SolidBox'), ('',))]
+
+FreeCAD.ActiveDocument.recompute()

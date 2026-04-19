@@ -27,12 +27,28 @@
 import FreeCAD
 from FreeCAD import Units
 import os
+import re
 import tempfile
 from CfdOF import CfdTools
 import math
 import MeshPart
 from CfdOF.TemplateBuilder import TemplateBuilder
 import Part
+
+
+def _sanitiseRegionName(name):
+    return re.sub(r'[^A-Za-z0-9_]', '_', name)
+
+
+def _getCompoundLinks(part_obj):
+    """Return the list of child body objects from a compound or BooleanFragments shape object."""
+    if hasattr(part_obj, 'Links'):      # Part::Compound
+        return list(part_obj.Links)
+    if hasattr(part_obj, 'Shapes'):     # Part::BooleanFragments (older FreeCAD)
+        return list(part_obj.Shapes)
+    if hasattr(part_obj, 'Objects'):    # Part::BooleanFragments (FreeCAD 1.x)
+        return list(part_obj.Objects)
+    return [part_obj]
 
 
 class CfdMeshTools:
@@ -687,6 +703,63 @@ class CfdMeshTools:
             self.gmsh_settings['ClMin'] = self.clmin
             sols = (''.join((str(n+1) + ', ') for n in range(len(self.mesh_obj.Part.Shape.Solids)))).rstrip(', ')
             self.gmsh_settings['Solids'] = sols
+
+            # Build per-region volume map for CHT (chtMultiRegionSimpleFoam/chtMultiRegionFoam)
+            solid_material_objs = CfdTools.getSolidMaterials(self.analysis)
+            if solid_material_objs:
+                region_volume_map = {}
+                mesh_part = self.mesh_obj.Part
+                links = _getCompoundLinks(mesh_part)
+                # Collect the original shapes for each solid body
+                solid_body_names = set()
+                solid_body_shapes = {}  # body_name -> Shape
+                for solid_obj in solid_material_objs:
+                    for ref in solid_obj.ShapeRefs:
+                        body_name = ref[0].Name
+                        solid_body_names.add(body_name)
+                        solid_body_shapes[body_name] = ref[0].Shape
+                # Also collect from links in case ShapeRefs uses a link object
+                for lnk in links:
+                    if lnk.Name in solid_body_names and lnk.Name not in solid_body_shapes:
+                        solid_body_shapes[lnk.Name] = lnk.Shape
+                solid_shapes = list(solid_body_shapes.values())
+                # Assign each result solid to a region by centroid containment in the
+                # original input shapes. BooleanFragments may split one input into
+                # multiple result solids (e.g. heat sink extending below the fluid box).
+                result_solids = mesh_part.Shape.Solids
+                solid_vol_indices = []
+                fluid_vol_indices = []
+                for i, result_solid in enumerate(result_solids, start=1):
+                    centroid = result_solid.CenterOfMass
+                    in_solid = any(
+                        s.isInside(centroid, 1e-3, True) for s in solid_shapes
+                    )
+                    if in_solid:
+                        solid_vol_indices.append(i)
+                    else:
+                        fluid_vol_indices.append(i)
+                # Assign solid regions (one entry per CfdSolidMaterial)
+                for solid_obj in solid_material_objs:
+                    rname = _sanitiseRegionName(
+                        getattr(solid_obj, 'RegionName', '') or solid_obj.Label)
+                    if solid_vol_indices:
+                        region_volume_map[rname] = ', '.join(str(v) for v in solid_vol_indices)
+                # Assign fluid region
+                mr_objs = CfdTools.getMeshRefinementObjs(self.mesh_obj)
+                internal_zones = [o for o in mr_objs if o.Internal]
+                if internal_zones:
+                    fluid_rname = _sanitiseRegionName(internal_zones[0].Label)
+                else:
+                    fluid_mats = CfdTools.getMaterials(self.analysis)
+                    fluid_rname = _sanitiseRegionName(
+                        fluid_mats[0].Label if fluid_mats else 'fluid')
+                if fluid_vol_indices:
+                    region_volume_map[fluid_rname] = ', '.join(str(v) for v in fluid_vol_indices)
+                self.gmsh_settings['IsMultiRegion'] = True
+                self.gmsh_settings['RegionVolumeMap'] = region_volume_map
+            else:
+                self.gmsh_settings['IsMultiRegion'] = False
+
             self.gmsh_settings['BoundaryFaceMap'] = {}
             for k in range(len(self.patch_faces)):
                 for l in range(len(self.patch_faces[k])):

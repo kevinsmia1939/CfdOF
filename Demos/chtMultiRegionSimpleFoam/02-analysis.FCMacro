@@ -1,0 +1,56 @@
+from CfdOF import CfdAnalysis
+from CfdOF import CfdTools
+
+# Create analysis container
+analysis = CfdAnalysis.makeCfdAnalysis('CfdAnalysis')
+CfdTools.setActiveAnalysis(analysis)
+
+# Physics model: MultiRegion, NonIsothermal, Steady, Laminar
+from CfdOF.Solve import CfdPhysicsSelection
+analysis.addObject(CfdPhysicsSelection.makeCfdPhysicsSelection())
+App.ActiveDocument.PhysicsModel.Phase = 'MultiRegion'
+App.ActiveDocument.PhysicsModel.Flow  = 'NonIsothermal'
+App.ActiveDocument.PhysicsModel.Time  = 'Steady'
+App.ActiveDocument.PhysicsModel.Turbulence = 'Laminar'
+App.ActiveDocument.PhysicsModel.gx = '0 m/s^2'
+App.ActiveDocument.PhysicsModel.gy = '0 m/s^2'
+App.ActiveDocument.PhysicsModel.gz = '-9.81 m/s^2'
+
+# Fluid material: air (NonIsothermal)
+# Label is kept distinct from the mesh-refinement zone label ('fluid') to avoid
+# FreeCAD auto-renaming duplicate labels; RegionName explicitly sets the region.
+from CfdOF.Solve import CfdFluidMaterial
+mats, name_path_list = CfdTools.importMaterials()
+fluidMat = CfdFluidMaterial.makeCfdFluidMaterial('FluidProperties')
+analysis.addObject(fluidMat)
+fluidMat.Label = 'AirCompressible'
+fluidMat.RegionName = 'fluid'
+fluidMat.Material = mats[name_path_list[[np[0] for np in name_path_list].index('AirCompressible')][1]]
+
+# Solid material: aluminium — uses CfdSolidMaterial with ShapeRefs pointing at the solid body.
+# No separate CfdMeshRefinement zone is needed for the solid region.
+from CfdOF.Solve import CfdSolidMaterial
+solidMat = CfdSolidMaterial.makeCfdSolidMaterial('SolidProperties')
+analysis.addObject(solidMat)
+solidMat.Label = 'AluminiumSolid'
+solidMat.RegionName = 'solid'
+solidMat.Material = mats[name_path_list[[np[0] for np in name_path_list].index('AluminiumSolid')][1]]
+# ShapeRefs is set after the geometry exists — assigned in 03-mesh.FCMacro
+
+# Initial conditions
+from CfdOF.Solve import CfdInitialiseFlowField
+initObj = CfdInitialiseFlowField.makeCfdInitialFlowField()
+analysis.addObject(initObj)
+App.ActiveDocument.InitialiseFields.PotentialFlow = False
+App.ActiveDocument.InitialiseFields.UseOutletPValue = False
+App.ActiveDocument.InitialiseFields.Pressure = '101325 Pa'
+App.ActiveDocument.InitialiseFields.Temperature = '300 K'
+
+# Solver
+from CfdOF.Solve import CfdSolverFoam
+solver = CfdSolverFoam.makeCfdSolverFoam()
+analysis.addObject(solver)
+App.ActiveDocument.CfdSolver.EndTime = 300
+App.ActiveDocument.CfdSolver.ConvergenceTol = 1e-4
+
+FreeCAD.ActiveDocument.recompute()
