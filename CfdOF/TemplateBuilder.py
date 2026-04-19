@@ -218,9 +218,11 @@ class TemplateBuilder(object):
             filename_param = None
             if trailing_nl is not None:
                 filename_param = contents[end+2:trailing_nl].strip()
-            # Loop the content passing values
+            # Loop the content passing values (skip empty strings from empty dict/list substitution)
             replacement = ""
             for v in keys:
+                if not v:
+                    continue
                 filename = None
                 if filename_param:
                     # Process filename with parameter
