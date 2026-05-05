@@ -149,10 +149,10 @@ class TaskPanelCfdMesh:
 
         if FreeCAD.GuiUp:
             # create the point every time the taskpanel is loaded
-            initPrevPoint(self.prev_point_node, self.prev_point_move_node, self.get_prev_point_size(self.mesh_obj.Part.Shape), 0, 1, 0,
-                         self.if_2_float(self.form.if_pointInMeshX),
-                         self.if_2_float(self.form.if_pointInMeshY),
-                         self.if_2_float(self.form.if_pointInMeshZ))
+            initPrevPoint(self.prev_point_node, self.prev_point_move_node, self.getPrevPointSize(self.mesh_obj.Part.Shape), 0, 1, 0,
+                         self.if2Float(self.form.if_pointInMeshX),
+                         self.if2Float(self.form.if_pointInMeshY),
+                         self.if2Float(self.form.if_pointInMeshZ))
             # then if not using snappyHexMesh remove the point
             utility = CfdMesh.MESHERS[self.form.cb_utility.currentIndex()]
             if utility != "snappyHexMesh":
@@ -226,9 +226,9 @@ class TaskPanelCfdMesh:
     def pointInMesh_changed(self):
         if FreeCAD.GuiUp:
             self.prev_point_move_node.translation.setValue(
-                             self.if_2_float(self.form.if_pointInMeshX),
-                             self.if_2_float(self.form.if_pointInMeshY),
-                             self.if_2_float(self.form.if_pointInMeshZ))
+                             self.if2Float(self.form.if_pointInMeshX),
+                             self.if2Float(self.form.if_pointInMeshY),
+                             self.if2Float(self.form.if_pointInMeshZ))
 
     def writeMesh(self):
         import importlib
@@ -473,12 +473,12 @@ class TaskPanelCfdMesh:
             setQuantity(self.form.if_pointInMeshY, str(iMPy) + "mm")
             setQuantity(self.form.if_pointInMeshZ, str(iMPz) + "mm")
 
-    def if_2_float(self, if_obj):
+    def if2Float(self, if_obj):
         """ converts the qt input field in the gui to float """
         value_obj = Units.Quantity(if_obj.text())
         return value_obj.getValueAs(Units.Length).Value
 
-    def get_prev_point_size(self, shape):
+    def getPrevPointSize(self, shape):
         """ return the estimated size of the preview point based on the mesh object"""
         size = 0.1 * min(min(shape.BoundBox.XLength, shape.BoundBox.YLength), shape.BoundBox.ZLength)
         return size
