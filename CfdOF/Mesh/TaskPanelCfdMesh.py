@@ -81,9 +81,9 @@ class TaskPanelCfdMesh:
         self.form.pb_load_mesh.clicked.connect(self.pbLoadMeshClicked)
         self.form.pb_clear_mesh.clicked.connect(self.pbClearMeshClicked)
         self.form.pb_searchPointInMesh.clicked.connect(self.searchPointInMesh)
-        self.form.if_pointInMeshX.valueChanged.connect(self.pointInMesh_changed)
-        self.form.if_pointInMeshY.valueChanged.connect(self.pointInMesh_changed)
-        self.form.if_pointInMeshZ.valueChanged.connect(self.pointInMesh_changed)
+        self.form.if_pointInMeshX.valueChanged.connect(self.pointInMeshChanged)
+        self.form.if_pointInMeshY.valueChanged.connect(self.pointInMeshChanged)
+        self.form.if_pointInMeshZ.valueChanged.connect(self.pointInMeshChanged)
         self.form.pb_check_mesh.clicked.connect(self.checkMeshClicked)
 
         self.radioGroup = QtGui.QButtonGroup()
@@ -223,7 +223,7 @@ class TaskPanelCfdMesh:
             if FreeCAD.GuiUp:
                 FreeCADGui.ActiveDocument.ActiveView.getSceneGraph().removeChild(self.prev_point_node)
 
-    def pointInMesh_changed(self):
+    def pointInMeshChanged(self):
         if FreeCAD.GuiUp:
             self.prev_point_move_node.translation.setValue(
                              self.if2Float(self.form.if_pointInMeshX),
