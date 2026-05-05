@@ -25,7 +25,7 @@ runParallel()
     if [ ! $err -eq 0 ]; then exit $err; fi
 }
 
-GMSH_EXE='/home/oliver/software/gmsh-4.13.1-Linux64/bin/gmsh'
+GMSH_EXE='/usr/local/bin/gmsh'
 if [[ $OSTYPE == 'darwin'* ]]
 then
     NTHREADS=$(sysctl -n hw.logicalcpu)
