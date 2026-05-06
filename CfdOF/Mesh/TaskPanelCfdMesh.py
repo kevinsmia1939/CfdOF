@@ -25,10 +25,10 @@
 #                                                                              #
 ################################################################################
 
-from __future__ import print_function
-import FreeCAD
+import math
 import os
 import os.path
+import FreeCAD
 from CfdOF.Mesh import CfdMesh
 import time
 from datetime import timedelta
@@ -480,5 +480,5 @@ class TaskPanelCfdMesh:
 
     def getPrevPointSize(self, shape):
         """ return the estimated size of the preview point based on the mesh object"""
-        size = 0.1 * min(min(shape.BoundBox.XLength, shape.BoundBox.YLength), shape.BoundBox.ZLength)
+        size = 0.02*math.sqrt(shape.BoundBox.XLength**2 + shape.BoundBox.YLength**2 + shape.BoundBox.ZLength**2)
         return size
