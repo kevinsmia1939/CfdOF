@@ -51,6 +51,8 @@ runCommand "$GMSH_EXE" -nt $NTHREADS - "gmsh/%(Name%)_Geometry.geo"
 %{%(FoamRuntime%)
 %:Posix
 FOAMDIR="%(TranslatedFoamPath%)"
+%:BashWSL
+FOAMDIR="%(TranslatedFoamPath%)"
 %}
 if [ ! -z "$FOAMDIR" ]
 then

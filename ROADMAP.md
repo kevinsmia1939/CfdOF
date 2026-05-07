@@ -17,7 +17,6 @@ could instead be directed to the log, so that the report view is cleaner and mor
 for the user. Generally improve the logging and messages that are printed there.
 (see FreeCAD.Console.PrintLog/PrintMessage/PrintWarning/PrintError.)
 * Test and provide more elegant errors or fallbacks for invalid/unexpected/unusual sequences of actions
-* Test and fix running under WSL on Windows
   
 ## Meshing
 
@@ -28,7 +27,6 @@ for the user. Generally improve the logging and messages that are printed there.
 
 * Add a mechanism to specify surface tension coefficients between each pair of fluids
   (with future extensibility to other pairwise interfacial properties).
-* Add cyclic boundary conditions
 * Add ability to import / export existing OF cases / results
 * Improve organisation of source code
 * Improve edge detection for meshing?

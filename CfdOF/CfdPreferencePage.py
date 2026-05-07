@@ -227,7 +227,7 @@ class CfdPreferencePage:
             None, translate("FilePicker", "Choose OpenFOAM directory"), self.foam_dir
         )
         if d and os.access(d, os.R_OK):
-            self.foam_dir = d
+            self.foam_dir = os.path.normpath(d)
         self.form.le_foam_dir.setText(self.foam_dir)
 
     def chooseParaviewPath(self):
@@ -238,7 +238,7 @@ class CfdPreferencePage:
             filter="*.exe" if platform.system() == "Windows" else None,
         )
         if p and os.access(p, os.R_OK):
-            self.paraview_path = p
+            self.paraview_path = os.path.normpath(p)
         self.form.le_paraview_path.setText(self.paraview_path)
 
     def chooseGmshPath(self):
@@ -249,7 +249,7 @@ class CfdPreferencePage:
             filter="*.exe" if platform.system() == "Windows" else None,
         )
         if p and os.access(p, os.R_OK):
-            self.gmsh_path = p
+            self.gmsh_path = os.path.normpath(p)
         self.form.le_gmsh_path.setText(self.gmsh_path)
 
     def outputDirChanged(self, text):
@@ -615,7 +615,7 @@ class CfdPreferencePageThread(QThread):
                 self.user_dir = CfdTools.reverseTranslatePath(self.user_dir, linux_shell=True)
 
             self.signals.status.emit("Extracting cfMesh...")
-            if CfdTools.getFoamRuntime() == 'WindowsDocker':
+            if CfdTools.getFoamRuntime() == 'BashWSL' or CfdTools.getFoamRuntime() == 'WindowsDocker':
                 from zipfile import ZipFile
                 with ZipFile(filename, 'r') as zip:
                     with tempfile.TemporaryDirectory() as tempdir:
@@ -645,7 +645,7 @@ class CfdPreferencePageThread(QThread):
                 self.user_dir = CfdTools.reverseTranslatePath(self.user_dir, linux_shell=True)
 
             self.signals.status.emit("Extracting HiSA...")
-            if CfdTools.getFoamRuntime() == 'WindowsDocker':
+            if CfdTools.getFoamRuntime() == 'BashWSL' or CfdTools.getFoamRuntime() == 'WindowsDocker':
                 from zipfile import ZipFile
                 with ZipFile(filename, 'r') as zip:
                     with tempfile.TemporaryDirectory() as tempdir:

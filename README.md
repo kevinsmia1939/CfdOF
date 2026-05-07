@@ -73,7 +73,7 @@ which can be automatically installed (see below for instructions).
 - [Paraview](http://www.paraview.org/)
 - [cfMesh (customised version updated to compile with latest OpenFOAM versions)](https://sourceforge.net/projects/cfmesh-cfdof/)
 - [HiSA (High Speed Aerodynamic Solver)](https://hisa.gitlab.io)
-- [Gmsh (version 2.13 or later)](http://gmsh.info/) - optional, for generating tetrahedral meshes
+- [Gmsh (version 2.15 or later)](http://gmsh.info/) - optional, for generating tetrahedral meshes
 
 ### Setting up the CfdOF workbench
 
@@ -103,10 +103,11 @@ Dependencies can be checked and installed conveniently from the CfdOF Preference
 In the FreeCAD window, select CfdOF | Open preferences.  The dependencies can be installed as
 individual components or as part of a docker container (refer to the **Docker container install** section below).
 
-The OpenFOAM installation is via the [BlueCFD Core](https://bluecfd.github.io/Core/) port of OpenFOAM (version 2024-1)
-or the [OpenCFD MinGW package](https://www.openfoam.com/download/install-binary-windows-mingw.php).
-Note that only version 2212 of the latter is currently supported due to an apparent bug affecting
-the operation of the `createPatch` utility in later versions.
+The OpenFOAM installation is via the [BlueCFD Core](https://bluecfd.github.io/Core/) port of OpenFOAM (version 2024-1).
+The [OpenCFD MinGW package](https://www.openfoam.com/download/install-binary-windows-mingw.php) is also
+supported; however, note that only version 2212 of the latter is currently working due to an apparent bug affecting
+the operation of the `createPatch` utility in later versions. Installations of OpenFOAM on the
+WSL Linux subsystem are also supported. Detailed instructions can be found [here](https://openfoam.org/download/windows/).
 
 OpenFOAM can be installed manually using the above links, or by clicking the relevant
 button in the Preferences panel described above. If you experience problems running OpenFOAM in CfdOF, please make
@@ -125,8 +126,9 @@ MPI is needed in order to run in parallel.
 
 Set the OpenFOAM install directory in the preferences panel to the BlueCFD install directory,
 or the directory ending in the 'vXXXX' subfolder (where XXXX is the version number installed)
-in the case of the MinGW package. It will be automatically detected in the default install
-locations.
+in the case of the MinGW package. For WSL, select the OpenFOAM installation directory within
+the Linux filesystem (or prefix the Linux path with `\\wsl.localhost\<Distribution>`, changing
+slashes to backslashes). It will be automatically detected in the default install locations.
 
 Any version of [ParaView](https://www.paraview.org/download/) can be installed,
 by following the above link or clicking the relevant button in the Preferences panel.

@@ -34,6 +34,8 @@ runCommand()
 %{%(system/FoamRuntime%)
 %:Posix
 FOAMDIR="%(system/TranslatedFoamPath%)"
+%:BashWSL
+FOAMDIR="%(system/TranslatedFoamPath%)"
 %}
 if [ ! -z "$FOAMDIR" ]
 then

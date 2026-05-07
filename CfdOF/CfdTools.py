@@ -640,6 +640,14 @@ def translatePath(p, linux_shell=False):
             return pp
     elif getFoamRuntime() == "BashWSL":
         # bash on windows: C:\Path -> /mnt/c/Path
+        #                  \\wsl.localhost\.*\Path -> /Path
+        if p.startswith('\\\\wsl.localhost\\'):
+            p = p.removeprefix('\\\\wsl.localhost\\')
+            dirs = p.split('\\')
+            if len(dirs) > 1:
+                return '/' + '/'.join(dirs[1:])
+            else:
+                return '/' + '/'.join(dirs)
         if os.path.isabs(p):
             return "/mnt/" + (drive[:-1]).lower() + pp
         else:
@@ -670,8 +678,19 @@ def reverseTranslatePath(p, linux_shell=False):
             return p.replace('/', '\\')
     elif getFoamRuntime() == "BashWSL":
         # bash on windows: /mnt/c/Path -> C:\Path
+        #                  /Path -> \\wsl.localhost\<Dist>\
         if p.startswith('/mnt/'):
             return pp[2].toupper() + ':\\' + '\\'.join(pp[3:])
+        elif os.path.isabs(p):
+            # Borrow the prefix from the foam directory (assumes this is in the Linux drive)
+            foam_dir = getFoamDir()
+            if foam_dir.startswith('\\\\wsl.localhost\\'):
+                dirs = foam_dir.split('\\')
+                if (len(dirs) > 2):
+                    prefix = '\\'.join(dirs[0:3])
+                else:
+                    prefix = '\\'.join(dirs)
+                return prefix + p.replace('/', '\\')
         else:
             return p.replace('/', '\\')
     elif linux_shell and getFoamRuntime().startswith("BlueCFD"):
@@ -735,7 +754,6 @@ def makeRunCommand(cmd, dir=None, source_env=True, linux_shell=False):
     including changing to the specified working directory if applicable.
     In Windows, linux_shell specifies running under the msys linux terminal
     """
-
     if getFoamRuntime() == "PosixDocker" and ' pull ' in cmd:
         # Case where running from Install Docker thread
         return cmd.split()
@@ -778,7 +796,7 @@ def makeRunCommand(cmd, dir=None, source_env=True, linux_shell=False):
                             break
             source = 'set OLDPATH=!PATH! && call "{}\\setvars_OF{}.bat" && set PATH=!PATH!;!OLDPATH! && '.format(norm_inst_path, foam_version)
         else:
-            env_setup_script = "{}/etc/bashrc".format(installation_path)
+            env_setup_script = "{}/etc/bashrc".format(translatePath(installation_path))
             source = 'source "{}" && '.format(env_setup_script)
 
     if getFoamRuntime() == "PosixDocker":
@@ -790,6 +808,10 @@ def makeRunCommand(cmd, dir=None, source_env=True, linux_shell=False):
         if not linux_shell and (getFoamRuntime() == "MinGW" or getFoamRuntime().startswith("BlueCFD")):
             cd = 'cd /d "{}" && '.format(dir)
         else:
+            if getFoamRuntime() == "BashWSL":
+                if ' ' in dir:
+                    # I'm not sure why this is - it seems to be OpenFOAM itself, since WSL is fine with spaces
+                    raise RuntimeError("Paths containing spaces are not supported with WSL")
             cd = 'cd "{}" && '.format(translatePath(dir, linux_shell=linux_shell))
 
     if getFoamRuntime() == "PosixDocker":
@@ -883,7 +905,8 @@ def makeRunCommand(cmd, dir=None, source_env=True, linux_shell=False):
                    '\' -l ofuser"']
         return cmdline
     elif getFoamRuntime() == "BashWSL":
-        cmdline = ['bash', '-c', source + cd + cmd]
+        # Escape any $ signs 
+        cmdline = ['bash', '-c', (source + cd + cmd).replace('$', '\\$')]
         return cmdline
     else:
         cmdline = ['bash', '-c', source + cd + cmd]
@@ -1076,7 +1099,9 @@ def checkCfdDependencies(msgFn):
 
                 # Check for cfMesh
                 try:
-                    cfmesh_ver = runFoamCommand("cartesianMesh -version")[0]
+                    # Run in home directory to be safe to avoid a freak-out by OpenFOAM applications if run in a path
+                    # with invalid chars (specifically, a path with spaces, under WSL)
+                    cfmesh_ver = runFoamCommand("cartesianMesh -version", os.path.expanduser('~'))[0]
                     cfmesh_ver = cfmesh_ver.rstrip().split()[-1]
                     msgFn("cfMesh-CfdOF version: " + cfmesh_ver)
                     cfmesh_ver = cfmesh_ver.split('.')
@@ -1091,7 +1116,7 @@ def checkCfdDependencies(msgFn):
 
                 # Check for HiSA
                 try:
-                    hisa_ver = runFoamCommand("hisa -version")[0]
+                    hisa_ver = runFoamCommand("hisa -version", os.path.expanduser('~'))[0]
                     hisa_ver = hisa_ver.rstrip().split()[-1]
                     msgFn("HiSA version: " + hisa_ver)
                     hisa_ver = hisa_ver.split('.')
@@ -1194,7 +1219,7 @@ def checkCfdDependencies(msgFn):
         msgFn("gmsh executable: " + gmsh_exe)
         try:
             # Needs to be runnable from OpenFOAM environment
-            gmshversion = runFoamCommand('"' + gmsh_exe + '"' + " -version")[2]
+            gmshversion = runFoamCommand('"' + translatePath(gmsh_exe) + '"' + " -version")[2]
         except (OSError, subprocess.CalledProcessError):
             msgFn("gmsh could not be run from OpenFOAM environment")
         if getFoamRuntime() == "MinGW":

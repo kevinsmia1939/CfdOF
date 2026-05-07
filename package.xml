@@ -12,7 +12,7 @@
 
     <freecadmin>1.0.0</freecadmin>
 
-    <version>1.35.1</version>
+    <version>1.36.1</version>
     <date>2026-05-06</date>
 
     <!--[ Dependencies ]―――――――――――――――――――――――――――――――――――――――――――――――――――――-->
@@ -74,7 +74,7 @@
   
     <url
         type = 'readme'
-    >https://github.com/jaheyns/CfdOF/blob/master/README.md</url>
+    >https://github.com/jaheyns/CfdOF/raw/master/README.md</url>
 
     <!--[ Content ]――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-->
 
