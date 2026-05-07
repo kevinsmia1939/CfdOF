@@ -1209,7 +1209,7 @@ def checkCfdDependencies(msgFn):
         msgFn("Could not load Plot module")
 
     print("Checking for gmsh:")
-    # check that gmsh version 2.13 or greater is installed
+    # check that gmsh version 2.15 or greater is installed
     gmshversion = ""
     try:
         gmsh_exe = getGmshExecutable()
@@ -1240,8 +1240,8 @@ def checkCfdDependencies(msgFn):
             gmshversion = gmshversion[-1]
             msgFn("gmsh version: " + gmshversion)
             versionlist = gmshversion.split(".")
-            if int(versionlist[0]) < 2 or (int(versionlist[0]) == 2 and int(versionlist[1]) < 13):
-                msgFn("gmsh version is older than minimum required (2.13)")
+            if int(versionlist[0]) < 2 or (int(versionlist[0]) == 2 and int(versionlist[1]) < 15):
+                msgFn("gmsh version is older than minimum required (2.15)")
         else:
             msgFn("gmsh version: " + gmshversion)
 
