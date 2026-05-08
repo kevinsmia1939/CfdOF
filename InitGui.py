@@ -72,6 +72,34 @@ class CfdOFWorkbench(Workbench):
         import CfdOF.CfdReloadWorkbench
         import CfdOF.CfdTestCommands
 
+        # Create backward compatible aliases for loading from file when modules have moved
+        from CfdOF import CfdAnalysis
+        sys.modules['CfdAnalysis'] = CfdAnalysis
+        from CfdOF.Solve import CfdPhysicsSelection
+        sys.modules['CfdPhysicsSelection'] = CfdPhysicsSelection
+        from CfdOF.Solve import CfdFluidMaterial
+        sys.modules['CfdFluidMaterial'] = CfdFluidMaterial
+        from CfdOF.Solve import CfdInitialiseFlowField
+        sys.modules['CfdInitialiseFlowField'] = CfdInitialiseFlowField
+        from CfdOF.Mesh import CfdMesh
+        sys.modules['CfdMesh'] = CfdMesh
+        from CfdOF.Mesh import CfdMeshRefinement
+        sys.modules['CfdMeshRefinement'] = CfdMeshRefinement
+        from CfdOF.Solve import CfdFluidBoundary
+        sys.modules['CfdFluidBoundary'] = CfdFluidBoundary
+        from CfdOF.Solve import CfdZone
+        sys.modules['CfdZone'] = CfdZone
+        from CfdOF.Solve import CfdSolverFoam
+        sys.modules['CfdSolverFoam'] = CfdSolverFoam
+        from CfdOF.PostProcess import CfdReportingFunction
+        sys.modules['core.functionobjects.reporting.CfdReportingFunctions'] = CfdReportingFunction
+        sys.modules['CfdOF.PostProcess.CfdReportingFunctions'] = CfdReportingFunction
+        from CfdOF.Solve import CfdScalarTransportFunction
+        sys.modules['core.functionobjects.scalartransport.CfdScalarTransportFunction'] = CfdScalarTransportFunction
+        from CfdOF.Mesh import CfdDynamicMeshRefinement
+        sys.modules['core.mesh.dynamic.CfdDynamicMeshRefinement'] = CfdDynamicMeshRefinement
+        sys.modules['core'] = CfdOF
+
         # Commands for both menu and toolbar, or one or the other if a tuple
         # starting with 'M' or 'T'
         cmdlst = ['CfdOF_Analysis',
@@ -118,31 +146,3 @@ class CfdOFWorkbench(Workbench):
 import CfdOF
 FreeCADGui.addWorkbench(CfdOFWorkbench())
 FreeCAD.__unit_test__ += ["TestCfdOF"]
-
-# Create backward compatible aliases for loading from file when modules have moved
-from CfdOF import CfdAnalysis
-sys.modules['CfdAnalysis'] = CfdAnalysis
-from CfdOF.Solve import CfdPhysicsSelection
-sys.modules['CfdPhysicsSelection'] = CfdPhysicsSelection
-from CfdOF.Solve import CfdFluidMaterial
-sys.modules['CfdFluidMaterial'] = CfdFluidMaterial
-from CfdOF.Solve import CfdInitialiseFlowField
-sys.modules['CfdInitialiseFlowField'] = CfdInitialiseFlowField
-from CfdOF.Mesh import CfdMesh
-sys.modules['CfdMesh'] = CfdMesh
-from CfdOF.Mesh import CfdMeshRefinement
-sys.modules['CfdMeshRefinement'] = CfdMeshRefinement
-from CfdOF.Solve import CfdFluidBoundary
-sys.modules['CfdFluidBoundary'] = CfdFluidBoundary
-from CfdOF.Solve import CfdZone
-sys.modules['CfdZone'] = CfdZone
-from CfdOF.Solve import CfdSolverFoam
-sys.modules['CfdSolverFoam'] = CfdSolverFoam
-from CfdOF.PostProcess import CfdReportingFunction
-sys.modules['core.functionobjects.reporting.CfdReportingFunctions'] = CfdReportingFunction
-sys.modules['CfdOF.PostProcess.CfdReportingFunctions'] = CfdReportingFunction
-from CfdOF.Solve import CfdScalarTransportFunction
-sys.modules['core.functionobjects.scalartransport.CfdScalarTransportFunction'] = CfdScalarTransportFunction
-from CfdOF.Mesh import CfdDynamicMeshRefinement
-sys.modules['core.mesh.dynamic.CfdDynamicMeshRefinement'] = CfdDynamicMeshRefinement
-sys.modules['core'] = CfdOF
