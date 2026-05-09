@@ -346,6 +346,14 @@ def getQuantity(inputField):
     return str(q)
 
 
+def if2Float(if_obj):
+    """
+    converts the qt input field in the gui to float
+    """
+    value_obj = Units.Quantity(if_obj.text())
+    return value_obj.getValueAs(Units.Length).Value
+
+
 def indexOrDefault(list, findItem, defaultIndex):
     """
     Look for findItem in list, and return defaultIndex if not found

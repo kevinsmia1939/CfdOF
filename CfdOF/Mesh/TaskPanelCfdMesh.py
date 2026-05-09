@@ -33,7 +33,7 @@ from CfdOF.Mesh import CfdMesh
 import time
 from datetime import timedelta
 from CfdOF import CfdTools
-from CfdOF.CfdTools import setQuantity, getQuantity, storeIfChanged
+from CfdOF.CfdTools import setQuantity, getQuantity, if2Float, storeIfChanged
 from CfdOF.Mesh import CfdMeshTools
 from CfdOF.CfdConsoleProcess import CfdConsoleProcess
 from FreeCAD import Units
@@ -150,9 +150,9 @@ class TaskPanelCfdMesh:
         if FreeCAD.GuiUp:
             # create the point every time the taskpanel is loaded
             initPrevPoint(self.prev_point_node, self.prev_point_move_node, self.getPrevPointSize(self.mesh_obj.Part.Shape), 0, 1, 0,
-                         self.if2Float(self.form.if_pointInMeshX),
-                         self.if2Float(self.form.if_pointInMeshY),
-                         self.if2Float(self.form.if_pointInMeshZ))
+                         if2Float(self.form.if_pointInMeshX),
+                         if2Float(self.form.if_pointInMeshY),
+                         if2Float(self.form.if_pointInMeshZ))
             # then if not using snappyHexMesh remove the point
             utility = CfdMesh.MESHERS[self.form.cb_utility.currentIndex()]
             if utility != "snappyHexMesh":
@@ -226,9 +226,9 @@ class TaskPanelCfdMesh:
     def pointInMeshChanged(self):
         if FreeCAD.GuiUp:
             self.prev_point_move_node.translation.setValue(
-                             self.if2Float(self.form.if_pointInMeshX),
-                             self.if2Float(self.form.if_pointInMeshY),
-                             self.if2Float(self.form.if_pointInMeshZ))
+                             if2Float(self.form.if_pointInMeshX),
+                             if2Float(self.form.if_pointInMeshY),
+                             if2Float(self.form.if_pointInMeshZ))
 
     def writeMesh(self):
         import importlib
@@ -472,11 +472,6 @@ class TaskPanelCfdMesh:
             setQuantity(self.form.if_pointInMeshX, str(iMPx) + "mm")
             setQuantity(self.form.if_pointInMeshY, str(iMPy) + "mm")
             setQuantity(self.form.if_pointInMeshZ, str(iMPz) + "mm")
-
-    def if2Float(self, if_obj):
-        """ converts the qt input field in the gui to float """
-        value_obj = Units.Quantity(if_obj.text())
-        return value_obj.getValueAs(Units.Length).Value
 
     def getPrevPointSize(self, shape):
         """ return the estimated size of the preview point based on the mesh object"""
