@@ -123,3 +123,4 @@ init.UseInletTurbulenceValues = False
 init.omega = '1 1/s'
 init.k = '0 mm^2/s^2'
 init.BoundaryU = None
+FreeCAD.ActiveDocument.recompute()

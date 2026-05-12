@@ -322,3 +322,4 @@ init.BoundaryU = FreeCAD.ActiveDocument.CfdFluidBoundary003
 init.BoundaryP = FreeCAD.ActiveDocument.CfdFluidBoundary004
 init.BoundaryT = FreeCAD.ActiveDocument.CfdFluidBoundary003
 init.BoundaryTurb = FreeCAD.ActiveDocument.CfdFluidBoundary003
+FreeCAD.ActiveDocument.recompute()
