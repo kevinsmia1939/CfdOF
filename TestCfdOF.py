@@ -58,7 +58,7 @@ import shutil
 
 
 home_path = CfdTools.getModulePath()
-temp_dir = tempfile.gettempdir()
+temp_dir = CfdTools.getDefaultOutputPath()
 test_file_dir = os.path.join(home_path, 'Data', 'TestFiles')
 
 
