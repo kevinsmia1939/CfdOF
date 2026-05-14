@@ -1,0 +1,13 @@
+; SPDX-FileCopyrightText: 2026 CfdOF contributors
+; QuartzSolid
+;
+; FreeCAD Material card: see https://www.freecad.org/wiki/Material
+
+[FCMat]
+Name = Quartz_solid
+Type = Solid
+Description = Fused quartz solid thermal properties
+Density = 2200 kg/m^3
+ThermalConductivity = 1.4 W/m/K
+SpecificHeat = 700 J/kg/K
+ReferenceSource = https://www.matweb.com/search/DataSheet.aspx?MatGUID=ffccd1bca743445ca3bc1706a52974dd

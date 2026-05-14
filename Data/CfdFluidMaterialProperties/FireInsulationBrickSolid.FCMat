@@ -1,0 +1,13 @@
+; SPDX-FileCopyrightText: 2026 CfdOF contributors
+; FireInsulationBrickSolid
+;
+; FreeCAD Material card: see https://www.freecad.org/wiki/Material
+
+[FCMat]
+Name = FireInsulationBrick_solid
+Type = Solid
+Description = Skamol SUPER 1100 E calcium silicate refractory insulation solid thermal properties
+Density = 245 kg/m^3
+ThermalConductivity = 0.070 W/m/K
+SpecificHeat = 840 J/kg/K
+ReferenceSource = https://www.matweb.com/search/DataSheet.aspx?MatGUID=052e271dc1f7447aba062bdf1e662e75
