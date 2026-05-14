@@ -94,4 +94,3 @@ then
 else
     runParallel $NPROC buoyantSimpleFoam
 fi
-

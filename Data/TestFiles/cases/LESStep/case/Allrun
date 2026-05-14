@@ -87,4 +87,3 @@ then
 else
     runParallel $NPROC pimpleFoam
 fi
-

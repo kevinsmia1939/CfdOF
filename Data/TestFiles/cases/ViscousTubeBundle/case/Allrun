@@ -92,4 +92,3 @@ then
 else
     runParallel $NPROC simpleFoam
 fi
-

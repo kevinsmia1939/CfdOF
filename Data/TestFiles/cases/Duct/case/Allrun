@@ -96,4 +96,3 @@ then
 else
     runParallel $NPROC porousSimpleFoam
 fi
-
