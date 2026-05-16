@@ -350,7 +350,7 @@ def if2Float(if_obj):
     """
     converts the qt input field in the gui to float
     """
-    value_obj = Units.Quantity(if_obj.text())
+    value_obj = if_obj.property("quantity")
     return value_obj.getValueAs(Units.Length).Value
 
 
