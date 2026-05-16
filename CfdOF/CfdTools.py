@@ -351,7 +351,7 @@ def if2Float(if_obj):
     converts the qt input field in the gui to float
     """
     value_obj = if_obj.property("quantity")
-    return value_obj.getValueAs(Units.Length).Value
+    return float(value_obj)
 
 
 def indexOrDefault(list, findItem, defaultIndex):
