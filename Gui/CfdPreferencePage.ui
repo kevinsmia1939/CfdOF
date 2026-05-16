@@ -162,7 +162,7 @@
         <bool>true</bool>
        </property>
        <property name="toolTip">
-        <string>The directory to which case folders are written. Used unless overridden on a per-analysis basis. Use a '.' to denote the location of the current saved document, or leave blank to use a temporary directory.</string>
+        <string>The directory to which case folders are written. Used unless overridden on a per-analysis basis. Use a '.' to denote the location of the current saved document, or leave blank to use the default location.</string>
        </property>
        <property name="readOnly">
         <bool>false</bool>

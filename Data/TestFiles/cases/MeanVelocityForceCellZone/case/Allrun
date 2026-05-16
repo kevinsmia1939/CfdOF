@@ -26,7 +26,7 @@ runCommand()
 }
 
 # Unset and source bashrc
-FOAMDIR="/opt/openfoam13"
+FOAMDIR="/usr/lib/openfoam/openfoam2512"
 if [ ! -z "$FOAMDIR" ]
 then
     source "$FOAMDIR/etc/config.sh/unset" 2> /dev/null
@@ -34,7 +34,7 @@ then
 fi
 
 # Copy mesh from mesh case dir if available
-MESHDIR="../meshCaseDamBreak3D"
+MESHDIR="../meshCaseMeanVelocityForceCellZone"
 if [ -f "$MESHDIR"/constant/polyMesh/faces ]
 then
     rm -rf constant/polyMesh
@@ -63,23 +63,11 @@ else
     echo "cAlpha 1;" > system/cAlpha
 fi
 
-mkdir -p 0/include
-if [ -z ${FOAM_API+x} ] && [ "$WM_PROJECT_VERSION" -ge 9 ]
-then
-    echo "type internal;" | tee 0/include/helperPatchFieldType system/helperPatchType
-else
-    echo "type fixedValue;" > 0/include/helperPatchFieldType
-    echo "type patch;" > system/helperPatchType
-fi
-
 # Update patch name and type
 runCommand createPatch -overwrite
 
 # Set cell zones contained inside the .stl surfaces
 runCommand topoSet -dict system/topoSetZonesDict
-
-# Set internal fields according to setFieldsDict
-runCommand setFields
 
 # Parallel decomposition
 if [ ! -d processor0 ]
@@ -90,15 +78,16 @@ fi
 # Pick up number of parallel processes
 NPROC=$(foamDictionary -entry "numberOfSubdomains" -value system/decomposeParDict)
 
-# Mesh renumbering does not work in Foundation with dynamic mesh
+# Mesh renumbering
+runParallel $NPROC renumberMesh -overwrite
 
 # Run application in parallel
 # Detect new foamRun in Foundation versions >= 11 and translate solver
 which foamRun > /dev/null 2>&1
 if [ $? == 0 ]
 then
-    runParallel $NPROC foamRun -solver incompressibleVoF
+    runParallel $NPROC foamRun -solver incompressibleFluid
 else
-    runParallel $NPROC interFoam
+    runParallel $NPROC pimpleFoam
 fi
 

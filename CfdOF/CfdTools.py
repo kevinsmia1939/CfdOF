@@ -78,7 +78,7 @@ def getDefaultOutputPath():
     prefs = getPreferencesLocation()
     output_path = FreeCAD.ParamGet(prefs).GetString("DefaultOutputPath", "")
     if not output_path:
-        output_path = tempfile.gettempdir()
+        output_path = os.path.expanduser('~/CfdOF')
     output_path = os.path.normpath(output_path)
     return output_path
 
@@ -1844,11 +1844,7 @@ class DockerContainer:
     def start_container(self):
         prefs = getPreferencesLocation()
         self.image_name = FreeCAD.ParamGet(prefs).GetString("DockerURL", "")
-        output_path = FreeCAD.ParamGet(prefs).GetString("DefaultOutputPath", "")
-
-        if not output_path:
-            output_path = tempfile.gettempdir()
-        output_path = os.path.normpath(output_path)
+        output_path = getDefaultOutputPath()
 
         if not os.path.isdir(output_path):
             print("Default output directory not found")
