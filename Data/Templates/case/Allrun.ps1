@@ -103,6 +103,21 @@ if ( $Env:WM_PROJECT_VERSION[0] -ne "v" -and 10 -le $Env:WM_PROJECT_VERSION )
 }
 
 %}
+%{%(physics/TurbulenceModel%)
+%:kOmegaSSTDES kOmegaSSTDDES kOmegaSSTIDDES SpalartAllmarasDES SpalartAllmarasDDES SpalartAllmarasIDDES
+# write the type of the DESModelRegions function for of10+ and for others
+if ( $Env:WM_PROJECT_VERSION[0] -ne "v" -and 10 -le $Env:WM_PROJECT_VERSION )
+{
+       echo 'type                      writeObjects; // of10' > system/DESModelRegionsFunction
+       echo 'libs                      (\"libutilityFunctionObjects.so\"); //of10' >> system/DESModelRegionsFunction
+}
+else
+{
+       echo 'type            DESModelRegions;' > system/DESModelRegionsFunction
+       echo 'libs            (\"libfieldFunctionObjects.so\");' >> system/DESModelRegionsFunction
+}
+
+%}
 # Update patch name and type
 runCommand createPatch -overwrite
 
