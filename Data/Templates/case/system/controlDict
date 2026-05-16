@@ -72,7 +72,7 @@ libs
 );
 
 %{%(physics/TurbulenceModel%)
-%:kOmegaSSTDES kOmegaSSTDDES kOmegaSSTIDDES SpalartAllmarasDES SpalartAllmarasDDES SpalartAllmarasIDDES
+%:SpalartAllmarasDES SpalartAllmarasDDES SpalartAllmarasIDDES
 // for reporting the DES/LES region field in openfoam 10 and later
 cacheTemporaryObjects
 (
