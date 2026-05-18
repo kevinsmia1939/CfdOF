@@ -113,6 +113,19 @@ then
 fi
 
 %}
+%{%(physics/TurbulenceModel%)
+%:kOmegaSSTDES kOmegaSSTDDES kOmegaSSTIDDES SpalartAllmarasDES SpalartAllmarasDDES SpalartAllmarasIDDES
+# write the type of the DESModelRegions function for of10+ and for others
+if [ "$WM_PROJECT_VERSION" -ge 10 ] && [ "${WM_PROJECT_VERSION:0:1}" != "v" ]
+then
+       echo "type                      writeObjects; // of10" > system/DESModelRegionsFunction
+       echo "libs                      (\"libutilityFunctionObjects.so\"); //of10" >> system/DESModelRegionsFunction
+else
+       echo "type            DESModelRegions;" > system/DESModelRegionsFunction
+       echo "libs            (\"libfieldFunctionObjects.so\");" >> system/DESModelRegionsFunction
+fi
+
+%}
 # Update patch name and type
 runCommand createPatch -overwrite
 
