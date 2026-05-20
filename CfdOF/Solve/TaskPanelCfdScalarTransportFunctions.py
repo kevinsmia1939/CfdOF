@@ -30,12 +30,18 @@ from CfdOF import CfdTools
 from CfdOF.CfdTools import getQuantity, setQuantity, storeIfChanged, indexOrDefault
 if FreeCAD.GuiUp:
     import FreeCADGui
+    from CfdOF.CfdTools import if2Float
+    from CfdOF.PreviewShapes import getPrevPointSize, initPrevPoint
+    from pivy import coin
 
 
 class TaskPanelCfdScalarTransportFunctions:
     """
     Task panel for adding solver scalar transport function objects
     """
+    if FreeCAD.GuiUp:
+        prev_point_move_node = coin.SoTranslation()
+        prev_point_node = coin.SoSeparator()
     def __init__(self, obj):
         self.obj = obj
         self.analysis_obj = CfdTools.getParentAnalysisObject(obj)
@@ -44,6 +50,9 @@ class TaskPanelCfdScalarTransportFunctions:
 
         ui_path = os.path.join(CfdTools.getModulePath(), 'Gui', "TaskPanelCfdScalarTransportFunctions.ui")
         self.form = FreeCADGui.PySideUic.loadUi(ui_path)
+        self.form.inputInjectionPointx.valueChanged.connect(self.inputInjectionPointChanged)
+        self.form.inputInjectionPointy.valueChanged.connect(self.inputInjectionPointChanged)
+        self.form.inputInjectionPointz.valueChanged.connect(self.inputInjectionPointChanged)
         
         self.load()
         self.updateUI()
@@ -74,13 +83,35 @@ class TaskPanelCfdScalarTransportFunctions:
 
         setQuantity(self.form.inputInjectionRate, self.obj.InjectionRate)
 
+        if FreeCAD.GuiUp:
+            # create the point every time the taskpanel is loaded
+            point_size = 5; # defualt value when there is no mesh object
+            analysis_object = CfdTools.getParentAnalysisObject(self.obj)
+            mesh_object = CfdTools.getMeshObject(analysis_object)
+            if mesh_object is not None:
+                point_size = getPrevPointSize(mesh_object.Part.Shape)
+            initPrevPoint(self.prev_point_node, self.prev_point_move_node, point_size, 0, 1, 0,
+                         if2Float(self.form.inputInjectionPointx),
+                         if2Float(self.form.inputInjectionPointy),
+                         if2Float(self.form.inputInjectionPointz))
+
     def updateUI(self):
         # Multiphase
         mp = (self.physics_model and self.physics_model.Phase != 'Single')
         self.form.checkRestrictToPhase.setVisible(mp)
         self.form.comboPhase.setVisible(mp)
 
+    def inputInjectionPointChanged(self):
+        if FreeCAD.GuiUp:
+            self.prev_point_move_node.translation.setValue(
+                             if2Float(self.form.inputInjectionPointx),
+                             if2Float(self.form.inputInjectionPointy),
+                             if2Float(self.form.inputInjectionPointz))
+
     def accept(self):
+        if FreeCAD.GuiUp:
+            FreeCADGui.ActiveDocument.ActiveView.getSceneGraph().removeChild(self.prev_point_node)
+
         doc = FreeCADGui.getDocument(self.obj.Document)
         doc.resetEdit()
 
@@ -102,5 +133,8 @@ class TaskPanelCfdScalarTransportFunctions:
         FreeCADGui.doCommand("FreeCAD.ActiveDocument.recompute()")
 
     def reject(self):
+        if FreeCAD.GuiUp:
+            FreeCADGui.ActiveDocument.ActiveView.getSceneGraph().removeChild(self.prev_point_node)
+
         doc = FreeCADGui.getDocument(self.obj.Document)
         doc.resetEdit()

@@ -25,7 +25,6 @@
 #                                                                              #
 ################################################################################
 
-import math
 import os
 import os.path
 import FreeCAD
@@ -44,7 +43,7 @@ if FreeCAD.GuiUp:
     from PySide import QtGui
     from PySide.QtCore import Qt
     from PySide.QtGui import QApplication
-    from CfdOF.PreviewShapes import initPrevPoint
+    from CfdOF.PreviewShapes import getPrevPointSize, initPrevPoint
     from pivy import coin
 
 translate = FreeCAD.Qt.translate
@@ -149,7 +148,7 @@ class TaskPanelCfdMesh:
 
         if FreeCAD.GuiUp:
             # create the point every time the taskpanel is loaded
-            initPrevPoint(self.prev_point_node, self.prev_point_move_node, self.getPrevPointSize(self.mesh_obj.Part.Shape), 0, 1, 0,
+            initPrevPoint(self.prev_point_node, self.prev_point_move_node, getPrevPointSize(self.mesh_obj.Part.Shape), 0, 1, 0,
                          if2Float(self.form.if_pointInMeshX),
                          if2Float(self.form.if_pointInMeshY),
                          if2Float(self.form.if_pointInMeshZ))
@@ -472,8 +471,3 @@ class TaskPanelCfdMesh:
             setQuantity(self.form.if_pointInMeshX, str(iMPx) + "mm")
             setQuantity(self.form.if_pointInMeshY, str(iMPy) + "mm")
             setQuantity(self.form.if_pointInMeshZ, str(iMPz) + "mm")
-
-    def getPrevPointSize(self, shape):
-        """ return the estimated size of the preview point based on the mesh object"""
-        size = 0.02*math.sqrt(shape.BoundBox.XLength**2 + shape.BoundBox.YLength**2 + shape.BoundBox.ZLength**2)
-        return size

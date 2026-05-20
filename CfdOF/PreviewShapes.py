@@ -23,7 +23,13 @@
 
 import FreeCADGui
 
+import math
 from pivy import coin
+
+def getPrevPointSize(shape):
+    """ return the estimated size of the preview point based on the mesh object"""
+    size = 0.02*math.sqrt(shape.BoundBox.XLength**2 + shape.BoundBox.YLength**2 + shape.BoundBox.ZLength**2)
+    return size
 
 def initPrevPoint(node, move_node, rad, r, g, b, x=0, y=0, z=0):
     col = coin.SoBaseColor()
@@ -35,4 +41,3 @@ def initPrevPoint(node, move_node, rad, r, g, b, x=0, y=0, z=0):
     node.addChild(move_node)
     node.addChild(sphere)
     FreeCADGui.ActiveDocument.ActiveView.getSceneGraph().addChild(node)
-
