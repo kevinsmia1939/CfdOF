@@ -1,6 +1,4 @@
-Please submit merge requests to the 'master' branch.
+Please submit merge requests to the 'dev' branch.
 
-Before finalising your merge request, please:
-- Ensure that all tests pass with
+Before finalising your merge request, please ensure that all tests pass with
 ```FreeCAD -t TestCfdOF```
-- Increment the version number in ```package.xml```

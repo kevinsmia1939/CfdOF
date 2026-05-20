@@ -28,7 +28,8 @@ Windows) as the workbench will be loaded from this location. After installing th
 Addon Manager, you should be able to use Git for source code management directly from this directory.
 A symlink can be used in Linux if you wish to work in a more convenient location.
 
-To contribute code, we suggest forking the CfdOF repository via the Github GUI, and issuing a Merge Request with your
+To contribute code, we suggest forking the CfdOF repository via the Github GUI, creating a new branch
+based on the latest development version in the 'dev' branch, and issuing a Merge Request with your
 bug fix and/or new feature. The repository workflow we use is based on the [Github-flow] philosophy.
 Essentially, we ask all developers to submit merge requests for self-contained, tested and working features.
 Although the process can be frustrating at times, the long-term health of the project depends on being strict on the
@@ -43,6 +44,17 @@ If you wish to get a first impression or some guidance on a feature you are deve
 'Draft' merge request which can be updated later. Alternatively, open an issue for a proposed change to initiate a
 discussion.
 
+Please submit merge requests to the 'dev' branch after checking that all tests pass (see [Testing] below). This
+development version will periodically be tested more thoroughly by maintainers (typically on availability of new 
+OpenFOAM releases) and merged into the 'master' branch and tagged with a release number. This makes it avaiable
+for general users via the addon manager.
+
+Urgent bug fixes may also be cherry-picked into the 'master' branch by maintainers at other times.
+
+Before submitting a pull request, you are urged to rebase your changes on the latest 'dev' and clean
+up the git history, squashing unnecessary extra commits together and writing brief but meaningful commit
+messages.
+
 ### Version numbering
 
 The version number loosely follows [Semantic versioning](https://semver.org) approach in the form MAJOR.MINOR.PATCH.
@@ -50,8 +62,22 @@ The major version number is incremented when there is a change which breaks back
 (`FCStd` files). This is avoided wherever possible, and phased conversion periods where an old format is accepted and the
 new format written out, are preferred. The minor version number is incremented when there is a new feature in a release,
 or a significant enhancement to existing functionality. The patch version is updated when a release contains only
-a minor bug fix or fixes. Please increment the version number in ```package.xml``` when
-submitting a merge request.
+a minor bug fix or fixes. Please do not increment the version number in ```package.xml``` when - this will be done
+only when creating releases.
+
+### Testing
+
+Unit and regression testing is supported. Where possible, it is asked that new functionality be included
+in the unit test framework.
+
+In order to run the tests, the following command can be used from the terminal:
+
+```bash
+FreeCAD -t TestCfdOF
+```
+
+Alternatively, from FreeCAD, select the 'Testing framework' workbench, choose the 'Self-test' button,
+select the 'TestCfdOF' test name and click 'Start'.
 
 ### Style guide
 
@@ -133,20 +159,6 @@ commit changes, saving time and avoiding manual errors.
    ```bash
    pre-commit autoupdate
    ```
-
-### Testing
-
-Unit and regression testing is supported. Where possible, it is asked that new functionality be included
-in the unit test framework.
-
-In order to run the tests, the following command can be used from the terminal:
-
-```bash
-FreeCAD -t TestCfdOF
-```
-
-Alternatively, from FreeCAD, select the 'Testing framework' workbench, choose the 'Self-test' button,
-select the 'TestCfdOF' test name and click 'Start'.
 
 ## Documentation
 

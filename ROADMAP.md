@@ -14,19 +14,24 @@ for the user. Generally improve the logging and messages that are printed there.
 (see FreeCAD.Console.PrintLog/PrintMessage/PrintWarning/PrintError.)
 * Test and provide more elegant errors or fallbacks for invalid/unexpected/unusual sequences of actions
   
+## Analysis object
+
+Add a task panel and allow editing case path
+
 ## Meshing
 
-* Add ability to import meshes from other formats? (CGNS, .msh (fluent), others?)
 * Expose parallel option in GUI
 
 ## Solver
 
 * Add a mechanism to specify surface tension coefficients between each pair of fluids
   (with future extensibility to other pairwise interfacial properties).
-* Add ability to import / export existing OF cases / results
 * Improve organisation of source code
-* Improve edge detection for meshing?
 * Expose parallel run option in GUI
+
+## Property page
+
+* Split into sub-pages
 
 ## Documentation
 
@@ -34,8 +39,7 @@ for the user. Generally improve the logging and messages that are printed there.
 
 ## Testing
 
-* More 'demo' cases are needed, which are specified as macros and run during the testing runs
-  * Cases with postprocessing
-  * Buoyant case(s)
+* Add additional, small 'demo' cases, which are specified as macros and run during the testing runs,
+  to cover all functionality
 * Additional unit tests which also test the functionality of the task panels, are needed. Currently testing is only
   done based on macros. Somehow, interaction with the GUI itself needs to be simulated.

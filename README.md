@@ -67,7 +67,7 @@ for instructions.
 The CfdOF workbench depends on the following external software, some of
 which can be automatically installed (see below for instructions).
 
-- [Latest release version of FreeCAD (at least version 0.20.0 / git commit 29177)](https://www.freecad.org/downloads.php)
+- [Latest release version of FreeCAD (at least version 1.0.0)](https://www.freecad.org/downloads.php)
  or [latest development version (prerelease)](https://github.com/FreeCAD/FreeCAD-Bundle/releases/tag/weekly-builds)
 - OpenFOAM [Foundation versions 9-13](http://openfoam.org/download/) or [OpenCFD versions 2006-2512](http://openfoam.com/download)
 - [Paraview](http://www.paraview.org/)
