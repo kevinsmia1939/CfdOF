@@ -123,6 +123,7 @@ class CfdAnalysis:
 
     def onDocumentRestored(self, obj):
         self.loading = False
+        self.ignore_next_grouptouched = False
         self.initProperties(obj)
 
     def __setstate__(self, state_dict):
