@@ -65,6 +65,10 @@ class TaskPanelCfdSolverControl:
 
         self.working_dir = CfdTools.getOutputPath(self.analysis_object)
 
+        self.form.inputParallel.setToolTip("Whethear to Solve the Case in Parallel")
+        self.form.inputParallelCores.setToolTip("Number of Parallel Cores to Use")
+
+        self.load()
         self.updateUI()
 
         # Connect Signals and Slots
@@ -72,15 +76,28 @@ class TaskPanelCfdSolverControl:
         self.form.pb_edit_inp.clicked.connect(self.editSolverInputFile)
         self.form.pb_run_solver.clicked.connect(self.runSolverProcess)
         self.form.pb_paraview.clicked.connect(self.openParaview)
+        self.form.inputParallel.stateChanged.connect(self.updateUI)
 
         self.Start = time.time()
         self.Timer.start()
+
+    def load(self):
+        self.form.inputParallel.setChecked(self.solver_object.Parallel)
+        self.form.inputParallelCores.setValue(self.solver_object.ParallelCores)
+
+    def store(self):
+        CfdTools.storeIfChanged(self.solver_object, 'Parallel', self.form.inputParallel.isChecked())
+        CfdTools.storeIfChanged(self.solver_object, 'ParallelCores', self.form.inputParallelCores.value())
 
     def updateUI(self):
         solverDirectory = os.path.join(self.working_dir, self.solver_object.InputCaseName)
         self.form.pb_edit_inp.setEnabled(os.path.exists(solverDirectory))
         self.form.pb_paraview.setEnabled(os.path.exists(os.path.join(solverDirectory, "pv.foam")))
         self.form.pb_run_solver.setEnabled(os.path.exists(os.path.join(solverDirectory, "Allrun")))
+        if self.form.inputParallel.isChecked():
+            self.form.ParallelCoresFrame.setVisible(True)
+        else:
+            self.form.ParallelCoresFrame.setVisible(False)
 
     def consoleMessage(self, message="", colour_type=None):
         self.console_message += \
@@ -107,12 +124,14 @@ class TaskPanelCfdSolverControl:
         self.solver_object.Proxy.solver_process.terminate()
         self.solver_object.Proxy.solver_process.waitForFinished()
         self.Timer.stop()
+        self.store()
 
     def write_input_file_handler(self):
         self.Start = time.time()
         FreeCADGui.doCommand("from CfdOF.Solve import CfdCaseWriterFoam")
         from CfdOF.Solve import CfdCaseWriterFoam
         import importlib
+        self.store()
         importlib.reload(CfdCaseWriterFoam)
         self.consoleMessage("Case writer called")
         self.form.pb_paraview.setEnabled(False)
@@ -147,6 +166,7 @@ class TaskPanelCfdSolverControl:
 
     def runSolverProcess(self):
         self.Start = time.time()
+        self.store()
 
         # Check for changes that require remesh
         if FreeCAD.GuiUp and (
