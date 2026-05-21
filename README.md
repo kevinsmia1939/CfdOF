@@ -73,7 +73,7 @@ which can be automatically installed (see below for instructions).
 - [Paraview](http://www.paraview.org/)
 - [cfMesh (customised version updated to compile with latest OpenFOAM versions)](https://sourceforge.net/projects/cfmesh-cfdof/)
 - [HiSA (High Speed Aerodynamic Solver)](https://hisa.gitlab.io)
-- [Gmsh (version 2.15 or later)](http://gmsh.info/) - optional, for generating tetrahedral meshes
+- [Gmsh (version 4.15 or later)](http://gmsh.info/) - optional, for generating tetrahedral meshes
 
 ### Setting up the CfdOF workbench
 

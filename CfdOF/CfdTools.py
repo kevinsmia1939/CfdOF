@@ -1246,12 +1246,14 @@ def checkCfdDependencies(msgFn):
             # Only the last line contains gmsh version number
             gmshversion = gmshversion.split()
             gmshversion = gmshversion[-1]
-            msgFn("gmsh version: " + gmshversion)
-            versionlist = gmshversion.split(".")
-            if int(versionlist[0]) < 2 or (int(versionlist[0]) == 2 and int(versionlist[1]) < 15):
-                msgFn("gmsh version is older than minimum required (2.15)")
-        else:
-            msgFn("gmsh version: " + gmshversion)
+        msgFn("gmsh version: " + gmshversion)
+        versionlist = gmshversion.split(".")
+        if int(versionlist[0]) < CfdDependencyData.GMSH_MAJOR_VERSION_REQUIRED or \
+            (int(versionlist[0]) == CfdDependencyData.GMSH_MAJOR_VERSION_REQUIRED and \
+             int(versionlist[1]) < CfdDependencyData.GMSH_MINOR_VERSION_REQUIRED):
+            msgFn("gmsh version is older than minimum required ({}.{})".format( 
+                  CfdDependencyData.GMSH_MAJOR_VERSION_REQUIRED,
+                  CfdDependencyData.GMSH_MINOR_VERSION_REQUIRED))
 
     msgFn("Completed CFD dependency check")
 
