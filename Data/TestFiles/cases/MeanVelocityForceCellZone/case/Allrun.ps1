@@ -24,7 +24,7 @@ function runParallel([int]$NumProcs, [string]$cmd)
 $PSDefaultParameterValues['Out-File:Encoding'] = 'ascii'
 
 # Copy mesh from mesh case dir if available
-$MESHDIR = "../meshCaseMeanVelocityForceCellZone"
+$MESHDIR = "../meshCase"
 if( Test-Path -PathType Leaf $MESHDIR/constant/polyMesh/faces )
 {
     rm -ErrorAction SilentlyContinue -Recurse -Force constant/polyMesh
@@ -48,6 +48,18 @@ else
 # Set interface compression
 echo "div(phi,alpha) Gauss vanLeer;" > system/alphaDivScheme
 echo "cAlpha 1;" > system/cAlpha
+
+# write the type of the DESModelRegions function for of10+ and for others
+if ( $Env:WM_PROJECT_VERSION[0] -ne "v" -and 10 -le $Env:WM_PROJECT_VERSION )
+{
+       echo 'type                      writeObjects; // of10' > system/DESModelRegionsFunction
+       echo 'libs                      (\"libutilityFunctionObjects.so\"); //of10' >> system/DESModelRegionsFunction
+}
+else
+{
+       echo 'type            DESModelRegions;' > system/DESModelRegionsFunction
+       echo 'libs            (\"libfieldFunctionObjects.so\");' >> system/DESModelRegionsFunction
+}
 
 # Update patch name and type
 runCommand createPatch -overwrite

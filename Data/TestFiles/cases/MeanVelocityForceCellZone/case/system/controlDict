@@ -51,13 +51,17 @@ functions
 {
     DESModelRegions1
     {
-        type            DESModelRegions;
-        libs            ("libfieldFunctionObjects.so");
+        #include "DESModelRegionsFunction"
         enabled         true;
         writeControl    outputTime;
         log             true;
         writeToFile     true;
         resultName      DESRegions;
-    }}
+		objects
+		(
+			kOmegaSSTIDDES:LESRegion
+		);
+    }
+}
 
 // ************************************************************************* //
