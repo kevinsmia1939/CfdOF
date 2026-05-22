@@ -99,6 +99,12 @@ castellatedMeshControls
 
     refinementRegions
     {
+        MeshRefinement
+        {
+            mode distance;
+            levels ((0.0 2));
+        }
+
     }
 
     locationInMesh (0.0 0.0 -0.005);
@@ -115,6 +121,7 @@ snapControls
 
     implicitFeatureSnap false;
     explicitFeatureSnap true;
+    multiRegionFeatureSnap true;
 }
 
 addLayersControls
