@@ -65,7 +65,7 @@ class TaskPanelCfdSolverControl:
 
         self.working_dir = CfdTools.getOutputPath(self.analysis_object)
 
-        self.form.inputParallel.setToolTip("Whethear to Solve the Case in Parallel")
+        self.form.inputParallel.setToolTip("Whether to Solve the Case in Parallel")
         self.form.inputParallelCores.setToolTip("Number of Parallel Cores to Use")
 
         self.load()
