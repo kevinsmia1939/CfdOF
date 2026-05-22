@@ -487,6 +487,8 @@ class CfdMeshTools:
                                 edge_level = CfdTools.relLenToRefinementLevel(mr_obj.RegionEdgeRefinement)
                                 snappy_settings['MeshRegions'][mr_patch_name] = {
                                     'RefinementLevel': refinement_level,
+                                    'RefinementThickness': self.scale * Units.Quantity(
+                                        mr_obj.RefinementThickness).Value,
                                     'EdgeRefinementLevel': edge_level,
                                     'MaxRefinementLevel': max(refinement_level, edge_level),
                                     'Baffle': False

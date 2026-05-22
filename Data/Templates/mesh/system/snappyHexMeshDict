@@ -154,6 +154,17 @@ castellatedMeshControls
 
 %}
 %}
+%{%(MeshRegionPresent%)
+%:True
+%{%(SnappySettings/MeshRegions%)
+        %(0%)
+        {
+            mode distance;
+            levels ((%(SnappySettings/MeshRegions/%(0%)/RefinementThickness%) %(SnappySettings/MeshRegions/%(0%)/RefinementLevel%)));
+        }
+
+%}
+%}
     }
 
     locationInMesh (%(SnappySettings/PointInMesh/x%) %(SnappySettings/PointInMesh/y%) %(SnappySettings/PointInMesh/z%));
