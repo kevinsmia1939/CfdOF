@@ -187,6 +187,7 @@ snapControls
 %:False
     implicitFeatureSnap false;
     explicitFeatureSnap true;
+    multiRegionFeatureSnap true;
 %}
 }
 
