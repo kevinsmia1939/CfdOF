@@ -157,12 +157,15 @@ castellatedMeshControls
 %{%(MeshRegionPresent%)
 %:True
 %{%(SnappySettings/MeshRegions%)
+%{%(SnappySettings/MeshRegions/%(0%)/Baffle%)
+%:False
         %(0%)
         {
             mode distance;
             levels ((%(SnappySettings/MeshRegions/%(0%)/RefinementThickness%) %(SnappySettings/MeshRegions/%(0%)/RefinementLevel%)));
         }
 
+%}
 %}
 %}
     }

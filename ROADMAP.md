@@ -23,7 +23,6 @@ Add a task panel and allow editing case path
 * Add a mechanism to specify surface tension coefficients between each pair of fluids
   (with future extensibility to other pairwise interfacial properties).
 * Improve organisation of source code
-* Expose parallel run option in GUI
 
 ## Property page
 

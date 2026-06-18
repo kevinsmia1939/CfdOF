@@ -155,7 +155,6 @@ class TaskPanelCfdFluidBoundary:
         setQuantity(self.form.input_axisx, self.obj.PeriodicCentreOfRotationAxis.x)
         setQuantity(self.form.input_axisy, self.obj.PeriodicCentreOfRotationAxis.y)
         setQuantity(self.form.input_axisz, self.obj.PeriodicCentreOfRotationAxis.z)
-        print(self.obj.PeriodicSeparationVector.x)
         setQuantity(self.form.input_sepx, Units.Quantity(self.obj.PeriodicSeparationVector.x, Units.Length))
         setQuantity(self.form.input_sepy, Units.Quantity(self.obj.PeriodicSeparationVector.y, Units.Length))
         setQuantity(self.form.input_sepz, Units.Quantity(self.obj.PeriodicSeparationVector.z, Units.Length))
