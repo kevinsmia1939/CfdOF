@@ -1,0 +1,30 @@
+from CfdOF import CfdTools
+from CfdOF.Solve import CfdFluidBoundary
+
+def add_boundary(label, boundary_type, subtype, thermal_type, faces,
+                 velocity=(0, 0, 0), pressure="100 kPa"):
+    boundary = CfdFluidBoundary.makeCfdFluidBoundary()
+    CfdTools.getActiveAnalysis().addObject(boundary)
+    boundary.Label = label
+    boundary.BoundaryType = boundary_type
+    boundary.BoundarySubType = subtype
+    boundary.ThermalBoundaryType = thermal_type
+    boundary.Temperature = "293 K"
+    boundary.Pressure = pressure
+    boundary.Ux = f"{velocity[0]} mm/s"
+    boundary.Uy = f"{velocity[1]} mm/s"
+    boundary.Uz = f"{velocity[2]} mm/s"
+    boundary.TurbulenceIntensityPercentage = 1.0
+    boundary.TurbulenceLengthScale = "100 mm"
+    boundary.ShapeRefs = [(App.ActiveDocument.BooleanFragments, tuple(faces))]
+    return boundary
+
+add_boundary("inlet", "wall", "fixedWall", "zeroGradient",
+             ("Face17",), velocity=(0, 0, 20))
+add_boundary("outlet", "outlet", "staticPressureOutlet", "zeroGradient",
+             ("Face15",))
+
+# The isothermal casing gives the steady CHT problem a robust thermal reference.
+add_boundary("side_walls", "wall", "slipWall", "fixedValue",
+             ("Face13", "Face16", "Face14", "Face18"))
+App.ActiveDocument.recompute()
