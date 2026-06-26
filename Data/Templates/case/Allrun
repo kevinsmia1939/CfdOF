@@ -169,6 +169,8 @@ fi
 %{%(zonesPresent%)
 %:True
 # Set cell zones contained inside the .stl surfaces
+%{%(useCreateZones%)
+%:True
 which createZones > /dev/null 2>&1
 if [ $? == 0 ]
 then
@@ -176,6 +178,9 @@ then
 else
 	runCommand topoSet -dict system/topoSetZonesDict
 fi
+%:False
+runCommand topoSet -dict system/topoSetZonesDict
+%}
 
 %}
 %{%(initialisationZonesPresent%)

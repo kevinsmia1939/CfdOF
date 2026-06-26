@@ -136,6 +136,7 @@ class CfdCaseWriterFoam:
             'initialisationZonesPresent': len(self.initialisation_zone_objs) > 0,
             'zones': {o.Label: {'PartNameList': tuple(r[0].Name for r in o.ShapeRefs)} for o in self.zone_objs},
             'zonesPresent': len(self.zone_objs) > 0,
+            'useCreateZones': False,
             'meshType': self.mesh_obj.Proxy.Type,
             'meshDimension': self.mesh_obj.ElementDimension,
             'meshDir': os.path.relpath(os.path.join(self.working_dir, self.mesh_obj.CaseName), self.case_folder),
@@ -707,6 +708,7 @@ class CfdCaseWriterFoam:
     def processPorousZoneProperties(self):
         settings = self.settings
         settings['porousZonesPresent'] = True
+        settings['useCreateZones'] = True
         porousZoneSettings = settings['porousZones']
         for po in self.porous_zone_objs:
             pd = {'PartNameList': tuple(r[0].Name for r in po.ShapeRefs)}
@@ -763,6 +765,7 @@ class CfdCaseWriterFoam:
     def processMeanVelocityForceCellZoneProperties(self):
         settings = self.settings
         settings['meanVelocityForceCellZonesPresent'] = True
+        settings['useCreateZones'] = True
         settings['fvOptionsPresent'] = True
         for o in self.mean_velocity_force_cellzone_objs:
             od = CfdTools.propsToDict(o)

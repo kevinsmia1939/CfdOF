@@ -166,6 +166,8 @@ if( (Get-Command createNonConformalCouples) )
 %{%(zonesPresent%)
 %:True
 # Set cell zones contained inside the .stl surfaces
+%{%(useCreateZones%)
+%:True
 if( (Get-Command createZones) )
 {
 	runCommand createZones -dict system/createZonesDict
@@ -174,6 +176,9 @@ else
 {
 	runCommand topoSet -dict system/topoSetZonesDict
 }
+%:False
+runCommand topoSet -dict system/topoSetZonesDict
+%}
 
 %}
 %{%(initialisationZonesPresent%)
