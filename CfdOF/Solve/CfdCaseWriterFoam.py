@@ -200,6 +200,8 @@ class CfdCaseWriterFoam:
             cfdMessage('Dynamic mesh adaptation rule present\n')
             self.processDynamicMeshRefinement()
 
+        self.processZoneCommandSettings()
+
         self.settings['createPatchesFromSnappyBaffles'] = False
         self.settings['createPatchesForPeriodics'] = False
         cfdMessage("Matching boundary conditions ...\n")
@@ -708,7 +710,6 @@ class CfdCaseWriterFoam:
     def processPorousZoneProperties(self):
         settings = self.settings
         settings['porousZonesPresent'] = True
-        settings['useCreateZones'] = True
         porousZoneSettings = settings['porousZones']
         for po in self.porous_zone_objs:
             pd = {'PartNameList': tuple(r[0].Name for r in po.ShapeRefs)}
@@ -765,7 +766,6 @@ class CfdCaseWriterFoam:
     def processMeanVelocityForceCellZoneProperties(self):
         settings = self.settings
         settings['meanVelocityForceCellZonesPresent'] = True
-        settings['useCreateZones'] = True
         settings['fvOptionsPresent'] = True
         for o in self.mean_velocity_force_cellzone_objs:
             od = CfdTools.propsToDict(o)
@@ -817,6 +817,15 @@ class CfdCaseWriterFoam:
             if settings['solver']['SolverName'] in ['simpleFoam', 'porousSimpleFoam', 'pimpleFoam', 'SRFSimpleFoam']:
                 if 'Pressure' in z:
                     z['KinematicPressure'] = z['Pressure']/settings['fluidProperties'][0]['Density']
+
+    def processZoneCommandSettings(self):
+        settings = self.settings
+        # createZones creates cellZones only. Initialisation zones are consumed by setFields
+        # through cellToCell/cellToFace regions, which require the cellSet from topoSet.
+        settings['useCreateZones'] = (
+            settings['zonesPresent'] and
+            not settings['initialisationZonesPresent']
+        )
 
     def bafflesPresent(self):
         for b in self.bc_group:
