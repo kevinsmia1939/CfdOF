@@ -10,12 +10,7 @@ runParallel()
     shift
     if [ -f log."$sol" ]; then rm log."$sol"; fi
     export OMPI_MCA_btl_vader_single_copy_mechanism=none  # Workaround for open-mpi/docker bug
-%{%(system/hostFileRequired%)
-%:False
-    mpiexec %(system/MPIOptionsOMPI%) -np $nproc "$exe" -parallel "$@" 1> >(tee -a log."$sol") 2> >(tee -a log."$sol" >&2)
-%:True
-    mpiexec %(system/MPIOptionsOMPI%) --hostfile %(system/hostFileName%) -np $nproc "$exe" -parallel "$@" 1> >(tee -a log."$sol") 2> >(tee -a log."$sol" >&2)
-%}
+    mpiexec  -np $nproc "$exe" -parallel "$@" 1> >(tee -a log."$sol") 2> >(tee -a log."$sol" >&2)
     err=$?
     if [ ! $err -eq 0 ]; then exit $err; fi
 }
@@ -31,12 +26,7 @@ runCommand()
 }
 
 # Unset and source bashrc
-%{%(system/FoamRuntime%)
-%:Posix
-FOAMDIR="%(system/TranslatedFoamPath%)"
-%:BashWSL
-FOAMDIR="%(system/TranslatedFoamPath%)"
-%}
+FOAMDIR="/usr/lib/openfoam/openfoam2606"
 if [ ! -z "$FOAMDIR" ]
 then
     source "$FOAMDIR/etc/config.sh/unset" 2> /dev/null
@@ -44,7 +34,7 @@ then
 fi
 
 # Copy mesh from mesh case dir if available
-MESHDIR="%(meshDir%)"
+MESHDIR="../meshCaseSimpleHeatFin"
 if [ -f "$MESHDIR"/constant/polyMesh/faces ]
 then
     rm -rf constant/polyMesh
@@ -73,122 +63,12 @@ else
     echo "cAlpha 1;" > system/cAlpha
 fi
 
-%{%(dynamicMeshEnabled%)
-%:True
-mkdir -p 0/include
-if [ -z ${FOAM_API+x} ] && [ "$WM_PROJECT_VERSION" -ge 9 ]
-then
-    echo "type internal;" | tee 0/include/helperPatchFieldType system/helperPatchType
-else
-    echo "type fixedValue;" > 0/include/helperPatchFieldType
-    echo "type patch;" > system/helperPatchType
-fi
-
-%}
-%{%(createPatchesForPeriodics%)
-%:True
-mkdir -p 0/MMR
-which createNonConformalCouples > /dev/null 2>&1
-if [ $? == 0 ]
-then
-	echo "type wall;" > system/periodic_type
-
-    echo "type movingWallSlipVelocity;" > 0/MMR/vector
-    echo "value \$internalField;" >> 0/MMR/vector
-
-    echo "type zeroGradient;" > 0/MMR/scalar
-
-    echo "type calculated;" > 0/MMR/calculated
-    echo "value uniform 0;" >> 0/MMR/calculated
-else
-	echo "type cyclicAMI;" | tee 0/MMR/{scalar,vector,calculated} system/periodic_type
-	echo "value \$internalField;" | tee -a 0/MMR/{scalar,vector,calculated}
-fi
-
-%:False
-%{%(MovingMeshRegionsPresent%)
-%:True
-mkdir -p 0/MMR
-which createNonConformalCouples > /dev/null 2>&1
-if [ $? == 0 ]
-then
-    echo "type movingWallSlipVelocity;" > 0/MMR/vector
-    echo "value \$internalField;" >> 0/MMR/vector
-
-    echo "type zeroGradient;" > 0/MMR/scalar
-
-    echo "type calculated;" > 0/MMR/calculated
-    echo "value uniform 0;" >> 0/MMR/calculated
-else
-	echo "type cyclicAMI;" | tee 0/MMR/{scalar,vector,calculated}
-	echo "value \$internalField;" | tee -a 0/MMR/{scalar,vector,calculated}
-fi
-
-%}
-%}
-%{%(scalarTransportFunctionsEnabled%)
-%:True
-# Enable fvOption source for scalar transport in OpenFOAM v10+
-if [ -z ${FOAM_API+x} ] && [ "$WM_PROJECT_VERSION" -ge 10 ]
-then
-    cp system/fvOptionsScalarTransport_OF10 system/fvOptionsScalarTransport
-fi
-
-%}
-%{%(physics/TurbulenceModel%)
-%:kOmegaSSTDES kOmegaSSTDDES kOmegaSSTIDDES SpalartAllmarasDES SpalartAllmarasDDES SpalartAllmarasIDDES
-# write the type of the DESModelRegions function for of10+ and for others
-if [ "$WM_PROJECT_VERSION" -ge 10 ] && [ "${WM_PROJECT_VERSION:0:1}" != "v" ]
-then
-       echo "type                      writeObjects; // of10" > system/DESModelRegionsFunction
-       echo "libs                      (\"libutilityFunctionObjects.so\"); //of10" >> system/DESModelRegionsFunction
-else
-       echo "type            DESModelRegions;" > system/DESModelRegionsFunction
-       echo "libs            (\"libfieldFunctionObjects.so\");" >> system/DESModelRegionsFunction
-fi
-
-%}
 # Update patch name and type
 runCommand createPatch -overwrite
 
-%{%(createPatchesForPeriodics%)
-%:True
-which createNonConformalCouples > /dev/null 2>&1
-if [ $? == 0 ]
-then
-%{%(createPeriodics%)
-%{%(createPeriodics/%(0%)/PeriodicMaster%)
-%:True
-	runCommand createNonConformalCouples -overwrite %(0%)_master %(0%)_slave
-	mv log.createNonConformalCouples log.createNonConformalCouples.%(0%)
-%}
-%}
-fi
-
-%}
-%{%(zonesPresent%)
-%:True
-# Set cell zones contained inside the .stl surfaces
-which createZones > /dev/null 2>&1
-if [ $? == 0 ]
-then
-	runCommand createZones -dict system/createZonesDict
-else
-	runCommand topoSet -dict system/topoSetZonesDict
-fi
-
-%}
-%{%(solver/SolverName%)
-%:chtMultiRegionSimpleFoam chtMultiRegionFoam
 # Split combined mesh into fluid and solid regions
 runCommand splitMeshRegions -cellZonesOnly -overwrite
 
-%{%(meanVelocityForceCellZonesPresent%)
-%:True
-# Create mean velocity force cell zones inside the split fluid region mesh
-runCommand topoSet -region %(multiRegionFluidNames/0%) -dict system/topoSetMeanVelocityForceZonesDict
-
-%}
 # Upgrade sampleMode on all mappedWall interface patches to nearestPatchFaceAMI (parallel-safe)
 # and add missing patch entries to 0/ field files for any interface patches splitMeshRegions created.
 # splitMeshRegions already creates correct <fluid>_to_<solid> / <solid>_to_<fluid> mappedWall pairs;
@@ -292,18 +172,12 @@ for r in FLUID_REGIONS:
     bfile = 'constant/' + r + '/polyMesh/boundary'
     if not os.path.exists(bfile):
         continue
-%{%(solver/Parallel%)
-%:True
     fix_samplemode_to_ami(bfile)
-%}
 for r in SOLID_REGIONS:
     bfile = 'constant/' + r + '/polyMesh/boundary'
     if not os.path.exists(bfile):
         continue
-%{%(solver/Parallel%)
-%:True
     fix_samplemode_to_ami(bfile)
-%}
 
 # Add 0/ field entries for all mappedWall interface patches splitMeshRegions created
 for r in FLUID_REGIONS:
@@ -339,45 +213,6 @@ for r in SOLID_REGIONS:
                 ])
 PYEOF
 
-%}
-%{%(initialisationZonesPresent%)
-%:True
-# Set internal fields according to setFieldsDict
-runCommand setFields
-
-%}
-%{%(bafflesPresent%)
-%:True
-%{%(createPatchesFromSnappyBaffles%)
-%:False
-# Combine mesh faceZones
-runCommand topoSet -dict system/topoSetBafflesDict
-
-# Creating baffles
-runCommand createBaffles -overwrite
-
-%}
-%}
-%{%(runChangeDictionary%)
-%:True
-# Update patch name and type
-runCommand changeDictionary
-
-%}
-%{%(initialValues/PotentialFlow%)
-%:True
-%{%(solver/SolverName%)
-%:buoyantSimpleFoam buoyantPimpleFoam interFoam multiphaseInterFoam
-PNAME=p_rgh
-%:default
-PNAME=p
-%}
-
-%}
-%{%(solver/Parallel%)
-%:True
-%{%(solver/SolverName%)
-%:chtMultiRegionSimpleFoam chtMultiRegionFoam
 # Parallel decomposition
 # Copy decomposeParDict to each region's system directory
 for region in $(ls -d constant/*/polyMesh 2>/dev/null | cut -d/ -f2); do
@@ -385,159 +220,17 @@ for region in $(ls -d constant/*/polyMesh 2>/dev/null | cut -d/ -f2); do
     cp system/decomposeParDict system/$region/decomposeParDict
 done
 runCommand decomposePar -allRegions -force
-%:default
-# Parallel decomposition
-if [ ! -d processor0 ]
-then
-    runCommand decomposePar -force
-fi
-
-%}
 # Pick up number of parallel processes
 NPROC=$(foamDictionary -entry "numberOfSubdomains" -value system/decomposeParDict)
 
-%{%(dynamicMeshEnabled%)
-%:False
-%{%(createPatchesForPeriodics%)
-%:False
-%{%(MovingMeshRegionsPresent%)
-%:False
-%{%(solver/SolverName%)
-%:chtMultiRegionSimpleFoam chtMultiRegionFoam
-%:default
-# Mesh renumbering
-runParallel $NPROC renumberMesh -overwrite
-%}
-%}
-%}
-%:True
-# Mesh renumbering does not work in Foundation with dynamic mesh
-%}
 
-%{%(createPatchesForPeriodics%)
-%:True
-which createNonConformalCouples > /dev/null 2>&1
-if [ $? == 0 ]
-then
-%{%(createPeriodics%)
-%{%(createPeriodics/%(0%)/PeriodicMaster%)
-%:True
-	runParallel $NPROC createNonConformalCouples -overwrite %(0%)_master %(0%)_slave
-	mv log.createNonConformalCouples log.createNonConformalCouples.%(0%)
-%}
-%}
-fi
-
-%}
-%{%(initialValues/PotentialFlow%)
-%:True
-%{%(solver/SolverName%)
-%:chtMultiRegionSimpleFoam chtMultiRegionFoam
-# potentialFoam not applicable to multi-region CHT (no single-region polyMesh after splitMeshRegions)
-%:default
-# Initialise flow
-%{%(bafflesPresent%)
-%:True
-# Baffle BC does not work with potentialFoam; do not initialise p
-runParallel $NPROC potentialFoam -initialiseUBCs -pName $PNAME
-%:default
-%{%(initialValues/PotentialFlowP%)
-%:True
-runParallel $NPROC potentialFoam -initialiseUBCs -pName $PNAME -writep
-%:default
-runParallel $NPROC potentialFoam -initialiseUBCs -pName $PNAME
-%}
-%}
-%{%(solver/SolverName%)
-%:buoyantSimpleFoam buoyantPimpleFoam interFoam multiphaseInterFoam
-# Remove phi with wrong units
-rm -f processor*/0/phi
-%}
-%}
-
-%}
 # Run application in parallel
 # Detect new foamRun in Foundation versions >= 11 and translate solver
 which foamRun > /dev/null 2>&1
 if [ $? == 0 ]
 then
-%{%(solver/SolverName%)
-%:simpleFoam pimpleFoam
-    runParallel $NPROC foamRun -solver incompressibleFluid
-%:buoyantSimpleFoam buoyantPimpleFoam
-    runParallel $NPROC foamRun -solver fluid
-%:interFoam
-    runParallel $NPROC foamRun -solver incompressibleVoF
-%:multiphaseInterFoam
-    runParallel $NPROC foamRun -solver incompressibleMultiphaseVoF
-%:default
-    runParallel $NPROC %(solver/SolverName%)
-%}
+    runParallel $NPROC chtMultiRegionSimpleFoam
 else
-    runParallel $NPROC %(solver/SolverName%)
+    runParallel $NPROC chtMultiRegionSimpleFoam
 fi
 
-%:False
-%{%(dynamicMeshEnabled%)
-%:False
-%{%(createPatchesForPeriodics%)
-%:False
-%{%(MovingMeshRegionsPresent%)
-%:False
-%{%(solver/SolverName%)
-%:chtMultiRegionSimpleFoam chtMultiRegionFoam
-%:default
-# Mesh renumbering
-runCommand renumberMesh -overwrite
-%}
-%}
-%}
-%:True
-# Mesh renumbering does not currently work in Foundation with dynamic mesh
-# runCommand renumberMesh -overwrite
-%}
-
-%{%(initialValues/PotentialFlow%)
-%:True
-# Initialise flow
-%{%(bafflesPresent%)
-%:True
-# Baffle BC does not work with potentialFoam; do not initialise p
-runCommand potentialFoam -initialiseUBCs -pName $PNAME
-%:default
-%{%(initialValues/PotentialFlowP%)
-%:True
-runCommand potentialFoam -initialiseUBCs -pName $PNAME -writep
-%:default
-runCommand potentialFoam -initialiseUBCs -pName $PNAME
-%}
-%}
-%{%(solver/SolverName%)
-%:buoyantSimpleFoam buoyantPimpleFoam interFoam multiphaseInterFoam
-# Remove phi with wrong units
-rm -f 0/phi
-%}
-
-%}
-# Run application
-# Detect new foamRun in Foundation versions >= 11 and translate solver
-which foamRun > /dev/null 2>&1
-if [ $? == 0 ]
-then
-%{%(solver/SolverName%)
-%:simpleFoam pimpleFoam
-    runCommand foamRun -solver incompressibleFluid
-%:buoyantSimpleFoam buoyantPimpleFoam
-    runCommand foamRun -solver fluid
-%:interFoam
-    runCommand foamRun -solver incompressibleVoF
-%:multiphaseInterFoam
-    runCommand foamRun -solver incompressibleMultiphaseVoF
-%:default
-    runCommand %(solver/SolverName%)
-%}
-else
-    runCommand %(solver/SolverName%)
-fi
-
-%}
