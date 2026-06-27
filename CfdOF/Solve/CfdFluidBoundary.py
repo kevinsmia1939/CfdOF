@@ -662,6 +662,17 @@ class CfdFluidBoundary:
         )
         addObjectProperty(
             obj,
+            "RegionCoupledPartners",
+            [],
+            "App::PropertyStringList",
+            "Multi-region",
+            QT_TRANSLATE_NOOP(
+                "App::Property",
+                "Partner boundary labels for non-conformal multi-region coupled interfaces",
+            ),
+        )
+        addObjectProperty(
+            obj,
             "RegionCoupledMaster",
             True,
             "App::PropertyBool",

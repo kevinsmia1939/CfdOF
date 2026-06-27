@@ -159,6 +159,8 @@ class TaskPanelCfdFluidBoundary:
         setQuantity(self.form.input_sepy, Units.Quantity(self.obj.PeriodicSeparationVector.y, Units.Length))
         setQuantity(self.form.input_sepz, Units.Quantity(self.obj.PeriodicSeparationVector.z, Units.Length))
 
+        self.initRegionCouplingControls(boundary_patches)
+
         # Turbulence
         if self.turb_model is not None:
             self.form.comboTurbulenceSpecification.addItems(CfdFluidBoundary.TURBULENT_INLET_SPEC[self.turb_model][0])
@@ -223,12 +225,63 @@ class TaskPanelCfdFluidBoundary:
         self.form.radioButtonSlavePeriodic.toggled.connect(self.updateUI)
         self.form.rb_rotational_periodic.toggled.connect(self.updateUI)
         self.form.rb_translational_periodic.toggled.connect(self.updateUI)
+        self.regionCoupledMasterCheck.toggled.connect(self.updateUI)
 
         # Face list selection panel - modifies obj.ShapeRefs passed to it
         self.faceSelector = CfdFaceSelectWidget.CfdFaceSelectWidget(self.form.faceSelectWidget,
                                                                     self.obj, True, True, False)
 
         self.updateUI()
+
+    def initRegionCouplingControls(self, boundary_patches):
+        self.regionCouplingFrame = QtGui.QGroupBox("Multi-region coupling")
+        regionLayout = QtGui.QFormLayout(self.regionCouplingFrame)
+
+        self.inputRegionName = QtGui.QLineEdit()
+        self.inputRegionName.setToolTip(
+            "OpenFOAM region containing this boundary. If left empty, CfdOF will try to infer it.")
+        self.inputRegionName.setText(getattr(self.obj, 'RegionName', ''))
+        regionLayout.addRow("Region name:", self.inputRegionName)
+
+        self.regionCoupledMasterCheck = QtGui.QCheckBox("Owns interface mapping")
+        self.regionCoupledMasterCheck.setToolTip(
+            "Enable on one side of each interface pair so the case writer generates the mappedWall relation.")
+        self.regionCoupledMasterCheck.setChecked(getattr(self.obj, 'RegionCoupledMaster', True))
+        regionLayout.addRow("", self.regionCoupledMasterCheck)
+
+        self.regionPartnerList = QtGui.QListWidget()
+        self.regionPartnerList.setToolTip(
+            "Select one or more partner boundaries on neighbouring mesh regions.")
+        self.regionPartnerList.setMinimumHeight(90)
+        stored_partners = set(self.getStoredRegionCoupledPartners())
+        for patch in boundary_patches:
+            if patch.Label == self.obj.Label:
+                continue
+            item = QtGui.QListWidgetItem(patch.Label)
+            item.setData(QtCore.Qt.UserRole, patch.Label)
+            item.setFlags(item.flags() | QtCore.Qt.ItemIsUserCheckable)
+            item.setCheckState(QtCore.Qt.Checked if patch.Label in stored_partners else QtCore.Qt.Unchecked)
+            self.regionPartnerList.addItem(item)
+        regionLayout.addRow("Partner boundaries:", self.regionPartnerList)
+
+        self.form.layout().insertWidget(1, self.regionCouplingFrame)
+
+    def getStoredRegionCoupledPartners(self):
+        partners = []
+        if hasattr(self.obj, 'RegionCoupledPartners'):
+            partners.extend([p for p in self.obj.RegionCoupledPartners if p])
+        legacy_partner = getattr(self.obj, 'RegionCoupledPartner', '')
+        if legacy_partner and legacy_partner not in partners:
+            partners.append(legacy_partner)
+        return partners
+
+    def getSelectedRegionCoupledPartners(self):
+        partners = []
+        for i in range(self.regionPartnerList.count()):
+            item = self.regionPartnerList.item(i)
+            if item.checkState() == QtCore.Qt.Checked:
+                partners.append(str(item.data(QtCore.Qt.UserRole)))
+        return partners
 
     def updateUI(self):
         # Boundary type and subtype
@@ -304,6 +357,8 @@ class TaskPanelCfdFluidBoundary:
                 self.form.translationalFrame.setVisible(True)
         else:
             self.form.periodicFrame.setVisible(False)
+
+        self.regionPartnerList.setEnabled(self.regionCoupledMasterCheck.isChecked())
 
     def comboBoundaryTypeChanged(self):
         index = self.form.comboBoundaryType.currentIndex()
@@ -480,6 +535,14 @@ class TaskPanelCfdFluidBoundary:
 
         storeIfChanged(self.obj, 'PeriodicPartner', self.form.comboBoxPeriodicPartner.currentText())
         storeIfChanged(self.obj, 'PeriodicMaster', self.form.radioButtonMasterPeriodic.isChecked())
+
+        # Multi-region coupling
+        region_partners = self.getSelectedRegionCoupledPartners()
+        storeIfChanged(self.obj, 'RegionName', self.inputRegionName.text().strip())
+        storeIfChanged(self.obj, 'RegionCoupledMaster', self.regionCoupledMasterCheck.isChecked())
+        storeIfChanged(self.obj, 'RegionCoupledPartners', region_partners)
+        storeIfChanged(self.obj, 'RegionCoupledPartner',
+                       region_partners[0] if region_partners else '')
 
         # Turbulence
         if self.turb_model in CfdFluidBoundary.TURBULENT_INLET_SPEC:

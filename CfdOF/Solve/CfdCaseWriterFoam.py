@@ -1009,8 +1009,19 @@ class CfdCaseWriterFoam:
             else:
                 matched = False
 
-            coupled_partner = getattr(bc_obj, 'RegionCoupledPartner', '')
-            if coupled_partner and getattr(bc_obj, 'RegionCoupledMaster', True):
+            coupled_partners = []
+            if hasattr(bc_obj, 'RegionCoupledPartners'):
+                coupled_partners.extend([p for p in bc_obj.RegionCoupledPartners if p])
+            legacy_partner = getattr(bc_obj, 'RegionCoupledPartner', '')
+            if legacy_partner and legacy_partner not in coupled_partners:
+                coupled_partners.append(legacy_partner)
+            if len(coupled_partners) > 1:
+                raise ValueError(
+                    "Boundary '{}' has multiple region-coupled partners ({}). OpenFOAM mappedWall "
+                    "patches can sample only one partner patch. Split this interface into one "
+                    "boundary patch per partner face, then assign one partner to each patch.".format(
+                        bc_obj.Label, ", ".join(coupled_partners)))
+            for coupled_partner in coupled_partners if getattr(bc_obj, 'RegionCoupledMaster', True) else []:
                 partner_obj = bc_by_label.get(coupled_partner)
                 if partner_obj is None:
                     raise ValueError("No region-coupled partner boundary '{}' was found for '{}'.".format(
@@ -1023,7 +1034,7 @@ class CfdCaseWriterFoam:
                     raise ValueError("Region-coupled boundaries '{}' and '{}' must have RegionName set "
                                      "or be classifiable from their selected geometry.".format(
                                          bc_obj.Label, partner_obj.Label))
-                region_couples[bc_obj.Label] = {
+                region_couples["{}_to_{}".format(bc_obj.Label, partner_obj.Label)] = {
                     'MasterPatch': bc_obj.Label,
                     'MasterRegion': master_region,
                     'SlavePatch': partner_obj.Label,
