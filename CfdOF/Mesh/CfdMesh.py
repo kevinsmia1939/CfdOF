@@ -66,21 +66,19 @@ class CommandCfdMeshFromShape:
         FreeCAD.ActiveDocument.openTransaction("Create CFD mesh")
         analysis_obj = CfdTools.getActiveAnalysis()
         if analysis_obj:
+            sel = FreeCADGui.Selection.getSelection()
             mesh_obj = CfdTools.getMesh(analysis_obj)
-            if not mesh_obj:
-                sel = FreeCADGui.Selection.getSelection()
-                if len(sel) == 1:
-                    if sel[0].isDerivedFrom("Part::Feature"):
-                        mesh_obj_name = sel[0].Name + "_Mesh"
-                        FreeCADGui.doCommand("from CfdOF.Mesh import CfdMesh")
-                        FreeCADGui.doCommand("CfdMesh.makeCfdMesh('" + mesh_obj_name + "')")
-                        FreeCADGui.doCommand("App.ActiveDocument.ActiveObject.Part = App.ActiveDocument." + sel[0].Name)
-                        if CfdTools.getActiveAnalysis():
-                            FreeCADGui.doCommand("from CfdOF import CfdTools")
-                            FreeCADGui.doCommand(
-                                "CfdTools.getActiveAnalysis().addObject(App.ActiveDocument.ActiveObject)")
-                        FreeCADGui.ActiveDocument.setEdit(FreeCAD.ActiveDocument.ActiveObject.Name)
-            else:
+            if len(sel) == 1 and sel[0].isDerivedFrom("Part::Feature"):
+                mesh_obj_name = sel[0].Name + "_Mesh"
+                FreeCADGui.doCommand("from CfdOF.Mesh import CfdMesh")
+                FreeCADGui.doCommand("CfdMesh.makeCfdMesh('" + mesh_obj_name + "')")
+                FreeCADGui.doCommand("App.ActiveDocument.ActiveObject.Part = App.ActiveDocument." + sel[0].Name)
+                if CfdTools.getActiveAnalysis():
+                    FreeCADGui.doCommand("from CfdOF import CfdTools")
+                    FreeCADGui.doCommand(
+                        "CfdTools.getActiveAnalysis().addObject(App.ActiveDocument.ActiveObject)")
+                FreeCADGui.ActiveDocument.setEdit(FreeCAD.ActiveDocument.ActiveObject.Name)
+            elif mesh_obj:
                 FreeCADGui.activeDocument().setEdit(mesh_obj.Name)
         FreeCADGui.Selection.clearSelection()
 
@@ -164,6 +162,28 @@ class CfdMesh:
             "Mesh Parameters",
             QT_TRANSLATE_NOOP("App::Property", "Part object to mesh"),
         )
+
+        addObjectProperty(
+            obj,
+            "RegionName",
+            "",
+            "App::PropertyString",
+            "Multi-region",
+            QT_TRANSLATE_NOOP(
+                "App::Property",
+                "OpenFOAM region name for multi-region cases. Defaults to the mesh label when empty.",
+            ),
+        )
+
+        if addObjectProperty(
+            obj,
+            "RegionType",
+            ["fluid", "solid"],
+            "App::PropertyEnumeration",
+            "Multi-region",
+            QT_TRANSLATE_NOOP("App::Property", "Region type for multi-region cases"),
+        ):
+            obj.RegionType = "fluid"
 
         if addObjectProperty(
             obj,

@@ -180,9 +180,63 @@ fi
 %}
 %{%(solver/SolverName%)
 %:chtMultiRegionSimpleFoam chtMultiRegionFoam
+%{%(multiRegionUseSplitMeshRegions%)
+%:True
 # Split combined mesh into fluid and solid regions
 runCommand splitMeshRegions -cellZonesOnly -overwrite
 
+%:False
+# Separate region meshes are expected in constant/<region>/polyMesh.
+# Configure explicit non-conformal region-coupled patch pairs.
+env -u PYTHONPATH -u PYTHONHOME python3 << 'PYEOF'
+import os, re
+
+couples = [
+%{%(multiRegionNonConformalCouples%)
+    ("%(multiRegionNonConformalCouples/%(0%)/MasterRegion%)",
+     "%(multiRegionNonConformalCouples/%(0%)/MasterPatch%)",
+     "%(multiRegionNonConformalCouples/%(0%)/SlaveRegion%)",
+     "%(multiRegionNonConformalCouples/%(0%)/SlavePatch%)"),
+%}
+]
+
+if not couples:
+    raise RuntimeError("Multi-mesh CHT requires at least one RegionCoupledPartner boundary pair")
+
+def replace_patch_block(txt, patch, neighbour_region, neighbour_patch):
+    pattern = re.compile(r'(\n\s*' + re.escape(patch) + r'\s*\n\s*\{)(.*?)(\n\s*\})', re.S)
+    match = pattern.search(txt)
+    if not match:
+        raise RuntimeError("Patch '{}' was not found in boundary file".format(patch))
+    body = match.group(2)
+    body = re.sub(r'\n\s*type\s+\w+\s*;', '', body)
+    body = re.sub(r'\n\s*sampleMode\s+\w+\s*;', '', body)
+    body = re.sub(r'\n\s*sampleRegion\s+\w+\s*;', '', body)
+    body = re.sub(r'\n\s*samplePatch\s+\w+\s*;', '', body)
+    body = (
+        "\n        type            mappedWall;"
+        "\n        sampleMode      nearestPatchFaceAMI;"
+        "\n        sampleRegion    " + neighbour_region + ";"
+        "\n        samplePatch     " + neighbour_patch + ";" + body
+    )
+    return txt[:match.start()] + match.group(1) + body + match.group(3) + txt[match.end():]
+
+def patch_region_boundary(region, patch, neighbour_region, neighbour_patch):
+    bfile = os.path.join('constant', region, 'polyMesh', 'boundary')
+    if not os.path.exists(bfile):
+        raise RuntimeError("Boundary file '{}' does not exist. Generate or copy the region mesh first.".format(bfile))
+    with open(bfile) as f:
+        txt = f.read()
+    txt = replace_patch_block(txt, patch, neighbour_region, neighbour_patch)
+    with open(bfile, 'w') as f:
+        f.write(txt)
+
+for master_region, master_patch, slave_region, slave_patch in couples:
+    patch_region_boundary(master_region, master_patch, slave_region, slave_patch)
+    patch_region_boundary(slave_region, slave_patch, master_region, master_patch)
+PYEOF
+
+%}
 %{%(meanVelocityForceCellZonesPresent%)
 %:True
 # Create mean velocity force cell zones inside the split fluid region mesh

@@ -638,6 +638,40 @@ class CfdFluidBoundary:
             ),
         )
 
+        addObjectProperty(
+            obj,
+            "RegionName",
+            "",
+            "App::PropertyString",
+            "Multi-region",
+            QT_TRANSLATE_NOOP(
+                "App::Property",
+                "OpenFOAM region containing this boundary patch. Defaults to automatic classification.",
+            ),
+        )
+        addObjectProperty(
+            obj,
+            "RegionCoupledPartner",
+            "",
+            "App::PropertyString",
+            "Multi-region",
+            QT_TRANSLATE_NOOP(
+                "App::Property",
+                "Partner boundary label for a non-conformal multi-region coupled interface",
+            ),
+        )
+        addObjectProperty(
+            obj,
+            "RegionCoupledMaster",
+            True,
+            "App::PropertyBool",
+            "Multi-region",
+            QT_TRANSLATE_NOOP(
+                "App::Property",
+                "Whether this side owns the generated non-conformal region-coupled pair",
+            ),
+        )
+
         # Turbulence
         all_turb_specs = []
         for k in TURBULENT_INLET_SPEC:

@@ -156,6 +156,10 @@ def getMeshObject(analysis_object):
     return models[0] if len(models) else None
 
 
+def getMeshObjects(analysis_object):
+    return getModelsOfType(analysis_object if analysis_object else FreeCAD.activeDocument().Objects, 'CfdMesh')
+
+
 def getPorousZoneObjects(analysis_object):
     return getModelsOfType(analysis_object, 'CfdPorousZone')
 

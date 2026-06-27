@@ -72,7 +72,8 @@ class CfdCaseWriterFoam:
         self.physics_model = CfdTools.getPhysicsModel(analysis_obj)
         if not self.physics_model:
             raise RuntimeError("No physics model was found in analysis " + analysis_obj.Label)
-        self.mesh_obj = CfdTools.getMesh(analysis_obj)
+        self.mesh_objs = CfdTools.getMeshObjects(analysis_obj)
+        self.mesh_obj = self.mesh_objs[0] if self.mesh_objs else None
         if not self.mesh_obj:
             raise RuntimeError("No mesh object was found in analysis " + analysis_obj.Label)
         self.material_objs = CfdTools.getMaterials(analysis_obj)
@@ -146,6 +147,9 @@ class CfdCaseWriterFoam:
             'multiRegionSolidNamesDict': {},
             'multiRegionFluidBoundaries': {},
             'multiRegionSolidBoundaries': {},
+            'multiRegionUseSplitMeshRegions': True,
+            'multiRegionNonConformalCouples': {},
+            'multiRegionNonConformalCouplesPresent': False,
             'initialValues': CfdTools.propsToDict(self.initial_conditions),
             'boundaries': dict((b.Label, CfdTools.propsToDict(b)) for b in self.bc_group),
             'reportingFunctions': dict((fo.Label, CfdTools.propsToDict(fo)) for fo in self.reporting_functions),
@@ -482,8 +486,31 @@ class CfdCaseWriterFoam:
                                  "if the body is only meant to be a boundary."
                                  .format(solver_name))
             settings['multiRegionEnabled'] = True
+            self.processMultiRegionMeshObjects()
             settings['multiRegionFluidNamesDict'] = {n: {} for n in settings['multiRegionFluidNames']}
             settings['multiRegionSolidNamesDict'] = {n: {} for n in settings['multiRegionSolidNames']}
+
+    def processMultiRegionMeshObjects(self):
+        """Collect explicit region mesh metadata for non-conformal CHT cases.
+
+        Multiple CfdMesh objects indicate that the fluid and solid regions are meshed
+        separately and coupled later through mappedWall AMI interfaces. The legacy
+        single-mesh path still uses splitMeshRegions.
+        """
+        settings = self.settings
+        if len(self.mesh_objs) <= 1:
+            return
+
+        settings['multiRegionUseSplitMeshRegions'] = False
+        for mesh_obj in self.mesh_objs:
+            region_name = getattr(mesh_obj, 'RegionName', '') or mesh_obj.Label
+            region_type = str(getattr(mesh_obj, 'RegionType', 'fluid'))
+            if region_type == 'solid':
+                if region_name not in settings['multiRegionSolidNames']:
+                    settings['multiRegionSolidNames'].append(region_name)
+            else:
+                if region_name not in settings['multiRegionFluidNames']:
+                    settings['multiRegionFluidNames'].append(region_name)
 
     def processBoundaryConditions(self):
         """ Compute any quantities required before case build """
@@ -930,6 +957,7 @@ class CfdCaseWriterFoam:
         settings = self.settings
         fluid_region_shapes = set()
         solid_region_shapes = set()
+        bc_by_label = {bc_obj.Label: bc_obj for bc_obj in self.bc_group}
 
         # Fluid region shapes from Internal mesh refinement zones
         mr_objs = CfdTools.getMeshRefinementObjs(self.mesh_obj)
@@ -969,8 +997,42 @@ class CfdCaseWriterFoam:
 
         fluid_bcs = {}
         solid_bcs = {}
+        region_couples = {}
         for bc_obj in self.bc_group:
-            matched = False
+            explicit_region = getattr(bc_obj, 'RegionName', '')
+            if explicit_region:
+                if explicit_region in settings['multiRegionSolidNames']:
+                    solid_bcs[bc_obj.Label] = settings['boundaries'][bc_obj.Label]
+                else:
+                    fluid_bcs[bc_obj.Label] = settings['boundaries'][bc_obj.Label]
+                matched = True
+            else:
+                matched = False
+
+            coupled_partner = getattr(bc_obj, 'RegionCoupledPartner', '')
+            if coupled_partner and getattr(bc_obj, 'RegionCoupledMaster', True):
+                partner_obj = bc_by_label.get(coupled_partner)
+                if partner_obj is None:
+                    raise ValueError("No region-coupled partner boundary '{}' was found for '{}'.".format(
+                        coupled_partner, bc_obj.Label))
+                master_region = explicit_region or self._regionNameForBoundary(bc_obj, fluid_region_shapes,
+                                                                               solid_region_shapes)
+                slave_region = getattr(partner_obj, 'RegionName', '') or self._regionNameForBoundary(
+                    partner_obj, fluid_region_shapes, solid_region_shapes)
+                if not master_region or not slave_region:
+                    raise ValueError("Region-coupled boundaries '{}' and '{}' must have RegionName set "
+                                     "or be classifiable from their selected geometry.".format(
+                                         bc_obj.Label, partner_obj.Label))
+                region_couples[bc_obj.Label] = {
+                    'MasterPatch': bc_obj.Label,
+                    'MasterRegion': master_region,
+                    'SlavePatch': partner_obj.Label,
+                    'SlaveRegion': slave_region,
+                }
+
+            if matched:
+                continue
+
             for ref in bc_obj.ShapeRefs:
                 if ref[0].Name in fluid_region_shapes:
                     fluid_bcs[bc_obj.Label] = settings['boundaries'][bc_obj.Label]
@@ -1024,6 +1086,16 @@ class CfdCaseWriterFoam:
 
         settings['multiRegionFluidBoundaries'] = fluid_bcs
         settings['multiRegionSolidBoundaries'] = solid_bcs
+        settings['multiRegionNonConformalCouples'] = region_couples
+        settings['multiRegionNonConformalCouplesPresent'] = len(region_couples) > 0
+
+    def _regionNameForBoundary(self, bc_obj, fluid_region_shapes, solid_region_shapes):
+        for ref in bc_obj.ShapeRefs:
+            if ref[0].Name in fluid_region_shapes:
+                return self.settings['multiRegionFluidNames'][0] if self.settings['multiRegionFluidNames'] else ''
+            if ref[0].Name in solid_region_shapes:
+                return ref[0].Label
+        return ''
 
     # Zones
     def exportZoneStlSurfaces(self):
