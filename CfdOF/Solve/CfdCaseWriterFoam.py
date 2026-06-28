@@ -81,7 +81,7 @@ class CfdCaseWriterFoam:
         self.solid_material_objs = CfdTools.getSolidMaterials(analysis_obj)
         if not self.material_objs and not self.solid_material_objs:
             raise RuntimeError("No material properties were found in analysis " + analysis_obj.Label)
-        self.bc_group = CfdTools.getCfdBoundaryGroup(analysis_obj)
+        self.bc_group = CfdTools.getCfdBoundaryGroupWithRegionInterfaces(analysis_obj)
         self.initial_conditions = CfdTools.getInitialConditions(analysis_obj)
         if not self.initial_conditions:
             raise RuntimeError("No initial conditions object was found in analysis " + analysis_obj.Label)
@@ -155,7 +155,7 @@ class CfdCaseWriterFoam:
             'multiRegionNonConformalCouples': {},
             'multiRegionNonConformalCouplesPresent': False,
             'initialValues': CfdTools.propsToDict(self.initial_conditions),
-            'boundaries': dict((b.Label, CfdTools.propsToDict(b)) for b in self.bc_group),
+            'boundaries': dict((b.Label, CfdTools.boundaryToDict(b)) for b in self.bc_group),
             'reportingFunctions': dict((fo.Label, CfdTools.propsToDict(fo)) for fo in self.reporting_functions),
             'reportingFunctionsEnabled': False,
             'scalarTransportFunctions': dict((st.Label, CfdTools.propsToDict(st)) for st in self.scalar_transport_objs),

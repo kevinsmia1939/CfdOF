@@ -209,6 +209,97 @@ def getCfdBoundaryGroup(analysis_object):
     return getModelsOfType(analysis_object, 'CfdFluidBoundary')
 
 
+def getRegionCoupledInterfaces(analysis_object):
+    return getModelsOfType(analysis_object, 'CfdRegionCoupledInterface')
+
+
+def _interfacePatchName(interface_obj, side):
+    if side == 1:
+        explicit = getattr(interface_obj, 'Patch1Name', '')
+        default = "{}_to_{}".format(interface_obj.Region1Name, interface_obj.Region2Name)
+    else:
+        explicit = getattr(interface_obj, 'Patch2Name', '')
+        default = "{}_to_{}".format(interface_obj.Region2Name, interface_obj.Region1Name)
+    label = explicit or default
+    if not label.strip() or label == "_to_":
+        label = "{}_side{}".format(interface_obj.Label, side)
+    return label.replace(" ", "_")
+
+
+class VirtualRegionCoupledBoundary:
+    """Boundary-like view generated from a CfdRegionCoupledInterface side."""
+
+    def __init__(self, interface_obj, side):
+        self.Interface = interface_obj
+        self.Side = side
+        self.Name = "{}_side{}".format(interface_obj.Name, side)
+        self.Label = _interfacePatchName(interface_obj, side)
+        self.DefaultBoundary = False
+        self.BoundaryType = "wall"
+        self.BoundarySubType = "fixedWall"
+        self.ThermalBoundaryType = getattr(interface_obj, "ThermalBoundaryType", "zeroGradient")
+        self.Temperature = "293 K"
+        self.HeatFlux = "0 W/m^2"
+        self.Power = "0 W"
+        self.HeatTransferCoeff = "0 W/m^2/K"
+        self.SlipRatio = "0"
+        self.Ux = "0 m/s"
+        self.Uy = "0 m/s"
+        self.Uz = "0 m/s"
+        self.Pressure = "0 Pa"
+        self.KinematicPressure = 0
+        self.VolumeFractions = {}
+        if side == 1:
+            self.ShapeRefs = interface_obj.ShapeRefs1
+            self.RegionName = interface_obj.Region1Name
+            self.RegionCoupledPartner = _interfacePatchName(interface_obj, 2)
+            self.RegionCoupledPartners = [self.RegionCoupledPartner]
+            self.RegionCoupledMaster = True
+        else:
+            self.ShapeRefs = interface_obj.ShapeRefs2
+            self.RegionName = interface_obj.Region2Name
+            self.RegionCoupledPartner = ""
+            self.RegionCoupledPartners = []
+            self.RegionCoupledMaster = False
+
+    def toDict(self):
+        return {
+            'DefaultBoundary': self.DefaultBoundary,
+            'BoundaryType': self.BoundaryType,
+            'BoundarySubType': self.BoundarySubType,
+            'ThermalBoundaryType': self.ThermalBoundaryType,
+            'Temperature': self.Temperature,
+            'HeatFlux': self.HeatFlux,
+            'Power': self.Power,
+            'HeatTransferCoeff': self.HeatTransferCoeff,
+            'SlipRatio': self.SlipRatio,
+            'Ux': self.Ux,
+            'Uy': self.Uy,
+            'Uz': self.Uz,
+            'Pressure': self.Pressure,
+            'KinematicPressure': self.KinematicPressure,
+            'RegionName': self.RegionName,
+            'RegionCoupledPartner': self.RegionCoupledPartner,
+            'RegionCoupledPartners': self.RegionCoupledPartners,
+            'RegionCoupledMaster': self.RegionCoupledMaster,
+            'VolumeFractions': self.VolumeFractions,
+        }
+
+
+def getCfdBoundaryGroupWithRegionInterfaces(analysis_object):
+    boundary_group = list(getCfdBoundaryGroup(analysis_object))
+    for interface_obj in getRegionCoupledInterfaces(analysis_object):
+        boundary_group.append(VirtualRegionCoupledBoundary(interface_obj, 1))
+        boundary_group.append(VirtualRegionCoupledBoundary(interface_obj, 2))
+    return boundary_group
+
+
+def boundaryToDict(obj):
+    if hasattr(obj, 'toDict'):
+        return obj.toDict()
+    return propsToDict(obj)
+
+
 def isPlanar(shape):
     """
     Return whether the shape is a planar face

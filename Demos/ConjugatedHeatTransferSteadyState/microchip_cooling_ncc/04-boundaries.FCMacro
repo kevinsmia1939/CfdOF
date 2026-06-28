@@ -1,5 +1,6 @@
 from CfdOF import CfdTools
 from CfdOF.Solve import CfdFluidBoundary
+from CfdOF.Solve import CfdRegionCoupledInterface
 
 
 def face_names(faces):
@@ -7,7 +8,7 @@ def face_names(faces):
 
 
 def add_boundary(label, region_name, boundary_type, subtype, thermal_type, shape, faces,
-                 velocity=(0, 0, 0), pressure="100 kPa", master=False, partners=None):
+                 velocity=(0, 0, 0), pressure="100 kPa"):
     boundary = CfdFluidBoundary.makeCfdFluidBoundary()
     CfdTools.getActiveAnalysis().addObject(boundary)
     boundary.Label = label
@@ -22,11 +23,19 @@ def add_boundary(label, region_name, boundary_type, subtype, thermal_type, shape
     boundary.TurbulenceIntensityPercentage = 1.0
     boundary.TurbulenceLengthScale = "100 mm"
     boundary.RegionName = region_name
-    boundary.RegionCoupledMaster = master
-    boundary.RegionCoupledPartners = partners or []
-    boundary.RegionCoupledPartner = boundary.RegionCoupledPartners[0] if boundary.RegionCoupledPartners else ""
     boundary.ShapeRefs = [(shape, face_names(faces))]
     return boundary
+
+
+def add_region_interface(region_a, shape_a, faces_a, region_b, shape_b, faces_b):
+    interface = CfdRegionCoupledInterface.makeCfdRegionCoupledInterface()
+    CfdTools.getActiveAnalysis().addObject(interface)
+    interface.Label = "{}_to_{}".format(region_a, region_b)
+    interface.Region1Name = region_a
+    interface.Region2Name = region_b
+    interface.ShapeRefs1 = [(shape_a, face_names(faces_a))]
+    interface.ShapeRefs2 = [(shape_b, face_names(faces_b))]
+    return interface
 
 
 def on_plane(face, axis, value, tol=1e-6):
@@ -87,11 +96,6 @@ for ai, (region_a, shape_a) in enumerate(regions):
         faces_a, faces_b = region_interface_faces(shape_a, shape_b)
         if not faces_a or not faces_b:
             continue
-        label_a = "{}_to_{}".format(region_a, region_b)
-        label_b = "{}_to_{}".format(region_b, region_a)
-        add_boundary(label_a, region_a, "wall", "fixedWall", "zeroGradient",
-                     shape_a, faces_a, master=True, partners=[label_b])
-        add_boundary(label_b, region_b, "wall", "fixedWall", "zeroGradient",
-                     shape_b, faces_b, master=False)
+        add_region_interface(region_a, shape_a, faces_a, region_b, shape_b, faces_b)
 
 App.ActiveDocument.recompute()

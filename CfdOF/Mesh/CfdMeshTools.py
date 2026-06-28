@@ -314,7 +314,7 @@ class CfdMeshTools:
         if not analysis_obj:
             analysis_obj = CfdTools.getActiveAnalysis()
         if analysis_obj:
-            bc_group = CfdTools.getCfdBoundaryGroup(analysis_obj)
+            bc_group = CfdTools.getCfdBoundaryGroupWithRegionInterfaces(analysis_obj)
         mesh_region_name = getattr(self.mesh_obj, 'RegionName', '') or self.mesh_obj.Label
         filter_boundaries_by_region = bool(
             mesh_region_name and analysis_obj and len(CfdTools.getMeshObjects(analysis_obj)) > 1)
