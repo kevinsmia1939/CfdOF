@@ -878,6 +878,8 @@ class _CfdFluidBoundary:
 class ViewProviderCfdFluidBoundary:
     def __init__(self, vobj):
         vobj.Proxy = self
+        self.ViewObject = vobj
+        self.Object = vobj.Object
         self.taskd = None
 
     def getIcon(self):
@@ -940,9 +942,11 @@ class ViewProviderCfdFluidBoundary:
         return True
 
     def doubleClicked(self, vobj):
-        doc = FreeCADGui.getDocument(vobj.Object.Document)
-        if not doc.getInEdit():
-            doc.setEdit(vobj.Object.Name)
+        if FreeCADGui.activeWorkbench().name() != 'CfdOFWorkbench':
+            FreeCADGui.activateWorkbench("CfdOFWorkbench")
+        gui_doc = FreeCADGui.getDocument(vobj.Object.Document)
+        if not gui_doc.getInEdit():
+            gui_doc.setEdit(vobj.Object.Name)
         else:
             FreeCAD.Console.PrintError('Task dialog already active\n')
             FreeCADGui.Control.showTaskView()
