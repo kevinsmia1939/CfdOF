@@ -148,6 +148,7 @@ class CfdCaseWriterFoam:
             'multiRegionFluidBoundaries': {},
             'multiRegionSolidBoundaries': {},
             'multiRegionUseSplitMeshRegions': True,
+            'multiRegionMeshDirs': {},
             'multiRegionNonConformalCouples': {},
             'multiRegionNonConformalCouplesPresent': False,
             'initialValues': CfdTools.propsToDict(self.initial_conditions),
@@ -505,6 +506,10 @@ class CfdCaseWriterFoam:
         for mesh_obj in self.mesh_objs:
             region_name = getattr(mesh_obj, 'RegionName', '') or mesh_obj.Label
             region_type = str(getattr(mesh_obj, 'RegionType', 'fluid'))
+            mesh_dir = os.path.relpath(os.path.join(self.working_dir, mesh_obj.CaseName), self.case_folder)
+            settings['multiRegionMeshDirs'][region_name] = {
+                'MeshDir': mesh_dir.replace('\\', '/'),
+            }
             if region_type == 'solid':
                 if region_name not in settings['multiRegionSolidNames']:
                     settings['multiRegionSolidNames'].append(region_name)

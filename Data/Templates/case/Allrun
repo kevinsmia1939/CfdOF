@@ -39,11 +39,13 @@ FOAMDIR="%(system/TranslatedFoamPath%)"
 %}
 if [ ! -z "$FOAMDIR" ]
 then
-    source "$FOAMDIR/etc/config.sh/unset" 2> /dev/null
+    source "$FOAMDIR/etc/config.sh/unset" 2> /dev/null || true
     source "$FOAMDIR/etc/bashrc"
 fi
 
 # Copy mesh from mesh case dir if available
+%{%(multiRegionUseSplitMeshRegions%)
+%:True
 MESHDIR="%(meshDir%)"
 if [ -f "$MESHDIR"/constant/polyMesh/faces ]
 then
@@ -54,6 +56,7 @@ then
     echo "Fatal error: Unable to find mesh in directory $MESHDIR" 1>&2
     exit 1
 fi
+%}
 
 # Detect available turbulence lib
 if [ -f "$FOAM_LIBBIN/libmomentumTransportModels.so" ] || [ -f "$FOAM_LIBBIN/libmomentumTransportModels.dll" ]
@@ -149,7 +152,10 @@ fi
 
 %}
 # Update patch name and type
+%{%(multiRegionUseSplitMeshRegions%)
+%:True
 runCommand createPatch -overwrite
+%}
 
 %{%(createPatchesForPeriodics%)
 %:True
@@ -189,7 +195,15 @@ runCommand splitMeshRegions -cellZonesOnly -overwrite
 # Separate region meshes are expected in constant/<region>/polyMesh.
 # Configure explicit non-conformal region-coupled patch pairs.
 env -u PYTHONPATH -u PYTHONHOME python3 << 'PYEOF'
-import os, re
+import os, re, shutil, subprocess
+
+global_create_patch_dict = os.path.join('system', 'createPatchDict')
+
+region_meshes = [
+%{%(multiRegionMeshDirs%)
+    ("%(0%)", "%(multiRegionMeshDirs/%(0%)/MeshDir%)"),
+%}
+]
 
 couples = [
 %{%(multiRegionNonConformalCouples%)
@@ -202,6 +216,84 @@ couples = [
 
 if not couples:
     raise RuntimeError("Multi-mesh CHT requires at least one RegionCoupledPartner boundary pair")
+
+for region, mesh_dir in region_meshes:
+    src = os.path.join(mesh_dir, 'constant', 'polyMesh')
+    dst = os.path.join('constant', region, 'polyMesh')
+    if not os.path.isdir(src):
+        raise RuntimeError("Mesh for region '{}' was not found at '{}'. Run that region's Allmesh first.".format(
+            region, src))
+    if os.path.isdir(dst):
+        shutil.rmtree(dst)
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
+    shutil.copytree(src, dst)
+
+def extract_boundary_patch_names(region):
+    bfile = os.path.join('constant', region, 'polyMesh', 'boundary')
+    with open(bfile) as f:
+        txt = f.read()
+    return set(re.findall(r'\n\s*([A-Za-z_][A-Za-z0-9_]*)\s*\n\s*\{', txt))
+
+def extract_patch_blocks(txt):
+    patches_match = re.search(r'\npatches\s*\(', txt)
+    if not patches_match:
+        return []
+    blocks = []
+    i = patches_match.end()
+    depth = 0
+    start = None
+    while i < len(txt):
+        char = txt[i]
+        if char == '{':
+            if depth == 0:
+                start = i
+            depth += 1
+        elif char == '}':
+            depth -= 1
+            if depth == 0 and start is not None:
+                blocks.append(txt[start:i + 1])
+                start = None
+        elif char == ')' and depth == 0:
+            break
+        i += 1
+    return blocks
+
+def block_matches_region(block, patch_names):
+    match = re.search(r'\n\s*patches\s*\((.*?)\)\s*;', block, re.S)
+    if not match:
+        return False
+    patterns = re.findall(r'"([^"]+)"|([A-Za-z0-9_.*+-]+)', match.group(1))
+    for quoted, unquoted in patterns:
+        pattern = quoted or unquoted
+        for patch_name in patch_names:
+            if re.fullmatch(pattern, patch_name):
+                return True
+    return False
+
+def write_region_create_patch_dict(region):
+    with open(global_create_patch_dict) as f:
+        txt = f.read()
+    patch_names = extract_boundary_patch_names(region)
+    blocks = [
+        block for block in extract_patch_blocks(txt)
+        if block_matches_region(block, patch_names)
+    ]
+    region_system_dir = os.path.join('system', region)
+    os.makedirs(region_system_dir, exist_ok=True)
+    region_dict = os.path.join(region_system_dir, 'createPatchDict')
+    header = txt[:re.search(r'\npatches\s*\(', txt).start()]
+    with open(region_dict, 'w') as f:
+        f.write(header)
+        f.write("\npatches\n(\n")
+        for block in blocks:
+            f.write(block)
+            f.write("\n")
+        f.write(");\n\n// ************************************************************************* //\n")
+    return os.path.abspath(region_dict)
+
+for region, mesh_dir in region_meshes:
+    create_patch_dict = write_region_create_patch_dict(region)
+    subprocess.check_call(['createPatch', '-region', region, '-dict', create_patch_dict, '-overwrite'])
 
 def replace_patch_block(txt, patch, neighbour_region, neighbour_patch):
     pattern = re.compile(r'(\n\s*' + re.escape(patch) + r'\s*\n\s*\{)(.*?)(\n\s*\})', re.S)
@@ -235,6 +327,8 @@ for master_region, master_patch, slave_region, slave_patch in couples:
     patch_region_boundary(master_region, master_patch, slave_region, slave_patch)
     patch_region_boundary(slave_region, slave_patch, master_region, master_patch)
 PYEOF
+py_status=$?
+if [ ! $py_status -eq 0 ]; then exit $py_status; fi
 
 %}
 %{%(meanVelocityForceCellZonesPresent%)

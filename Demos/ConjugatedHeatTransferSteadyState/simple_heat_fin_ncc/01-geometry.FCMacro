@@ -1,0 +1,23 @@
+import FreeCAD as App
+
+document_name = "simple_heat_fin_ncc"
+
+if document_name in App.listDocuments():
+    App.closeDocument(document_name)
+doc = App.newDocument(document_name)
+App.setActiveDocument(doc.Name)
+
+fluid = doc.addObject("Part::Box", "FluidRegion")
+fluid.Label = "fluid_channel"
+fluid.Length = "60 mm"
+fluid.Width = "20 mm"
+fluid.Height = "20 mm"
+
+solid = doc.addObject("Part::Box", "SolidRegion")
+solid.Label = "heat_fin"
+solid.Length = "60 mm"
+solid.Width = "20 mm"
+solid.Height = "5 mm"
+solid.Placement.Base = App.Vector(0, 0, 20)
+
+doc.recompute()

@@ -315,7 +315,16 @@ class CfdMeshTools:
             analysis_obj = CfdTools.getActiveAnalysis()
         if analysis_obj:
             bc_group = CfdTools.getCfdBoundaryGroup(analysis_obj)
+        mesh_region_name = getattr(self.mesh_obj, 'RegionName', '') or self.mesh_obj.Label
+        filter_boundaries_by_region = bool(
+            mesh_region_name and analysis_obj and len(CfdTools.getMeshObjects(analysis_obj)) > 1)
+        boundary_applies = []
         for bc_id, bc_obj in enumerate(bc_group):
+            bc_region_name = getattr(bc_obj, 'RegionName', '')
+            applies = not filter_boundaries_by_region or not bc_region_name or bc_region_name == mesh_region_name
+            boundary_applies.append(applies)
+            if not applies:
+                continue
             for ri, ref in enumerate(bc_obj.ShapeRefs):
                 try:
                     bf = CfdTools.resolveReference(ref)
@@ -439,12 +448,14 @@ class CfdMeshTools:
                 bc_matched[nb] = True
 
         for bc_id, matched in enumerate(bc_matched):
-            if not matched and not bc_group[bc_id].DefaultBoundary:
+            if boundary_applies[bc_id] and not matched and not bc_group[bc_id].DefaultBoundary:
                 CfdTools.cfdWarning(
                     "No part of the boundary '{}' matched any part of the geometry '{}' being meshed\n".format(
                         bc_group[bc_id].Label, self.mesh_obj.Part.Label))
         # Handle baffles
         for bc_id, bc_obj in enumerate(bc_group):
+            if not boundary_applies[bc_id]:
+                continue
             if bc_obj.BoundaryType == 'baffle':
                 baffle_matches = [m for m in bc_mr_matched_faces if m[0][0] == bc_id]
                 mr_match_per_baffle_ref = []
