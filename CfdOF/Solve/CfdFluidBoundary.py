@@ -923,7 +923,9 @@ class ViewProviderCfdFluidBoundary:
         return
 
     def setEdit(self, vobj, mode):
-        analysis_object = CfdTools.getParentAnalysisObject(self.Object)
+        self.ViewObject = vobj
+        self.Object = vobj.Object
+        analysis_object = CfdTools.getParentAnalysisObject(vobj.Object)
         if analysis_object is None:
             CfdTools.cfdErrorBox("Boundary must have a parent analysis object")
             return False
@@ -935,8 +937,8 @@ class ViewProviderCfdFluidBoundary:
 
         import importlib
         importlib.reload(TaskPanelCfdFluidBoundary)
-        self.taskd = TaskPanelCfdFluidBoundary.TaskPanelCfdFluidBoundary(self.Object, physics_model, material_objs)
-        self.Object.ViewObject.show()
+        self.taskd = TaskPanelCfdFluidBoundary.TaskPanelCfdFluidBoundary(vobj.Object, physics_model, material_objs)
+        vobj.Object.ViewObject.show()
         self.taskd.obj = vobj.Object
         FreeCADGui.Control.showDialog(self.taskd)
         return True
