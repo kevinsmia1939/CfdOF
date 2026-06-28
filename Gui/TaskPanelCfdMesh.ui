@@ -489,7 +489,7 @@
      <item row="1" column="2">
       <widget class="QPushButton" name="pb_write_all_meshes">
        <property name="toolTip">
-        <string>Write mesh cases for all mesh objects using each mesh object's saved settings</string>
+        <string>Write and run all mesh cases using each mesh object's saved settings</string>
        </property>
        <property name="text">
         <string>Mesh all</string>

@@ -351,9 +351,13 @@ class TaskPanelCfdMesh:
                       + cart_mesh.part_obj.Shape.ShapeType)
                 print('  CharacteristicLengthMax: ' + str(cart_mesh.clmax))
                 cart_mesh.writeMesh()
+                self.analysis_obj.NeedsMeshRerun = True
 
-            self.analysis_obj.NeedsMeshRerun = True
-            self.consoleMessage("All mesh cases written")
+                self.consoleMessage("Running mesher for {} ...".format(mesh_obj.Label))
+                self.runMeshForObject(mesh_obj, cart_mesh)
+
+            self.analysis_obj.NeedsMeshRerun = False
+            self.consoleMessage("All mesh cases written and meshed")
         except Exception as ex:
             self.consoleMessage("Error " + type(ex).__name__ + ": " + str(ex), 'Error')
             raise
@@ -361,6 +365,31 @@ class TaskPanelCfdMesh:
             QApplication.restoreOverrideCursor()
             self.mesh_obj.Proxy.cart_mesh = CfdMeshTools.CfdMeshTools(self.mesh_obj)
             self.updateUI()
+
+    def runMeshForObject(self, mesh_obj, cart_mesh):
+        if CfdTools.getFoamRuntime() == "MinGW" or CfdTools.getFoamRuntime().startswith('BlueCFD'):
+            cmd = CfdTools.makeRunCommand('Allmesh.bat', source_env=False)
+        else:
+            cmd = CfdTools.makeRunCommand('./Allmesh', cart_mesh.mesh_case_dir, source_env=False)
+
+        mesh_process = CfdConsoleProcess(stdout_hook=self.gotOutputLines)
+        mesh_process.stderrHook = lambda lines: self.gotMeshObjectErrorLines(mesh_process, lines)
+        mesh_obj.Proxy.mesh_process = mesh_process
+        cart_mesh.error = False
+        mesh_process.start(cmd, env_vars=CfdTools.getRunEnvironment(), working_dir=cart_mesh.mesh_case_dir)
+        if not mesh_process.waitForStarted():
+            cart_mesh.error = True
+            raise RuntimeError("Error starting mesher for {}".format(mesh_obj.Label))
+        if not mesh_process.waitForFinished() or mesh_process.exitCode() != 0:
+            cart_mesh.error = True
+            raise RuntimeError("Mesher failed for {}".format(mesh_obj.Label))
+        self.consoleMessage("Meshing completed for {}".format(mesh_obj.Label))
+
+    def gotMeshObjectErrorLines(self, mesh_process, lines):
+        print_err = mesh_process.processErrorOutput(lines)
+        if print_err is not None:
+            self.consoleMessage(print_err, 'Error')
+        return print_err
 
     def progressCallback(self, message):
         self.consoleMessage(message)
