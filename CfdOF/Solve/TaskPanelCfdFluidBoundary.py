@@ -358,7 +358,8 @@ class TaskPanelCfdFluidBoundary:
         else:
             self.form.periodicFrame.setVisible(False)
 
-        self.regionPartnerList.setEnabled(self.regionCoupledMasterCheck.isChecked())
+        if hasattr(self, 'regionPartnerList') and hasattr(self, 'regionCoupledMasterCheck'):
+            self.regionPartnerList.setEnabled(self.regionCoupledMasterCheck.isChecked())
 
     def comboBoundaryTypeChanged(self):
         index = self.form.comboBoundaryType.currentIndex()
