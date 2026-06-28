@@ -27,6 +27,7 @@
 
 import os
 import os.path
+import math
 from FreeCAD import Units, Vector
 from CfdOF import CfdTools
 from CfdOF.TemplateBuilder import TemplateBuilder
@@ -101,6 +102,8 @@ class CfdCaseWriterFoam:
 
         self.settings = None
         self.SnappySettings = None
+        self._mean_velocity_force_part_names = {}
+        self._mean_velocity_force_settings = {}
 
     def writeCase(self):
         """ writeCase() will collect case settings, and finally build a runnable case. """
@@ -852,6 +855,9 @@ class CfdCaseWriterFoam:
         Solid regions: sourced from CfdSolidMaterial.ShapeRefs.
         """
         settings = self.settings
+        if not settings.get('multiRegionUseSplitMeshRegions', True):
+            return
+
         path = os.path.join(self.working_dir, self.solver_obj.InputCaseName, "constant", "triSurface")
 
         # Fluid regions: use Internal mesh refinement zones
@@ -1173,33 +1179,157 @@ class CfdCaseWriterFoam:
     # Mean velocity force cell zones
     def exportMeanVelocityForceCellZoneStlSurfaces(self):
         for o in self.mean_velocity_force_cellzone_objs:
-            for r in o.ShapeRefs:
+            force_name = o.Name
+            force_label = o.Label
+            direction = tuple(p for p in o.Direction)
+            ubar = tuple(p for p in o.Ubar)
+            relaxation = o.Relaxation
+            part_name_list = []
+            cylinder_specs = getattr(o, 'CellZoneCylinderSpecs', [])
+            if cylinder_specs:
                 path = os.path.join(self.working_dir,
                                     self.solver_obj.InputCaseName,
                                     "constant",
                                     "triSurface")
                 if not os.path.exists(path):
                     os.makedirs(path)
-                shape = r[0].Shape
-                CfdMeshTools.writeSurfaceMeshFromShape(shape, path, r[0].Name, self.mesh_obj)
+                for spec in cylinder_specs:
+                    name, radius, height, x, y, z = [v.strip() for v in spec.split(',')]
+                    self._writeMeanVelocityForceCylinderStl(
+                        name, float(radius), float(height), Vector(float(x), float(y), float(z)), path)
+                    part_name_list.append(name)
+                    print("Successfully wrote stl surface for mean velocity force cell zone\n")
+                self._cacheMeanVelocityForceSettings(
+                    force_name, force_label, part_name_list, direction, ubar, relaxation)
+                continue
+            for part_obj in self._getMeanVelocityForceCellZonePartObjects(o):
+                path = os.path.join(self.working_dir,
+                                    self.solver_obj.InputCaseName,
+                                    "constant",
+                                    "triSurface")
+                if not os.path.exists(path):
+                    os.makedirs(path)
+                if part_obj.TypeId == "Part::Cylinder":
+                    self._writeMeanVelocityForceCylinderStl(
+                        part_obj.Name,
+                        Units.Quantity(part_obj.Radius, Units.Length).getValueAs("mm"),
+                        Units.Quantity(part_obj.Height, Units.Length).getValueAs("mm"),
+                        part_obj.Placement.Base,
+                        path)
+                else:
+                    shape = part_obj.Shape
+                    CfdMeshTools.writeSurfaceMeshFromShape(shape, path, part_obj.Name, self.mesh_obj)
+                part_name_list.append(part_obj.Name)
                 print("Successfully wrote stl surface for mean velocity force cell zone\n")
+            self._cacheMeanVelocityForceSettings(
+                force_name, force_label, part_name_list, direction, ubar, relaxation)
+
+    def _cacheMeanVelocityForceSettings(self, force_name, force_label, part_name_list, direction, ubar, relaxation):
+        part_name_tuple = tuple(part_name_list)
+        self._mean_velocity_force_part_names[force_name] = part_name_tuple
+        self._mean_velocity_force_settings[force_name] = {
+            'Label': force_label,
+            'PartNameList': part_name_tuple,
+            'Direction': direction,
+            'Ubar': ubar,
+            'Relaxation': relaxation,
+        }
+
+    def _getMeanVelocityForceCellZonePartObjects(self, force_obj):
+        doc = self.analysis_obj.Document
+        part_names = getattr(force_obj, 'CellZoneShapeNames', [])
+        if part_names:
+            part_objs = []
+            for part_name in part_names:
+                part_obj = doc.getObject(part_name)
+                if part_obj is None:
+                    raise RuntimeError(
+                        "Mean velocity force cell zone object '{}' was not found".format(part_name))
+                part_objs.append(part_obj)
+            return part_objs
+        return [r[0] for r in force_obj.ShapeRefs]
+
+    def _writeMeanVelocityForceCylinderStl(self, name, radius, height, base, path):
+        output_file_name = os.path.join(path, name + '.stl')
+        scaling_factor = Units.Quantity(1, Units.Length).getValueAs("m")
+        segments = 96
+
+        def point(x, y, z):
+            p = (base + Vector(x, y, z)) * scaling_factor
+            return (p.x, p.y, p.z)
+
+        bottom_center = point(0, 0, 0)
+        top_center = point(0, 0, height)
+        bottom = []
+        top = []
+        for i in range(segments):
+            angle = 2.0 * math.pi * i / segments
+            x = radius * math.cos(angle)
+            y = radius * math.sin(angle)
+            bottom.append(point(x, y, 0))
+            top.append(point(x, y, height))
+
+        def normal(p1, p2, p3):
+            ux, uy, uz = (p2[i] - p1[i] for i in range(3))
+            vx, vy, vz = (p3[i] - p1[i] for i in range(3))
+            nx = uy * vz - uz * vy
+            ny = uz * vx - ux * vz
+            nz = ux * vy - uy * vx
+            mag = (nx * nx + ny * ny + nz * nz) ** 0.5
+            if mag == 0:
+                return (0.0, 0.0, 0.0)
+            return (nx / mag, ny / mag, nz / mag)
+
+        def write_facet(fid, p1, p2, p3):
+            n = normal(p1, p2, p3)
+            fid.write(" facet normal {} {} {}\n".format(*n))
+            fid.write("  outer loop\n")
+            for p in (p1, p2, p3):
+                fid.write("   vertex {} {} {}\n".format(*p))
+            fid.write("  endloop\n")
+            fid.write(" endfacet\n")
+
+        with open(output_file_name, 'w') as fid:
+            fid.write("solid {}\n".format(name))
+            for i in range(segments):
+                j = (i + 1) % segments
+                write_facet(fid, bottom[i], bottom[j], top[j])
+                write_facet(fid, bottom[i], top[j], top[i])
+                write_facet(fid, bottom_center, bottom[i], bottom[j])
+                write_facet(fid, top_center, top[j], top[i])
+            fid.write("endsolid {}\n".format(name))
 
     def processMeanVelocityForceCellZoneProperties(self):
         settings = self.settings
         settings['meanVelocityForceCellZonesPresent'] = True
         settings['fvOptionsPresent'] = True
-        for o in self.mean_velocity_force_cellzone_objs:
-            od = CfdTools.propsToDict(o)
-            part_name_list = tuple(r[0].Name for r in o.ShapeRefs)
-            settings['meanVelocityForceCellZones'][o.Label] = {
-                'PartNameList': part_name_list,
-                'Direction': od['Direction'],
-                'Ubar': od['Ubar'],
-                'Relaxation': od['Relaxation'],
+        if self._mean_velocity_force_settings:
+            zone_settings = list(self._mean_velocity_force_settings.values())
+        else:
+            zone_settings = []
+            for o in self.mean_velocity_force_cellzone_objs:
+                part_name_list = tuple(
+                    part_obj.Name for part_obj in self._getMeanVelocityForceCellZonePartObjects(o))
+                zone_settings.append({
+                    'Label': o.Label,
+                    'PartNameList': part_name_list,
+                    'Direction': tuple(p for p in o.Direction),
+                    'Ubar': tuple(p for p in o.Ubar),
+                    'Relaxation': o.Relaxation,
+                })
+        for zone_setting in zone_settings:
+            zone_label = zone_setting['Label']
+            settings['meanVelocityForceCellZones'][zone_label] = {
+                'PartNameList': zone_setting['PartNameList'],
+                'Direction': zone_setting['Direction'],
+                'Ubar': zone_setting['Ubar'],
+                'Relaxation': zone_setting['Relaxation'],
             }
-            # Register the zone for topoSetZonesDict so the cellZoneSet is created
-            settings['zones'][o.Label] = {'PartNameList': part_name_list}
-        settings['zonesPresent'] = True
+            if not settings['multiRegionEnabled']:
+                # Register the zone for topoSetZonesDict so the cellZoneSet is created
+                settings['zones'][zone_label] = {'PartNameList': zone_setting['PartNameList']}
+        if not settings['multiRegionEnabled']:
+            settings['zonesPresent'] = True
 
     def processInitialisationZoneProperties(self):
         settings = self.settings

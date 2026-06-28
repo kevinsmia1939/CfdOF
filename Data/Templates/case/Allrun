@@ -333,8 +333,8 @@ if [ ! $py_status -eq 0 ]; then exit $py_status; fi
 %}
 %{%(meanVelocityForceCellZonesPresent%)
 %:True
-# Create mean velocity force cell zones inside the split fluid region mesh
-runCommand topoSet -region %(multiRegionFluidNames/0%) -dict system/topoSetMeanVelocityForceZonesDict
+# Create mean velocity force cell zones inside the fluid region mesh
+runCommand topoSet -region %(multiRegionFluidNames/0%) -dict "$PWD/system/%(multiRegionFluidNames/0%)/topoSetMeanVelocityForceZonesDict"
 
 %}
 # Upgrade sampleMode on all mappedWall interface patches to nearestPatchFaceAMI (parallel-safe)

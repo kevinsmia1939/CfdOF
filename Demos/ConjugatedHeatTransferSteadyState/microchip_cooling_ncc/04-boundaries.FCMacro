@@ -1,0 +1,97 @@
+from CfdOF import CfdTools
+from CfdOF.Solve import CfdFluidBoundary
+
+
+def face_names(faces):
+    return tuple("Face{}".format(i) for i in faces)
+
+
+def add_boundary(label, region_name, boundary_type, subtype, thermal_type, shape, faces,
+                 velocity=(0, 0, 0), pressure="100 kPa", master=False, partners=None):
+    boundary = CfdFluidBoundary.makeCfdFluidBoundary()
+    CfdTools.getActiveAnalysis().addObject(boundary)
+    boundary.Label = label
+    boundary.BoundaryType = boundary_type
+    boundary.BoundarySubType = subtype
+    boundary.ThermalBoundaryType = thermal_type
+    boundary.Temperature = "293 K"
+    boundary.Pressure = pressure
+    boundary.Ux = "{} mm/s".format(velocity[0])
+    boundary.Uy = "{} mm/s".format(velocity[1])
+    boundary.Uz = "{} mm/s".format(velocity[2])
+    boundary.TurbulenceIntensityPercentage = 1.0
+    boundary.TurbulenceLengthScale = "100 mm"
+    boundary.RegionName = region_name
+    boundary.RegionCoupledMaster = master
+    boundary.RegionCoupledPartners = partners or []
+    boundary.RegionCoupledPartner = boundary.RegionCoupledPartners[0] if boundary.RegionCoupledPartners else ""
+    boundary.ShapeRefs = [(shape, face_names(faces))]
+    return boundary
+
+
+def on_plane(face, axis, value, tol=1e-6):
+    bb = face.BoundBox
+    if axis == "x":
+        return abs(bb.XMin - value) <= tol and abs(bb.XMax - value) <= tol
+    if axis == "y":
+        return abs(bb.YMin - value) <= tol and abs(bb.YMax - value) <= tol
+    return abs(bb.ZMin - value) <= tol and abs(bb.ZMax - value) <= tol
+
+
+def region_interface_faces(shape_a, shape_b, tol=1e-5):
+    faces_a = []
+    faces_b = []
+    for ia, face_a in enumerate(shape_a.Shape.Faces, 1):
+        for ib, face_b in enumerate(shape_b.Shape.Faces, 1):
+            try:
+                common = face_a.common(face_b)
+                area = common.Area
+            except Exception:
+                area = 0.0
+            if area > tol:
+                faces_a.append(ia)
+                faces_b.append(ib)
+    return sorted(set(faces_a)), sorted(set(faces_b))
+
+
+fluid = App.ActiveDocument.FluidRegion
+fluid_bb = fluid.Shape.BoundBox
+
+fluid_inlet = [i for i, f in enumerate(fluid.Shape.Faces, 1) if on_plane(f, "z", fluid_bb.ZMin)]
+fluid_outlet = [i for i, f in enumerate(fluid.Shape.Faces, 1) if on_plane(f, "z", fluid_bb.ZMax)]
+fluid_sides = [
+    i for i, f in enumerate(fluid.Shape.Faces, 1)
+    if on_plane(f, "x", fluid_bb.XMin) or on_plane(f, "x", fluid_bb.XMax)
+    or on_plane(f, "y", fluid_bb.YMin) or on_plane(f, "y", fluid_bb.YMax)
+]
+
+add_boundary("inlet", "FluidProperties001", "wall", "fixedWall", "zeroGradient",
+             fluid, fluid_inlet, velocity=(0, 0, 20))
+add_boundary("outlet", "FluidProperties001", "outlet", "staticPressureOutlet", "zeroGradient",
+             fluid, fluid_outlet)
+
+# The isothermal casing gives the steady CHT problem a robust thermal reference.
+add_boundary("side_walls", "FluidProperties001", "wall", "slipWall", "fixedValue",
+             fluid, fluid_sides)
+
+regions = [
+    ("FluidProperties001", App.ActiveDocument.FluidRegion),
+    ("heat_sink_volume001", App.ActiveDocument.HeatSinkRegion),
+    ("PCB_volume001", App.ActiveDocument.PCBRegion),
+    ("hot_microchip_volume001", App.ActiveDocument.MicrochipRegion),
+    ("Polypropylene_solid001", App.ActiveDocument.FanCaseRegion),
+]
+
+for ai, (region_a, shape_a) in enumerate(regions):
+    for region_b, shape_b in regions[ai + 1:]:
+        faces_a, faces_b = region_interface_faces(shape_a, shape_b)
+        if not faces_a or not faces_b:
+            continue
+        label_a = "{}_to_{}".format(region_a, region_b)
+        label_b = "{}_to_{}".format(region_b, region_a)
+        add_boundary(label_a, region_a, "wall", "fixedWall", "zeroGradient",
+                     shape_a, faces_a, master=True, partners=[label_b])
+        add_boundary(label_b, region_b, "wall", "fixedWall", "zeroGradient",
+                     shape_b, faces_b, master=False)
+
+App.ActiveDocument.recompute()

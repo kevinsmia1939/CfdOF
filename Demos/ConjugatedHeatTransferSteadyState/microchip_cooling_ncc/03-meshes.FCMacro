@@ -1,0 +1,35 @@
+from CfdOF import CfdTools
+from CfdOF.Mesh import CfdMesh
+
+
+def add_mesh(name, part, region_name, region_type, case_name):
+    CfdMesh.makeCfdMesh(name)
+    mesh = App.ActiveDocument.ActiveObject
+    mesh.Label = name + "001"
+    mesh.Part = part
+    mesh.RegionName = region_name
+    mesh.RegionType = region_type
+    mesh.CaseName = case_name
+    CfdTools.getActiveAnalysis().addObject(mesh)
+    mesh.CharacteristicLengthMax = "3 mm"
+    mesh.MeshUtility = "gmsh"
+    mesh.ElementDimension = "3D"
+    mesh.CellsBetweenLevels = 3
+    mesh.EdgeRefinement = 1.0
+    mesh.PointInMesh = {"x": "0 m", "y": "0 m", "z": "0 m"}
+    mesh.NumberOfProcesses = 1
+    return mesh
+
+
+add_mesh("Fluid_Mesh", App.ActiveDocument.FluidRegion, "FluidProperties001", "fluid",
+         "meshCaseMicrochipCoolingNccFluid")
+add_mesh("HeatSink_Mesh", App.ActiveDocument.HeatSinkRegion, "heat_sink_volume001", "solid",
+         "meshCaseMicrochipCoolingNccHeatSink")
+add_mesh("PCB_Mesh", App.ActiveDocument.PCBRegion, "PCB_volume001", "solid",
+         "meshCaseMicrochipCoolingNccPCB")
+add_mesh("Microchip_Mesh", App.ActiveDocument.MicrochipRegion, "hot_microchip_volume001", "solid",
+         "meshCaseMicrochipCoolingNccMicrochip")
+add_mesh("FanCase_Mesh", App.ActiveDocument.FanCaseRegion, "Polypropylene_solid001", "solid",
+         "meshCaseMicrochipCoolingNccFanCase")
+
+App.ActiveDocument.recompute()
