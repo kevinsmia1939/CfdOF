@@ -238,16 +238,54 @@ class VirtualRegionCoupledBoundary:
         self.BoundaryType = "wall"
         self.BoundarySubType = "fixedWall"
         self.ThermalBoundaryType = getattr(interface_obj, "ThermalBoundaryType", "zeroGradient")
-        self.Temperature = "293 K"
-        self.HeatFlux = "0 W/m^2"
-        self.Power = "0 W"
-        self.HeatTransferCoeff = "0 W/m^2/K"
-        self.SlipRatio = "0"
-        self.Ux = "0 m/s"
-        self.Uy = "0 m/s"
-        self.Uz = "0 m/s"
-        self.Pressure = "0 Pa"
+        self.VelocityIsCartesian = True
+        self.Ux = 0.0
+        self.Uy = 0.0
+        self.Uz = 0.0
+        self.VelocityMag = 0.0
+        self.DirectionFace = ""
+        self.ReverseNormal = False
+        self.Pressure = 0.0
         self.KinematicPressure = 0
+        self.SlipRatio = 0.0
+        self.VolFlowRate = 0.0
+        self.MassFlowRate = 0.0
+        self.RelativeToFrame = False
+        self.PorousBaffleMethod = "porousCoeff"
+        self.PressureDropCoeff = 0.0
+        self.ScreenWireDiameter = 0.0002
+        self.ScreenSpacing = 0.002
+        self.AngularVelocity = 0.0
+        self.CentreOfRotationx = 0.0
+        self.CentreOfRotationy = 0.0
+        self.CentreOfRotationz = 0.0
+        self.RotationAxisx = 0.0
+        self.RotationAxisy = 0.0
+        self.RotationAxisz = 1.0
+        self.RoughnessHeight = 0.0
+        self.RoughnessConstant = 0.5
+        self.Temperature = 293.0
+        self.HeatFlux = 0.0
+        self.Power = 0.0
+        self.HeatTransferCoeff = 0.0
+        self.RotationalPeriodic = False
+        self.PeriodicCentreOfRotation = (0.0, 0.0, 0.0)
+        self.PeriodicCentreOfRotationAxis = (0.0, 0.0, 1.0)
+        self.PeriodicSeparationVector = (0.0, 0.0, 0.0)
+        self.PeriodicPartner = ""
+        self.PeriodicMaster = True
+        self.TurbulenceInletSpecification = "intensityAndLengthScale"
+        self.TurbulentKineticEnergy = 0.01
+        self.SpecificDissipationRate = 1.0
+        self.DissipationRate = 50.0
+        self.NuTilda = 55.0
+        self.Intermittency = 1.0
+        self.ReThetat = 1.0
+        self.TurbulentViscosity = 50.0
+        self.kEqnTurbulentKineticEnergy = 0.01
+        self.kEqnTurbulentViscosity = 50.0
+        self.TurbulenceIntensityPercentage = 1.0
+        self.TurbulenceLengthScale = 0.1
         self.VolumeFractions = {}
         if side == 1:
             self.ShapeRefs = interface_obj.ShapeRefs1
@@ -267,12 +305,51 @@ class VirtualRegionCoupledBoundary:
             'DefaultBoundary': self.DefaultBoundary,
             'BoundaryType': self.BoundaryType,
             'BoundarySubType': self.BoundarySubType,
+            'ShapeRefs': self.ShapeRefs,
+            'VelocityIsCartesian': self.VelocityIsCartesian,
+            'VelocityMag': self.VelocityMag,
+            'DirectionFace': self.DirectionFace,
+            'ReverseNormal': self.ReverseNormal,
             'ThermalBoundaryType': self.ThermalBoundaryType,
             'Temperature': self.Temperature,
             'HeatFlux': self.HeatFlux,
             'Power': self.Power,
             'HeatTransferCoeff': self.HeatTransferCoeff,
             'SlipRatio': self.SlipRatio,
+            'VolFlowRate': self.VolFlowRate,
+            'MassFlowRate': self.MassFlowRate,
+            'RelativeToFrame': self.RelativeToFrame,
+            'PorousBaffleMethod': self.PorousBaffleMethod,
+            'PressureDropCoeff': self.PressureDropCoeff,
+            'ScreenWireDiameter': self.ScreenWireDiameter,
+            'ScreenSpacing': self.ScreenSpacing,
+            'AngularVelocity': self.AngularVelocity,
+            'CentreOfRotationx': self.CentreOfRotationx,
+            'CentreOfRotationy': self.CentreOfRotationy,
+            'CentreOfRotationz': self.CentreOfRotationz,
+            'RotationAxisx': self.RotationAxisx,
+            'RotationAxisy': self.RotationAxisy,
+            'RotationAxisz': self.RotationAxisz,
+            'RoughnessHeight': self.RoughnessHeight,
+            'RoughnessConstant': self.RoughnessConstant,
+            'RotationalPeriodic': self.RotationalPeriodic,
+            'PeriodicCentreOfRotation': self.PeriodicCentreOfRotation,
+            'PeriodicCentreOfRotationAxis': self.PeriodicCentreOfRotationAxis,
+            'PeriodicSeparationVector': self.PeriodicSeparationVector,
+            'PeriodicPartner': self.PeriodicPartner,
+            'PeriodicMaster': self.PeriodicMaster,
+            'TurbulenceInletSpecification': self.TurbulenceInletSpecification,
+            'TurbulentKineticEnergy': self.TurbulentKineticEnergy,
+            'SpecificDissipationRate': self.SpecificDissipationRate,
+            'DissipationRate': self.DissipationRate,
+            'NuTilda': self.NuTilda,
+            'Intermittency': self.Intermittency,
+            'ReThetat': self.ReThetat,
+            'TurbulentViscosity': self.TurbulentViscosity,
+            'kEqnTurbulentKineticEnergy': self.kEqnTurbulentKineticEnergy,
+            'kEqnTurbulentViscosity': self.kEqnTurbulentViscosity,
+            'TurbulenceIntensityPercentage': self.TurbulenceIntensityPercentage,
+            'TurbulenceLengthScale': self.TurbulenceLengthScale,
             'Ux': self.Ux,
             'Uy': self.Uy,
             'Uz': self.Uz,

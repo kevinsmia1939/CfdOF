@@ -238,5 +238,5 @@ class _ViewProviderCfdRegionCoupledInterface:
         return None
 
 
-if FreeCAD.GuiUp:
+if FreeCAD.GuiUp and hasattr(FreeCADGui, 'addCommand'):
     FreeCADGui.addCommand('CfdOF_RegionCoupledInterface', CommandCfdRegionCoupledInterface())
