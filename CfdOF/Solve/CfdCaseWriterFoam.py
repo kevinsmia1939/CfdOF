@@ -1010,8 +1010,9 @@ class CfdCaseWriterFoam:
         solid_bcs = {}
         region_couples = {}
         for bc_obj in self.bc_group:
+            is_region_interface = hasattr(bc_obj, 'Interface')
             explicit_region = getattr(bc_obj, 'RegionName', '')
-            if explicit_region:
+            if explicit_region and not is_region_interface:
                 if explicit_region in settings['multiRegionSolidNames']:
                     solid_bcs[bc_obj.Label] = settings['boundaries'][bc_obj.Label]
                 else:
@@ -1051,6 +1052,9 @@ class CfdCaseWriterFoam:
                     'SlavePatch': partner_obj.Label,
                     'SlaveRegion': slave_region,
                 }
+
+            if is_region_interface:
+                continue
 
             if matched:
                 continue

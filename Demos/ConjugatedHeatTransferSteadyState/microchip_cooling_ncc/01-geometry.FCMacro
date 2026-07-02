@@ -1,6 +1,5 @@
 import FreeCAD as App
 import Part
-import Draft
 import BOPTools.SplitFeatures as SplitFeatures
 
 
@@ -29,22 +28,15 @@ Box002 = make_box("Box002", "microchip", 30, 30, 1, (135, 135, 11))
 # Heat sink: 30 x 30 x 3 mm base plus seven 1 mm thick fins, then placed on
 # top of the microchip. Keep object names aligned with the original demo.
 Box003 = make_box("Box003", "Cube", 30, 30, 3, (0, 0, 0))
-Box004 = make_box("Box004", "Cube001", 30, 1, 12, (0, 0, 0))
-Array = Draft.make_ortho_array(
-    Box004,
-    v_x=App.Vector(100, 0, 0),
-    v_y=App.Vector(0, 4.833333, 0),
-    v_z=App.Vector(0, 0, 100),
-    n_x=1,
-    n_y=7,
-    n_z=1,
-    use_link=False,
-)
-Array.Label = "Array"
+fin_pitch = 29.0 / 6.0
+Fins = [
+    make_box("Box{:03d}".format(4 + i), "Cube{:03d}".format(i + 1), 30, 1, 12, (0, fin_pitch * i, 0))
+    for i in range(7)
+]
 
 Fusion = doc.addObject("Part::MultiFuse", "Fusion")
 Fusion.Label = "heat_sink"
-Fusion.Shapes = [Box003, Array]
+Fusion.Shapes = [Box003] + Fins
 Fusion.Placement.Base = App.Vector(135, 135, 12)
 
 # Fan case: square 30 x 30 x 10 mm duct with a 28 mm diameter cylindrical hole.
@@ -134,7 +126,8 @@ FanCaseRegion = add_region_object(
     ),
 )
 
-for obj in [Box, Box001, Box002, Box003, Box004, Array, Fusion, Body, BooleanFragments]:
-    obj.ViewObject.Visibility = False
+for obj in [Box, Box001, Box002, Box003] + Fins + [Fusion, Body, BooleanFragments]:
+    if obj.ViewObject:
+        obj.ViewObject.Visibility = False
 
 doc.recompute()

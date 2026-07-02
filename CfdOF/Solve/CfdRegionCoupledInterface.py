@@ -173,6 +173,7 @@ class ViewProviderCfdRegionCoupledInterface:
         vobj.Proxy = self
         self.ViewObject = vobj
         self.Object = vobj.Object
+        self.taskd = None
 
     def getIcon(self):
         return os.path.join(CfdTools.getModulePath(), "Gui", "Icons", "region_coupled_interface.svg")
@@ -202,10 +203,37 @@ class ViewProviderCfdRegionCoupledInterface:
         return
 
     def setEdit(self, vobj, mode):
-        return False
+        self.ViewObject = vobj
+        self.Object = vobj.Object
+        analysis_object = CfdTools.getParentAnalysisObject(vobj.Object)
+        if analysis_object is None:
+            CfdTools.cfdErrorBox("Region-coupled interface must have a parent analysis object")
+            return False
+
+        from CfdOF.Solve import TaskPanelCfdRegionCoupledInterface
+        import importlib
+        importlib.reload(TaskPanelCfdRegionCoupledInterface)
+        self.taskd = TaskPanelCfdRegionCoupledInterface.TaskPanelCfdRegionCoupledInterface(vobj.Object)
+        vobj.Object.ViewObject.show()
+        FreeCADGui.Control.showDialog(self.taskd)
+        return True
+
+    def doubleClicked(self, vobj):
+        if FreeCADGui.activeWorkbench().name() != 'CfdOFWorkbench':
+            FreeCADGui.activateWorkbench("CfdOFWorkbench")
+        gui_doc = FreeCADGui.getDocument(vobj.Object.Document)
+        if not gui_doc.getInEdit():
+            gui_doc.setEdit(vobj.Object.Name)
+        else:
+            FreeCAD.Console.PrintError('Task dialog already active\n')
+            FreeCADGui.Control.showTaskView()
+        return True
 
     def unsetEdit(self, vobj, mode):
-        return
+        if self.taskd:
+            self.taskd.closing()
+            self.taskd = None
+        FreeCADGui.Control.closeDialog()
 
     def __getstate__(self):
         return None

@@ -30,6 +30,7 @@ import os.path
 from CfdOF import CfdTools
 from CfdOF.Mesh import CfdMeshRefinement
 from CfdOF.Solve import CfdFluidBoundary
+from CfdOF.Solve import CfdRegionCoupledInterface
 from CfdOF.Solve import CfdZone
 if FreeCAD.GuiUp:
     import FreeCADGui
@@ -123,6 +124,7 @@ class CfdFaceSelectWidget:
             if "Shape" in i.PropertiesList:
                 if not i.Shape.isNull() and \
                         not (hasattr(i, 'Proxy') and isinstance(i.Proxy, CfdFluidBoundary.CfdFluidBoundary)) and \
+                        not (hasattr(i, 'Proxy') and isinstance(i.Proxy, CfdRegionCoupledInterface.CfdRegionCoupledInterface)) and \
                         not (hasattr(i, 'Proxy') and isinstance(i.Proxy, CfdMeshRefinement.CfdMeshRefinement)) and \
                         not (hasattr(i, 'Proxy') and isinstance(i.Proxy, CfdZone.CfdZone)):
                     self.shapeNames.append(i.Name)
