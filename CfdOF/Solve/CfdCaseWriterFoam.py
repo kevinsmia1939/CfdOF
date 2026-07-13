@@ -187,6 +187,8 @@ class CfdCaseWriterFoam:
             self.exportMeanVelocityForceCellZoneStlSurfaces()
             self.processMeanVelocityForceCellZoneProperties()
 
+        self.processMeanVelocityForceProperties()
+
         if self.reporting_functions:
             cfdMessage('Reporting functions present\n')
             self.processReportingFunctions()
@@ -369,7 +371,8 @@ class CfdCaseWriterFoam:
         bc_names = list(settings['boundaries'].keys())
         for bc_name in bc_names:
             bc = settings['boundaries'][bc_name]
-            if not bc['VelocityIsCartesian']:
+            self.processSineBoundaryVelocity(bc_name, bc)
+            if not bc['VelocityIsCartesian'] and bc.get('VelocityProfileTemplate') != 'Sine':
                 velo_mag = bc['VelocityMag']
                 face = bc['DirectionFace'].split(':')
                 print(bc['ShapeRefs'])
@@ -438,6 +441,9 @@ class CfdCaseWriterFoam:
                         bc['TurbulenceInletSpecification'] == 'intensityAndLengthScale':
                     if bc['BoundarySubType'] == 'uniformVelocityInlet' or bc['BoundarySubType'] == 'farField':
                         Uin = (bc['Ux']**2 + bc['Uy']**2 + bc['Uz']**2)**0.5
+                        if bc.get('VelocityProfileTemplate') == 'Sine':
+                            Uin = max(Uin, self.vectorMagnitude(bc['SinePeakVelocity']) +
+                                      self.vectorMagnitude(bc['SineAverageVelocity']))
 
                         # Turb Intensity and length scale
                         I = bc['TurbulenceIntensity']
@@ -484,6 +490,54 @@ class CfdCaseWriterFoam:
                     'BoundaryType': 'constraint',
                     'BoundarySubType': 'symmetry'
                 }
+
+    def processSineBoundaryVelocity(self, bc_name, bc):
+        bc['VelocityProfileTemplate'] = 'Steady'
+        if bc.get('VelocityProfile', 'Steady') != 'Sine wave':
+            return
+        if self.settings['physics']['Time'] != 'Transient':
+            raise RuntimeError("Sine-wave velocity on boundary '{}' is only available for transient analyses."
+                               .format(bc_name))
+        if bc['BoundaryType'] != 'inlet' or bc['BoundarySubType'] != 'uniformVelocityInlet':
+            raise RuntimeError("Sine-wave boundary velocity is only supported for uniform velocity inlets.")
+
+        average = (bc['SineAverageUx'], bc['SineAverageUy'], bc['SineAverageUz'])
+        peak = (bc['SinePeakUx'], bc['SinePeakUy'], bc['SinePeakUz'])
+        self.processSineVelocityProfile(bc, average, peak)
+        bc['Ux'], bc['Uy'], bc['Uz'] = average
+
+    def processMeanVelocityForceProperties(self):
+        if self.settings['meanVelocityForceEnabled']:
+            self.processMeanVelocityForceEntry(self.settings['meanVelocityForce'])
+        for zone in self.settings['meanVelocityForceCellZones'].values():
+            self.processMeanVelocityForceEntry(zone)
+
+    def processMeanVelocityForceEntry(self, data):
+        data['VelocityProfileTemplate'] = 'Steady'
+        if data.get('VelocityProfile', 'Steady') != 'Sine wave':
+            return
+        if self.settings['physics']['Time'] != 'Transient':
+            raise RuntimeError("Sine-wave mean velocity force is only available for transient analyses.")
+
+        self.processSineVelocityProfile(data, data['SineAverageVelocity'], data['SinePeakVelocity'])
+
+    def processSineVelocityProfile(self, data, average, peak):
+        data['VelocityProfileTemplate'] = 'Sine'
+        data['SineAverageVelocity'] = average
+        data['SinePeakVelocity'] = peak
+        data['SineAverageVelocityString'] = self.formatVector(average)
+        data['SinePeakVelocityString'] = self.formatVector(peak)
+        data['SineAverageVelocityCpp'] = self.formatCppVector(average)
+        data['SinePeakVelocityCpp'] = self.formatCppVector(peak)
+
+    def formatVector(self, vector):
+        return "{} {} {}".format(vector[0], vector[1], vector[2])
+
+    def formatCppVector(self, vector):
+        return "{}, {}, {}".format(vector[0], vector[1], vector[2])
+
+    def vectorMagnitude(self, vector):
+        return (vector[0]**2 + vector[1]**2 + vector[2]**2)**0.5
 
     def parseFaces(self, shape_refs):
         pass
@@ -771,6 +825,10 @@ class CfdCaseWriterFoam:
                 'PartNameList': part_name_list,
                 'Direction': od['Direction'],
                 'Ubar': od['Ubar'],
+                'VelocityProfile': od.get('VelocityProfile', 'Steady'),
+                'SineAverageVelocity': od.get('SineAverageVelocity', (0, 0, 0)),
+                'SinePeakVelocity': od.get('SinePeakVelocity', (0, 0, 0)),
+                'SineFrequency': od.get('SineFrequency', 1.0),
                 'Relaxation': od['Relaxation'],
             }
             # Register the zone for topoSetZonesDict so the cellZoneSet is created

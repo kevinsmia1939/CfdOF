@@ -92,6 +92,15 @@ class TaskPanelCfdFluidBoundary:
         setQuantity(self.form.inputCartY, self.obj.Uy)
         setQuantity(self.form.inputCartZ, self.obj.Uz)
         setQuantity(self.form.inputVelocityMag, self.obj.VelocityMag)
+        vpi = indexOrDefault(CfdFluidBoundary.VELOCITY_PROFILES, getattr(self.obj, 'VelocityProfile', 'Steady'), 0)
+        self.form.comboVelocityProfile.setCurrentIndex(vpi)
+        setQuantity(self.form.inputSineAverageX, self.obj.SineAverageUx)
+        setQuantity(self.form.inputSineAverageY, self.obj.SineAverageUy)
+        setQuantity(self.form.inputSineAverageZ, self.obj.SineAverageUz)
+        setQuantity(self.form.inputSinePeakX, self.obj.SinePeakUx)
+        setQuantity(self.form.inputSinePeakY, self.obj.SinePeakUy)
+        setQuantity(self.form.inputSinePeakZ, self.obj.SinePeakUz)
+        setQuantity(self.form.inputSineFrequency, self.obj.SineFrequency)
         self.form.lineDirection.setText(self.obj.DirectionFace)
         self.form.checkReverse.setChecked(self.obj.ReverseNormal)
         setQuantity(self.form.inputPressure, self.obj.Pressure)
@@ -208,6 +217,7 @@ class TaskPanelCfdFluidBoundary:
 
         self.form.radioButtonCart.toggled.connect(self.updateUI)
         self.form.radioButtonMagNormal.toggled.connect(self.updateUI)
+        self.form.comboVelocityProfile.currentIndexChanged.connect(self.updateUI)
         self.form.lineDirection.textChanged.connect(self.lineDirectionChanged)
         self.form.buttonDirection.clicked.connect(self.buttonDirectionClicked)
         self.form.buttonGroupPorous.buttonClicked.connect(self.updateUI)
@@ -268,8 +278,18 @@ class TaskPanelCfdFluidBoundary:
         else:
             self.form.thermalFrame.setVisible(False)
 
-        self.form.frameCart.setVisible(self.form.radioButtonCart.isChecked())
-        self.form.frameMagNormal.setVisible(self.form.radioButtonMagNormal.isChecked())
+        sine_profile_enabled = (self.physics_model.Time == 'Transient' and
+                                CfdFluidBoundary.BOUNDARY_TYPES[type_index] == 'inlet' and
+                                CfdFluidBoundary.SUBTYPES[type_index][subtype_index] == 'uniformVelocityInlet')
+        self.form.labelVelocityProfile.setVisible(sine_profile_enabled)
+        self.form.comboVelocityProfile.setVisible(sine_profile_enabled)
+        sine_selected = (sine_profile_enabled and
+                         CfdFluidBoundary.VELOCITY_PROFILES[self.form.comboVelocityProfile.currentIndex()] == 'Sine wave')
+        self.form.frameSineVelocity.setVisible(sine_selected)
+        self.form.radioButtonCart.setVisible(not sine_selected)
+        self.form.radioButtonMagNormal.setVisible(not sine_selected)
+        self.form.frameCart.setVisible(not sine_selected and self.form.radioButtonCart.isChecked())
+        self.form.frameMagNormal.setVisible(not sine_selected and self.form.radioButtonMagNormal.isChecked())
 
         method = self.form.buttonGroupPorous.checkedId()
         self.form.stackedWidgetPorous.setCurrentIndex(method)
@@ -426,6 +446,15 @@ class TaskPanelCfdFluidBoundary:
         storeIfChanged(self.obj, 'Uy', getQuantity(self.form.inputCartY))
         storeIfChanged(self.obj, 'Uz', getQuantity(self.form.inputCartZ))
         storeIfChanged(self.obj, 'VelocityMag', getQuantity(self.form.inputVelocityMag))
+        storeIfChanged(self.obj, 'VelocityProfile',
+                       CfdFluidBoundary.VELOCITY_PROFILES[self.form.comboVelocityProfile.currentIndex()])
+        storeIfChanged(self.obj, 'SineAverageUx', getQuantity(self.form.inputSineAverageX))
+        storeIfChanged(self.obj, 'SineAverageUy', getQuantity(self.form.inputSineAverageY))
+        storeIfChanged(self.obj, 'SineAverageUz', getQuantity(self.form.inputSineAverageZ))
+        storeIfChanged(self.obj, 'SinePeakUx', getQuantity(self.form.inputSinePeakX))
+        storeIfChanged(self.obj, 'SinePeakUy', getQuantity(self.form.inputSinePeakY))
+        storeIfChanged(self.obj, 'SinePeakUz', getQuantity(self.form.inputSinePeakZ))
+        storeIfChanged(self.obj, 'SineFrequency', getQuantity(self.form.inputSineFrequency))
         storeIfChanged(self.obj, 'DirectionFace', self.form.lineDirection.text())
         storeIfChanged(self.obj, 'ReverseNormal', self.form.checkReverse.isChecked())
         storeIfChanged(self.obj, 'MassFlowRate', getQuantity(self.form.inputMassFlowRate))

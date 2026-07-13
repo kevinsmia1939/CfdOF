@@ -31,6 +31,7 @@ from CfdOF import CfdTools
 from CfdOF.CfdTools import addObjectProperty
 
 QT_TRANSLATE_NOOP = FreeCAD.Qt.QT_TRANSLATE_NOOP
+VELOCITY_PROFILES = ["Steady", "Sine wave"]
 
 
 def makeCfdMeanVelocityForce(name="MeanVelocityForce"):
@@ -109,6 +110,39 @@ class CfdMeanVelocityForce:
             "App::PropertyVector",
             "Mean velocity force",
             QT_TRANSLATE_NOOP("App::Property", "Target mean velocity vector"),
+        )
+        if addObjectProperty(
+            obj,
+            "VelocityProfile",
+            VELOCITY_PROFILES,
+            "App::PropertyEnumeration",
+            "Mean velocity force",
+            QT_TRANSLATE_NOOP("App::Property", "Velocity profile"),
+        ):
+            obj.VelocityProfile = "Steady"
+        addObjectProperty(
+            obj,
+            "SineAverageVelocity",
+            FreeCAD.Vector(0, 0, 0),
+            "App::PropertyVector",
+            "Mean velocity force",
+            QT_TRANSLATE_NOOP("App::Property", "Sine-wave average velocity vector"),
+        )
+        addObjectProperty(
+            obj,
+            "SinePeakVelocity",
+            FreeCAD.Vector(0, 0, 0),
+            "App::PropertyVector",
+            "Mean velocity force",
+            QT_TRANSLATE_NOOP("App::Property", "Sine-wave peak oscillatory velocity vector"),
+        )
+        addObjectProperty(
+            obj,
+            "SineFrequency",
+            "1 1/s",
+            "App::PropertyQuantity",
+            "Mean velocity force",
+            QT_TRANSLATE_NOOP("App::Property", "Sine-wave oscillation frequency"),
         )
         addObjectProperty(
             obj,
@@ -237,4 +271,5 @@ class _ViewProviderCfdMeanVelocityForce:
         return None
 
 
-FreeCADGui.addCommand('CfdOF_MeanVelocityForce', CommandCfdMeanVelocityForce())
+if FreeCAD.GuiUp:
+    FreeCADGui.addCommand('CfdOF_MeanVelocityForce', CommandCfdMeanVelocityForce())

@@ -72,6 +72,10 @@ boundaryField
 %:inlet
 %{%(boundaries/%(0%)/BoundarySubType%)
 %:uniformVelocityInlet
+%{%(boundaries/%(0%)/VelocityProfileTemplate%)
+%:Sine
+%[0/_boundary_uniformVelocityInlet_sine%]
+%:default
     %(0%)
     {
 %{%(solver/SolverName%)
@@ -93,6 +97,7 @@ boundaryField
 %}
         value               uniform ( %(boundaries/%(0%)/Ux%) %(boundaries/%(0%)/Uy%) %(boundaries/%(0%)/Uz%) );
     }
+%}
 %:volumetricFlowRateInlet
     %(0%)
     {

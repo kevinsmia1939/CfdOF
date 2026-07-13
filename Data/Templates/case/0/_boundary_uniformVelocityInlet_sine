@@ -1,0 +1,13 @@
+    %(0%)
+    {
+        type                uniformFixedValue;
+        uniformValue        sine;
+        uniformValueCoeffs
+        {
+            frequency       %(boundaries/%(0%)/SineFrequency%);
+            amplitude       (%(boundaries/%(0%)/SinePeakVelocityString%));
+            start           0;
+            level           (%(boundaries/%(0%)/SineAverageVelocityString%));
+        }
+        value               uniform (%(boundaries/%(0%)/SineAverageVelocityString%));
+    }

@@ -1,0 +1,99 @@
+from __future__ import print_function
+
+import os
+import subprocess
+import sys
+import types
+import builtins
+
+import FreeCAD as App
+if not App.GuiUp and 'FreeCADGui' not in sys.modules:
+    freecad_gui = types.ModuleType('FreeCADGui')
+    freecad_gui.addCommand = lambda *args, **kwargs: None
+    sys.modules['FreeCADGui'] = freecad_gui
+builtins.FreeCADGui = sys.modules.get('FreeCADGui')
+
+demo_dir = os.path.dirname(__file__)
+repo_dir = os.path.abspath(os.path.join(demo_dir, '..', '..'))
+if repo_dir not in sys.path:
+    sys.path.insert(0, repo_dir)
+for module_name in list(sys.modules):
+    if module_name == 'CfdOF' or module_name.startswith('CfdOF.'):
+        del sys.modules[module_name]
+
+from CfdOF import CfdTools
+from CfdOF.Mesh import CfdMeshTools
+from CfdOF.Solve import CfdCaseWriterFoam
+
+
+def execute_macro(macro_path):
+    namespace = {
+        '__file__': macro_path,
+        'FreeCAD': App,
+        'App': App,
+        'Gui': sys.modules.get('FreeCADGui'),
+    }
+    with open(macro_path) as macro_file:
+        exec(compile(macro_file.read(), macro_path, 'exec'), namespace)
+
+
+App.openDocument(os.path.join(demo_dir, 'PeriodicBoundaryAndMeanVelocityForce.FCStd'))
+App.ActiveDocument.recompute()
+
+for macro_name in [
+    '02-analysis.FCMacro',
+    '03-mesh.FCMacro',
+    '04-boundaryConditions.FCMacro',
+    '05-meanVelocityForce.FCMacro',
+]:
+    execute_macro(os.path.join(demo_dir, macro_name))
+
+analysis = CfdTools.getActiveAnalysis()
+analysis.OutputPath = os.path.join(os.path.expanduser('~'), 'CfdOF_sineWaveFlowVelocityTest')
+
+physics = App.ActiveDocument.PhysicsModel
+physics.Time = 'Transient'
+
+solver = CfdTools.getSolver(analysis)
+solver.InputCaseName = 'caseSineWaveFlowVelocity'
+solver.EndTime = '0.02 s'
+solver.TimeStep = '0.001 s'
+solver.TransientWriteInterval = '0.005 s'
+solver.Parallel = False
+
+mean_velocity_force = App.ActiveDocument.MeanVelocityForce
+mean_velocity_force.VelocityProfile = 'Sine wave'
+mean_velocity_force.Direction = App.Vector(1.0, 0.0, 0.0)
+mean_velocity_force.Ubar = App.Vector(0.005, 0.0, 0.0)
+mean_velocity_force.SineAverageVelocity = App.Vector(0.005, 0.0, 0.0)
+mean_velocity_force.SinePeakVelocity = App.Vector(0.010, 0.0, 0.0)
+mean_velocity_force.SineFrequency = '2 1/s'
+
+App.ActiveDocument.recompute()
+
+mesh_writer = CfdMeshTools.CfdMeshTools(CfdTools.getMeshObject(analysis))
+mesh_writer.writeMesh()
+
+env = os.environ.copy()
+env.update(CfdTools.getRunEnvironment())
+
+subprocess.check_call(
+    CfdTools.makeRunCommand('./Allmesh', mesh_writer.mesh_case_dir, source_env=False),
+    env=env)
+
+case_writer = CfdCaseWriterFoam.CfdCaseWriterFoam(analysis)
+case_writer.writeCase()
+
+fv_options_path = os.path.join(case_writer.case_folder, 'system', 'fvOptions')
+with open(fv_options_path) as fv_options_file:
+    fv_options = fv_options_file.read()
+if 'vectorCodedSource' not in fv_options:
+    raise RuntimeError('Expected sine mean velocity force to write vectorCodedSource in fvOptions')
+if 'peakVelocity(0.01, 0.0, 0.0)' not in fv_options and 'peakVelocity(0.01, 0, 0)' not in fv_options:
+    raise RuntimeError('Expected sine peak velocity of 10 mm/s in fvOptions')
+
+subprocess.check_call(
+    CfdTools.makeRunCommand('./Allrun', case_writer.case_folder, source_env=False),
+    env=env)
+
+print('Sine-wave mean velocity force test case written and solved at {}'.format(case_writer.case_folder))

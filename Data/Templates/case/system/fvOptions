@@ -58,6 +58,85 @@ FoamFile
 
 %{%(meanVelocityForceEnabled%)
 %:True
+%{%(meanVelocityForce/VelocityProfileTemplate%)
+%:Sine
+momentumSource
+{
+    type            vectorCodedSource;
+    selectionMode   all;
+    active          yes;
+    name            momentumSource;
+
+    vectorCodedSourceCoeffs
+    {
+        selectionMode   all;
+        fields          (U);
+
+        codeInclude
+        #{
+            #include "mathematicalConstants.H"
+        #};
+
+        codeCorrect
+        #{
+            const vector averageVelocity(%(meanVelocityForce/SineAverageVelocityCpp%));
+            const vector peakVelocity(%(meanVelocityForce/SinePeakVelocityCpp%));
+            const scalar frequency = %(meanVelocityForce/SineFrequency%);
+
+            const scalar t = mesh_.time().value();
+            const vector target =
+                averageVelocity
+              + peakVelocity
+              * Foam::sin
+                (
+                    2.0
+                  * Foam::constant::mathematical::pi
+                  * frequency
+                  * t
+                );
+
+            vector sumVolU = vector::zero;
+            scalar sumVol = 0.0;
+
+            const scalarField& V = mesh_.V();
+            forAll(cells_, i)
+            {
+                const label celli = cells_[i];
+                const scalar vol = V[celli];
+                sumVolU += fld[celli]*vol;
+                sumVol += vol;
+            }
+
+            reduce(sumVolU, sumOp<vector>());
+            reduce(sumVol, sumOp<scalar>());
+
+            const vector current = sumVolU/stabilise(sumVol, VSMALL);
+            const vector delta = target - current;
+
+            forAll(cells_, i)
+            {
+                fld[cells_[i]] += delta;
+            }
+
+            fld.correctBoundaryConditions();
+
+            Info<< "momentumSource: target Ubar = " << target
+                << ", uncorrected Ubar = " << current << endl;
+        #};
+
+        codeAddSup
+        #{
+            (void)fieldi;
+        #};
+
+        codeConstrain
+        #{
+            (void)fieldi;
+        #};
+    }
+}
+
+%:default
 momentumSource
 {
     type            meanVelocityForce;
@@ -75,10 +154,92 @@ momentumSource
 }
 
 %}
+%}
 %{%(meanVelocityForceCellZonesPresent%)
 %:True
 %{%(meanVelocityForceCellZones%)
 %{%(meanVelocityForceCellZones/%(0%)/PartNameList%)
+%{%(meanVelocityForceCellZones/%(1%)/VelocityProfileTemplate%)
+%:Sine
+%(0%)MomentumSource
+{
+    type            vectorCodedSource;
+    selectionMode   cellZone;
+    cellZone        %(0%);
+    active          yes;
+    name            %(0%)MomentumSource;
+
+    vectorCodedSourceCoeffs
+    {
+        selectionMode   cellZone;
+        cellZone        %(0%);
+        fields          (U);
+
+        codeInclude
+        #{
+            #include "mathematicalConstants.H"
+        #};
+
+        codeCorrect
+        #{
+            const vector averageVelocity(%(meanVelocityForceCellZones/%(1%)/SineAverageVelocityCpp%));
+            const vector peakVelocity(%(meanVelocityForceCellZones/%(1%)/SinePeakVelocityCpp%));
+            const scalar frequency = %(meanVelocityForceCellZones/%(1%)/SineFrequency%);
+
+            const scalar t = mesh_.time().value();
+            const vector target =
+                averageVelocity
+              + peakVelocity
+              * Foam::sin
+                (
+                    2.0
+                  * Foam::constant::mathematical::pi
+                  * frequency
+                  * t
+                );
+
+            vector sumVolU = vector::zero;
+            scalar sumVol = 0.0;
+
+            const scalarField& V = mesh_.V();
+            forAll(cells_, i)
+            {
+                const label celli = cells_[i];
+                const scalar vol = V[celli];
+                sumVolU += fld[celli]*vol;
+                sumVol += vol;
+            }
+
+            reduce(sumVolU, sumOp<vector>());
+            reduce(sumVol, sumOp<scalar>());
+
+            const vector current = sumVolU/stabilise(sumVol, VSMALL);
+            const vector delta = target - current;
+
+            forAll(cells_, i)
+            {
+                fld[cells_[i]] += delta;
+            }
+
+            fld.correctBoundaryConditions();
+
+            Info<< "%(0%)MomentumSource: target Ubar = " << target
+                << ", uncorrected Ubar = " << current << endl;
+        #};
+
+        codeAddSup
+        #{
+            (void)fieldi;
+        #};
+
+        codeConstrain
+        #{
+            (void)fieldi;
+        #};
+    }
+}
+
+%:default
 %(0%)MomentumSource
 {
     type            meanVelocityForce;
@@ -96,6 +257,7 @@ momentumSource
     }
 }
 
+%}
 %}
 %}
 %}

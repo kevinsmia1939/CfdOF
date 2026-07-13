@@ -285,6 +285,7 @@ THERMAL_HELPTEXT = ["Fixed Temperature", "No heat transfer", "Specified power in
 BOUNDARY_THERMALTAB = [[0], [], [1], [2], [3, 0]]
 
 POROUS_METHODS = ['porousCoeff', 'porousScreen']
+VELOCITY_PROFILES = ["Steady", "Sine wave"]
 
 
 def makeCfdFluidBoundary(name="CfdFluidBoundary"):
@@ -409,6 +410,71 @@ class CfdFluidBoundary:
             "App::PropertySpeed",
             "Flow",
             QT_TRANSLATE_NOOP("App::Property", "Velocity magnitude"),
+        )
+        if addObjectProperty(
+            obj,
+            "VelocityProfile",
+            VELOCITY_PROFILES,
+            "App::PropertyEnumeration",
+            "Flow",
+            QT_TRANSLATE_NOOP("App::Property", "Velocity profile"),
+        ):
+            obj.VelocityProfile = "Steady"
+        addObjectProperty(
+            obj,
+            "SineAverageUx",
+            "0 m/s",
+            "App::PropertySpeed",
+            "Flow",
+            QT_TRANSLATE_NOOP("App::Property", "Sine-wave average velocity (x component)"),
+        )
+        addObjectProperty(
+            obj,
+            "SineAverageUy",
+            "0 m/s",
+            "App::PropertySpeed",
+            "Flow",
+            QT_TRANSLATE_NOOP("App::Property", "Sine-wave average velocity (y component)"),
+        )
+        addObjectProperty(
+            obj,
+            "SineAverageUz",
+            "0 m/s",
+            "App::PropertySpeed",
+            "Flow",
+            QT_TRANSLATE_NOOP("App::Property", "Sine-wave average velocity (z component)"),
+        )
+        addObjectProperty(
+            obj,
+            "SinePeakUx",
+            "0 m/s",
+            "App::PropertySpeed",
+            "Flow",
+            QT_TRANSLATE_NOOP("App::Property", "Sine-wave peak oscillatory velocity (x component)"),
+        )
+        addObjectProperty(
+            obj,
+            "SinePeakUy",
+            "0 m/s",
+            "App::PropertySpeed",
+            "Flow",
+            QT_TRANSLATE_NOOP("App::Property", "Sine-wave peak oscillatory velocity (y component)"),
+        )
+        addObjectProperty(
+            obj,
+            "SinePeakUz",
+            "0 m/s",
+            "App::PropertySpeed",
+            "Flow",
+            QT_TRANSLATE_NOOP("App::Property", "Sine-wave peak oscillatory velocity (z component)"),
+        )
+        addObjectProperty(
+            obj,
+            "SineFrequency",
+            "1 1/s",
+            "App::PropertyQuantity",
+            "Flow",
+            QT_TRANSLATE_NOOP("App::Property", "Sine-wave oscillation frequency"),
         )
         addObjectProperty(
             obj,
@@ -943,4 +1009,5 @@ class _ViewProviderCfdFluidBoundary:
         return None
 
 
-FreeCADGui.addCommand('CfdOF_FluidBoundary', CommandCfdFluidBoundary())
+if FreeCAD.GuiUp:
+    FreeCADGui.addCommand('CfdOF_FluidBoundary', CommandCfdFluidBoundary())
