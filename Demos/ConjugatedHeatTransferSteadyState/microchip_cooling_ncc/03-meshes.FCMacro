@@ -1,0 +1,82 @@
+from CfdOF import CfdTools
+from CfdOF.Mesh import CfdMesh
+
+
+def close_to(value, target, tol=1e-6):
+    return abs(value - target) <= tol
+
+
+def solid_name(predicate, description):
+    solids = App.ActiveDocument.BooleanFragments.Shape.Solids
+    matches = [i for i, solid in enumerate(solids, 1) if predicate(solid.BoundBox)]
+    if len(matches) != 1:
+        raise RuntimeError("Expected one {} solid, found {}".format(description, len(matches)))
+    return "Solid{}".format(matches[0])
+
+
+def region_solid_names():
+    solids = App.ActiveDocument.BooleanFragments.Shape.Solids
+    fluid_index = max(range(1, len(solids) + 1), key=lambda i: solids[i - 1].Volume)
+    return {
+        "FluidProperties001": "Solid{}".format(fluid_index),
+        "heat_sink_volume001": solid_name(
+            lambda bb: close_to(bb.XMin, 135) and close_to(bb.XMax, 165)
+            and close_to(bb.YMin, 135) and close_to(bb.YMax, 165)
+            and close_to(bb.ZMin, 12) and close_to(bb.ZMax, 24),
+            "heat sink",
+        ),
+        "PCB_volume001": solid_name(
+            lambda bb: close_to(bb.XMin, 100) and close_to(bb.XMax, 200)
+            and close_to(bb.YMin, 100) and close_to(bb.YMax, 200)
+            and close_to(bb.ZMin, 10) and close_to(bb.ZMax, 11),
+            "PCB",
+        ),
+        "hot_microchip_volume001": solid_name(
+            lambda bb: close_to(bb.XMin, 135) and close_to(bb.XMax, 165)
+            and close_to(bb.YMin, 135) and close_to(bb.YMax, 165)
+            and close_to(bb.ZMin, 11) and close_to(bb.ZMax, 12),
+            "microchip",
+        ),
+        "Polypropylene_solid001": solid_name(
+            lambda bb: close_to(bb.XMin, 135) and close_to(bb.XMax, 165)
+            and close_to(bb.YMin, 135) and close_to(bb.YMax, 165)
+            and close_to(bb.ZMin, 24) and close_to(bb.ZMax, 34),
+            "fan case",
+        ),
+    }
+
+
+def add_mesh(name, region_name, region_type, case_name, part_sub_shape):
+    CfdMesh.makeCfdMesh(name)
+    mesh = App.ActiveDocument.ActiveObject
+    mesh.Label = name + "001"
+    mesh.Part = App.ActiveDocument.BooleanFragments
+    mesh.PartSubShape = part_sub_shape
+    mesh.RegionName = region_name
+    mesh.RegionType = region_type
+    mesh.CaseName = case_name
+    CfdTools.getActiveAnalysis().addObject(mesh)
+    mesh.CharacteristicLengthMax = "3 mm"
+    mesh.MeshUtility = "gmsh"
+    mesh.ElementDimension = "3D"
+    mesh.CellsBetweenLevels = 3
+    mesh.EdgeRefinement = 1.0
+    mesh.PointInMesh = {"x": "0 m", "y": "0 m", "z": "0 m"}
+    mesh.NumberOfProcesses = 1
+    return mesh
+
+
+solid_names = region_solid_names()
+
+add_mesh("Fluid_Mesh", "FluidProperties001", "fluid",
+         "meshCaseMicrochipCoolingNccFluid", solid_names["FluidProperties001"])
+add_mesh("HeatSink_Mesh", "heat_sink_volume001", "solid",
+         "meshCaseMicrochipCoolingNccHeatSink", solid_names["heat_sink_volume001"])
+add_mesh("PCB_Mesh", "PCB_volume001", "solid",
+         "meshCaseMicrochipCoolingNccPCB", solid_names["PCB_volume001"])
+add_mesh("Microchip_Mesh", "hot_microchip_volume001", "solid",
+         "meshCaseMicrochipCoolingNccMicrochip", solid_names["hot_microchip_volume001"])
+add_mesh("FanCase_Mesh", "Polypropylene_solid001", "solid",
+         "meshCaseMicrochipCoolingNccFanCase", solid_names["Polypropylene_solid001"])
+
+App.ActiveDocument.recompute()

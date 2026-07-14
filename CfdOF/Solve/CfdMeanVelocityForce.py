@@ -93,6 +93,22 @@ class CfdMeanVelocityForce:
             "Mean velocity force",
             QT_TRANSLATE_NOOP("App::Property", "Solid reference(s) defining the cell zone (used when SelectionMode is cellZone)"),
         )
+        addObjectProperty(
+            obj,
+            "CellZoneShapeNames",
+            [],
+            "App::PropertyStringList",
+            "Mean velocity force",
+            QT_TRANSLATE_NOOP("App::Property", "Cached object names defining the cell zone (used by scripted cases)"),
+        )
+        addObjectProperty(
+            obj,
+            "CellZoneCylinderSpecs",
+            [],
+            "App::PropertyStringList",
+            "Mean velocity force",
+            QT_TRANSLATE_NOOP("App::Property", "Primitive cylinder specifications as name,radius,height,x,y,z in mm"),
+        )
 
         addObjectProperty(
             obj,

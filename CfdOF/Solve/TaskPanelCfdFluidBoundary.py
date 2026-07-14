@@ -159,6 +159,8 @@ class TaskPanelCfdFluidBoundary:
         setQuantity(self.form.input_sepy, Units.Quantity(self.obj.PeriodicSeparationVector.y, Units.Length))
         setQuantity(self.form.input_sepz, Units.Quantity(self.obj.PeriodicSeparationVector.z, Units.Length))
 
+        self.initRegionCouplingControls(boundary_patches)
+
         # Turbulence
         if self.turb_model is not None:
             self.form.comboTurbulenceSpecification.addItems(CfdFluidBoundary.TURBULENT_INLET_SPEC[self.turb_model][0])
@@ -229,6 +231,18 @@ class TaskPanelCfdFluidBoundary:
                                                                     self.obj, True, True, False)
 
         self.updateUI()
+
+    def initRegionCouplingControls(self, boundary_patches):
+        self.regionCouplingFrame = QtGui.QGroupBox("Multi-region coupling")
+        regionLayout = QtGui.QFormLayout(self.regionCouplingFrame)
+
+        self.inputRegionName = QtGui.QLineEdit()
+        self.inputRegionName.setToolTip(
+            "OpenFOAM region containing this boundary. If left empty, CfdOF will try to infer it.")
+        self.inputRegionName.setText(getattr(self.obj, 'RegionName', ''))
+        regionLayout.addRow("Region name:", self.inputRegionName)
+
+        self.form.layout().insertWidget(1, self.regionCouplingFrame)
 
     def updateUI(self):
         # Boundary type and subtype
@@ -480,6 +494,8 @@ class TaskPanelCfdFluidBoundary:
 
         storeIfChanged(self.obj, 'PeriodicPartner', self.form.comboBoxPeriodicPartner.currentText())
         storeIfChanged(self.obj, 'PeriodicMaster', self.form.radioButtonMasterPeriodic.isChecked())
+
+        storeIfChanged(self.obj, 'RegionName', self.inputRegionName.text().strip())
 
         # Turbulence
         if self.turb_model in CfdFluidBoundary.TURBULENT_INLET_SPEC:

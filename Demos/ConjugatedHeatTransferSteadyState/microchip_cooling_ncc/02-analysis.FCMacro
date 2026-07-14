@@ -1,0 +1,72 @@
+from CfdOF import CfdAnalysis, CfdTools
+from CfdOF.Solve import CfdPhysicsSelection
+from CfdOF.Solve import CfdFluidMaterial
+from CfdOF.Solve import CfdInitialiseFlowField
+from CfdOF.Solve import CfdSolverFoam
+
+analysis = CfdAnalysis.makeCfdAnalysis("CfdAnalysis")
+analysis.Label = "CfdAnalysis001"
+CfdTools.setActiveAnalysis(analysis)
+analysis.addObject(CfdPhysicsSelection.makeCfdPhysicsSelection())
+analysis.addObject(CfdFluidMaterial.makeCfdFluidMaterial("FluidProperties"))
+analysis.addObject(CfdInitialiseFlowField.makeCfdInitialFlowField())
+analysis.addObject(CfdSolverFoam.makeCfdSolverFoam())
+
+physics = App.ActiveDocument.PhysicsModel
+physics.Label = "PhysicsModel001"
+physics.Time = "Steady"
+physics.Flow = "NonIsothermal"
+physics.Phase = "MultiRegion"
+physics.Turbulence = "Laminar"
+physics.TurbulenceModel = "kEpsilon"
+physics.gx = "0 mm/s^2"
+physics.gy = "0 mm/s^2"
+physics.gz = "0 mm/s^2"
+
+fluid = App.ActiveDocument.FluidProperties
+fluid.Label = "FluidProperties001"
+fluid.Material = {
+    "CardName": "AirIncompressible",
+    "CpPolynomial": "1004.703 0 0 0 0 0 0 0",
+    "DensityPolynomial": "1.2 0 0 0 0 0 0 0",
+    "Description": "Constant-property air for low-Mach forced convection",
+    "DynamicViscosityPolynomial": "1.8e-5 0 0 0 0 0 0 0",
+    "MolarMass": "0.0289643897748887 kg/mol",
+    "Name": "Air", "ThermalConductivityPolynomial": "0.0262 0 0 0 0 0 0 0",
+    "Type": "Incompressible",
+}
+
+initial = App.ActiveDocument.InitialiseFields
+initial.Label = "InitialiseFields001"
+initial.PotentialFlow = False
+initial.PotentialFlowP = False
+initial.Pressure = "100 kPa"
+initial.Temperature = "293 K"
+initial.UseInletTemperatureValue = False
+initial.UseInletTurbulenceValues = False
+initial.UseInletUValues = False
+initial.UseOutletPValue = False
+initial.Ux = initial.Uy = "0 mm/s"
+initial.Uz = "20 mm/s"
+initial.k = "10000 mm^2/s^2"
+initial.epsilon = "50000000 mm^2/s^3"
+initial.omega = "1 1/s"
+
+solver = App.ActiveDocument.CfdSolver
+solver.Label = "CfdSolver001"
+solver.MaxIterations = 2000
+solver.SteadyWriteInterval = 200
+solver.PurgeWrite = 2
+solver.MaxCFLNumber = 2.0
+solver.MaxInterfaceCFLNumber = 2.0
+solver.Parallel = False
+solver.ParallelCores = 1
+solver.TurbulenceRelaxation = 0.3
+solver.URelaxation = 0.5
+solver.pRelaxation = 0.3
+solver.rhoRelaxation = 0.3
+solver.energyRelaxation = 0.3
+solver.FluidNonOrthogonalCorrectors = 3
+solver.SolidEnergyRelaxation = 0.2
+solver.SolidNonOrthogonalCorrectors = 0
+App.ActiveDocument.recompute()

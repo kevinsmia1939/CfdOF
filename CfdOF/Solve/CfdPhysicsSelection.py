@@ -146,7 +146,7 @@ class CfdPhysicsModel:
         if addObjectProperty(
             obj,
             "Phase",
-            ["Single", "FreeSurface"],
+            ["Single", "FreeSurface", "MultiRegion"],
             "App::PropertyEnumeration",
             "Physics modelling",
             QT_TRANSLATE_NOOP("App::Property", "Type of phases present"),
@@ -356,4 +356,5 @@ class _ViewProviderPhysicsSelection:
         return None
 
 
-FreeCADGui.addCommand('CfdOF_PhysicsModel', CommandCfdPhysicsSelection())
+if FreeCAD.GuiUp and hasattr(FreeCADGui, 'addCommand'):
+    FreeCADGui.addCommand('CfdOF_PhysicsModel', CommandCfdPhysicsSelection())

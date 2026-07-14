@@ -1,0 +1,74 @@
+from CfdOF import CfdTools
+from CfdOF.Solve import CfdSolidMaterial
+
+aluminium = {
+    "Author": "AluminiumSolid", "AuthorAndLicense": "",
+    "CardName": "AluminiumSolid", "Density": "2699 kg/m^3",
+    "Description": "Aluminium solid thermal properties for CHT simulation",
+    "License": "", "Name": "Aluminium_solid", "ReferenceSource": "",
+    "SourceURL": "", "SpecificHeat": "897 J/kg/K",
+    "ThermalConductivity": "237 W/m/K", "Type": "Solid",
+}
+
+
+def close_to(value, target, tol=1e-6):
+    return abs(value - target) <= tol
+
+
+def solid_name(predicate, description):
+    solids = App.ActiveDocument.BooleanFragments.Shape.Solids
+    matches = [i for i, solid in enumerate(solids, 1) if predicate(solid.BoundBox)]
+    if len(matches) != 1:
+        raise RuntimeError("Expected one {} solid, found {}".format(description, len(matches)))
+    return "Solid{}".format(matches[0])
+
+
+def add_solid(name, label, solid_ref, material, heat_generation="0 W/m^3"):
+    solid = CfdSolidMaterial.makeCfdSolidMaterial(name)
+    CfdTools.getActiveAnalysis().addObject(solid)
+    solid.Label = label
+    solid.RegionName = label
+    solid.Material = material
+    solid.HeatGeneration = heat_generation
+    solid.ShapeRefs = [(App.ActiveDocument.BooleanFragments, (solid_ref,))]
+    return solid
+
+
+add_solid("SolidProperties", "heat_sink_volume001",
+          solid_name(
+              lambda bb: close_to(bb.XMin, 135) and close_to(bb.XMax, 165)
+              and close_to(bb.YMin, 135) and close_to(bb.YMax, 165)
+              and close_to(bb.ZMin, 12) and close_to(bb.ZMax, 24),
+              "heat sink",
+          ), aluminium)
+add_solid("SolidProperties", "PCB_volume001", solid_name(
+    lambda bb: close_to(bb.XMin, 100) and close_to(bb.XMax, 200)
+    and close_to(bb.YMin, 100) and close_to(bb.YMax, 200)
+    and close_to(bb.ZMin, 10) and close_to(bb.ZMax, 11),
+    "PCB",
+), {
+    "Density": "1.1e-06 kg/mm^3", "Description": "User-entered properties",
+    "Name": "Custom", "SpecificHeat": "200000000.0 mm^2/(s^2*K)",
+    "ThermalConductivity": "200.0 mm*kg/(s^3*K)", "Type": "Solid",
+})
+add_solid("SolidProperties", "hot_microchip_volume001", solid_name(
+    lambda bb: close_to(bb.XMin, 135) and close_to(bb.XMax, 165)
+    and close_to(bb.YMin, 135) and close_to(bb.YMax, 165)
+    and close_to(bb.ZMin, 11) and close_to(bb.ZMax, 12),
+    "microchip",
+), aluminium, "1e+09 W/m^3")
+add_solid("SolidProperties", "Polypropylene_solid001", solid_name(
+    lambda bb: close_to(bb.XMin, 135) and close_to(bb.XMax, 165)
+    and close_to(bb.YMin, 135) and close_to(bb.YMax, 165)
+    and close_to(bb.ZMin, 24) and close_to(bb.ZMax, 34),
+    "fan case",
+), {
+    "Author": "PolypropyleneSolid", "AuthorAndLicense": "",
+    "CardName": "PolypropyleneSolid", "Density": "918 kg/m^3",
+    "Description": "Polypropylene solid thermal properties", "License": "",
+    "Name": "Polypropylene_solid",
+    "ReferenceSource": "https://www.matweb.com/search/DataSheet.aspx?MatGUID=a882a1c603374e278d062f106dfda95b",
+    "SourceURL": "", "SpecificHeat": "1920 J/kg/K",
+    "ThermalConductivity": "0.249 W/m/K", "Type": "Solid",
+})
+App.ActiveDocument.recompute()
