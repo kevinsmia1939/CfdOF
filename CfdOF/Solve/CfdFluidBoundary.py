@@ -64,6 +64,7 @@ SUBNAMES = [
         translate("Subnames", "Rotating"),
         translate("Subnames", "Translating"),
         translate("Subnames", "Rough"),
+        translate("Subnames", "Region-coupled"),
     ],
     [
         translate("Subnames", "Uniform velocity"),
@@ -84,7 +85,8 @@ SUBNAMES = [
 
 # NOTE: don't translate this
 SUBTYPES = [
-    ["fixedWall", "slipWall", "partialSlipWall", "rotatingWall", "translatingWall", "roughWall"],
+    ["fixedWall", "slipWall", "partialSlipWall", "rotatingWall", "translatingWall", "roughWall",
+     "regionCoupledWall"],
     [
         "uniformVelocityInlet",
         "volumetricFlowRateInlet",
@@ -106,6 +108,7 @@ SUBTYPES_HELPTEXT = [
         translate("Subtypes", "Fixed velocity corresponding to rotation about an axis"),
         translate("Subtypes", "Fixed velocity tangential to wall; zero normal velocity"),
         translate("Subtypes", "Wall roughness function"),
+        translate("Subtypes", "Coupled heat transfer interface between two mesh regions"),
     ],
     [
         translate("Subtypes", "Velocity specified; normal component imposed for reverse flow"),
@@ -147,7 +150,8 @@ BOUNDARY_UI = [[[False, [], False, False, False, True, None, False],  # No slip
                 [True, [2], False, False, False, True, None, False],  # Partial slip
                 [True, [8], False, False, False, True, None, False],  # Rotating wall
                 [True, [0], False, False, False, True, None, False],  # Translating wall
-                [True, [0, 6], False, False, False, True, None, False]],  # Rough
+                [True, [0, 6], False, False, False, True, None, False],  # Rough
+                [False, [], False, False, False, True, None, False]],  # Region-coupled
                [[True, [0, 1], True, True, True, True, [2], False],  # Velocity
                 [True, [3], False, True, True, True, [2], False],  # Vol flow rate
                 [True, [4], False, True, True, True, [2], False],  # Mass Flow rate
@@ -638,6 +642,17 @@ class CfdFluidBoundary:
             ),
         )
 
+        addObjectProperty(
+            obj,
+            "RegionName",
+            "",
+            "App::PropertyString",
+            "Multi-region",
+            QT_TRANSLATE_NOOP(
+                "App::Property",
+                "OpenFOAM region containing this boundary patch. Defaults to automatic classification.",
+            ),
+        )
         # Turbulence
         all_turb_specs = []
         for k in TURBULENT_INLET_SPEC:
@@ -833,6 +848,8 @@ class _CfdFluidBoundary:
 class ViewProviderCfdFluidBoundary:
     def __init__(self, vobj):
         vobj.Proxy = self
+        self.ViewObject = vobj
+        self.Object = vobj.Object
         self.taskd = None
 
     def getIcon(self):
@@ -876,7 +893,9 @@ class ViewProviderCfdFluidBoundary:
         return
 
     def setEdit(self, vobj, mode):
-        analysis_object = CfdTools.getParentAnalysisObject(self.Object)
+        self.ViewObject = vobj
+        self.Object = vobj.Object
+        analysis_object = CfdTools.getParentAnalysisObject(vobj.Object)
         if analysis_object is None:
             CfdTools.cfdErrorBox("Boundary must have a parent analysis object")
             return False
@@ -888,16 +907,18 @@ class ViewProviderCfdFluidBoundary:
 
         import importlib
         importlib.reload(TaskPanelCfdFluidBoundary)
-        self.taskd = TaskPanelCfdFluidBoundary.TaskPanelCfdFluidBoundary(self.Object, physics_model, material_objs)
-        self.Object.ViewObject.show()
+        self.taskd = TaskPanelCfdFluidBoundary.TaskPanelCfdFluidBoundary(vobj.Object, physics_model, material_objs)
+        vobj.Object.ViewObject.show()
         self.taskd.obj = vobj.Object
         FreeCADGui.Control.showDialog(self.taskd)
         return True
 
     def doubleClicked(self, vobj):
-        doc = FreeCADGui.getDocument(vobj.Object.Document)
-        if not doc.getInEdit():
-            doc.setEdit(vobj.Object.Name)
+        if FreeCADGui.activeWorkbench().name() != 'CfdOFWorkbench':
+            FreeCADGui.activateWorkbench("CfdOFWorkbench")
+        gui_doc = FreeCADGui.getDocument(vobj.Object.Document)
+        if not gui_doc.getInEdit():
+            gui_doc.setEdit(vobj.Object.Name)
         else:
             FreeCAD.Console.PrintError('Task dialog already active\n')
             FreeCADGui.Control.showTaskView()
@@ -943,4 +964,5 @@ class _ViewProviderCfdFluidBoundary:
         return None
 
 
-FreeCADGui.addCommand('CfdOF_FluidBoundary', CommandCfdFluidBoundary())
+if FreeCAD.GuiUp and hasattr(FreeCADGui, 'addCommand'):
+    FreeCADGui.addCommand('CfdOF_FluidBoundary', CommandCfdFluidBoundary())

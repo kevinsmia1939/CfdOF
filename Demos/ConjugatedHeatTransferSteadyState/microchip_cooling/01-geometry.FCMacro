@@ -1,0 +1,66 @@
+import FreeCAD as App
+import Part
+import Draft
+import BOPTools.SplitFeatures as SplitFeatures
+
+
+doc = App.newDocument("microchip_cooling")
+App.setActiveDocument(doc.Name)
+
+
+def make_box(name, label, length, width, height, placement):
+    obj = doc.addObject("Part::Box", name)
+    obj.Label = label
+    obj.Length = f"{length} mm"
+    obj.Width = f"{width} mm"
+    obj.Height = f"{height} mm"
+    obj.Placement.Base = App.Vector(*placement)
+    return obj
+
+
+Box = make_box("Box", "room", 120, 120, 100, (89, 90, 0))
+Box001 = make_box("Box001", "PCB", 100, 100, 1, (100, 100, 10))
+Box002 = make_box("Box002", "microchip", 30, 30, 1, (135, 135, 11))
+
+# Heat sink: 30 x 30 x 3 mm base plus seven 1 mm thick fins, then placed on
+# top of the microchip.  Keep object names aligned with the original demo.
+Box003 = make_box("Box003", "Cube", 30, 30, 3, (0, 0, 0))
+Box004 = make_box("Box004", "Cube001", 30, 1, 12, (0, 0, 0))
+Array = Draft.make_ortho_array(
+    Box004,
+    v_x=App.Vector(100, 0, 0),
+    v_y=App.Vector(0, 4.833333, 0),
+    v_z=App.Vector(0, 0, 100),
+    n_x=1,
+    n_y=7,
+    n_z=1,
+    use_link=False,
+)
+Array.Label = "Array"
+
+Fusion = doc.addObject("Part::MultiFuse", "Fusion")
+Fusion.Label = "heat_sink"
+Fusion.Shapes = [Box003, Array]
+Fusion.Placement.Base = App.Vector(135, 135, 12)
+
+# Fan case: square 30 x 30 x 10 mm duct with a 28 mm diameter cylindrical hole.
+outer = Part.makeBox(30, 30, 10, App.Vector(-15, -15, 0))
+inner = Part.makeCylinder(14, 10, App.Vector(0, 0, 0))
+Body = doc.addObject("Part::Feature", "Body")
+Body.Label = "fan case"
+Body.Shape = outer.cut(inner)
+Body.Placement.Base = App.Vector(150, 150, 24)
+
+Cylinder = doc.addObject("Part::Cylinder", "Cylinder")
+Cylinder.Label = "fan"
+Cylinder.Radius = "13 mm"
+Cylinder.Height = "8 mm"
+Cylinder.Placement.Base = App.Vector(150, 150, 26)
+
+doc.recompute()
+
+BooleanFragments = SplitFeatures.makeBooleanFragments(name="BooleanFragments")
+BooleanFragments.Label = "BooleanFragments"
+BooleanFragments.Objects = [Fusion, Box002, Box001, Box, Body]
+BooleanFragments.Mode = "Standard"
+doc.recompute()

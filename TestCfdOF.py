@@ -297,7 +297,10 @@ class MacroTest:
         self.writer = CfdCaseWriterFoam.CfdCaseWriterFoam(FreeCAD.ActiveDocument.CfdAnalysis)
         self.writer.writeCase()
 
-    def runTest(self, dir_name, macro_names):
+    def runTest(self, dir_name, macro_names, case_name=None):
+        if case_name is None:
+            case_name = dir_name
+
         # Unset the appending of the document name to the output path to get a predictable place where
         # files are stored
         prefs = CfdTools.getPreferencesLocation()
@@ -313,16 +316,16 @@ class MacroTest:
         fccPrint('Writing {} case files ...'.format(dir_name))
         analysis = CfdTools.getActiveAnalysis()
         analysis.OutputPath = temp_dir
-        CfdTools.getSolver(analysis).InputCaseName = "case" + dir_name
-        CfdTools.getMeshObject(analysis).CaseName = "meshCase" + dir_name
+        CfdTools.getSolver(analysis).InputCaseName = "case" + case_name
+        CfdTools.getMeshObject(analysis).CaseName = "meshCase" + case_name
         self.writeCaseFiles()
         self.child_instance.assertTrue(self.writer, "CfdTest of writer failed")
 
-        mesh_ref_dir = os.path.join(test_file_dir, "cases", dir_name, "meshCase")
+        mesh_ref_dir = os.path.join(test_file_dir, "cases", case_name, "meshCase")
         mesh_case_dir = self.meshwriter.mesh_case_dir
         comparePaths(mesh_ref_dir, mesh_case_dir, self.child_instance)
 
-        ref_dir = os.path.join(test_file_dir, "cases", dir_name, "case")
+        ref_dir = os.path.join(test_file_dir, "cases", case_name, "case")
         case_dir = self.writer.case_folder
         comparePaths(ref_dir, case_dir, self.child_instance)
 
@@ -542,6 +545,23 @@ class WaterPouringTest(unittest.TestCase, MacroTest):
 
     def test_run(self):
         self.runTest(self.__class__.__dir_name, self.__class__.__macros)
+
+    def tearDown(self):
+        self.closeDoc()
+
+
+class SimpleHeatFinTest(unittest.TestCase, MacroTest):
+    __dir_name = os.path.join('ConjugatedHeatTransferSteadyState', 'simple_heat_fin')
+    __case_name = 'SimpleHeatFin'
+    __macros = ['01-geometry.FCMacro', '02-analysis.FCMacro', '03-mesh.FCMacro', '04-boundaries.FCMacro',
+                '05-solidMaterial.FCMacro']
+
+    def __init__(self, var):
+        super().__init__(var)
+        MacroTest.child_instance = self
+
+    def test_run(self):
+        self.runTest(self.__class__.__dir_name, self.__class__.__macros, self.__class__.__case_name)
 
     def tearDown(self):
         self.closeDoc()

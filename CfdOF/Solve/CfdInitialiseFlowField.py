@@ -379,4 +379,5 @@ class _ViewProviderCfdInitialseInternalFlowField:
         return None
 
 
-FreeCADGui.addCommand('CfdOF_InitialiseInternal', CommandCfdInitialiseInternalFlowField())
+if FreeCAD.GuiUp and hasattr(FreeCADGui, 'addCommand'):
+    FreeCADGui.addCommand('CfdOF_InitialiseInternal', CommandCfdInitialiseInternalFlowField())

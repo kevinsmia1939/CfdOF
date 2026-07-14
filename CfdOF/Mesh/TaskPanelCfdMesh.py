@@ -73,6 +73,7 @@ class TaskPanelCfdMesh:
 
         self.form.cb_utility.activated.connect(self.choose_utility)
         self.form.pb_write_mesh.clicked.connect(self.writeMesh)
+        self.form.pb_write_all_meshes.clicked.connect(self.writeAllMeshes)
         self.form.pb_edit_mesh.clicked.connect(self.editMesh)
         self.form.pb_run_mesh.clicked.connect(self.runMesh)
         self.form.pb_stop_mesh.clicked.connect(self.killMeshProcess)
@@ -106,6 +107,7 @@ class TaskPanelCfdMesh:
         self.form.if_NumberOfProcesses.setToolTip("Number of parallel processes")
         self.form.if_NumberOfThreads.setToolTip("Number of parallel threads per process.\n0 means use all available (if NumberOfProcesses = 1) or use 1 (if NumberOfProcesses > 1)")
 
+        self.initRegionControls()
         self.load()
         self.updateUI()
 
@@ -119,6 +121,21 @@ class TaskPanelCfdMesh:
     def reject(self):
         FreeCADGui.ActiveDocument.resetEdit()
         return True
+
+    def initRegionControls(self):
+        self.regionFrame = QtGui.QGroupBox("Multi-region")
+        regionLayout = QtGui.QFormLayout(self.regionFrame)
+
+        self.inputRegionName = QtGui.QLineEdit()
+        self.inputRegionName.setToolTip(
+            "OpenFOAM region name. If left empty, the mesh label is used.")
+        regionLayout.addRow("Region name:", self.inputRegionName)
+
+        self.comboRegionType = QtGui.QComboBox()
+        self.comboRegionType.addItems(["fluid", "solid"])
+        regionLayout.addRow("Region type:", self.comboRegionType)
+
+        self.form.layout().insertWidget(1, self.regionFrame)
 
     def closed(self):
         # We call this from unsetEdit to ensure cleanup
@@ -145,6 +162,9 @@ class TaskPanelCfdMesh:
         self.form.radio_explicit_edge_detection.setChecked(not self.mesh_obj.ImplicitEdgeDetection)
         self.form.if_NumberOfProcesses.setValue(self.mesh_obj.NumberOfProcesses)
         self.form.if_NumberOfThreads.setValue(self.mesh_obj.NumberOfThreads)
+        self.inputRegionName.setText(getattr(self.mesh_obj, 'RegionName', ''))
+        self.comboRegionType.setCurrentIndex(
+            self.comboRegionType.findText(getattr(self.mesh_obj, 'RegionType', 'fluid')))
 
         index_utility = CfdTools.indexOrDefault(list(zip(
                 CfdMesh.MESHERS, CfdMesh.DIMENSION, CfdMesh.DUAL_CONVERSION)), 
@@ -170,6 +190,8 @@ class TaskPanelCfdMesh:
         self.form.pb_paraview.setEnabled(os.path.exists(os.path.join(case_path, "pv.foam")))
         self.form.pb_load_mesh.setEnabled(os.path.exists(os.path.join(case_path, "surfaceMesh.vtk")))
         self.form.pb_check_mesh.setEnabled(os.path.exists(os.path.join(case_path, "surfaceMesh.vtk")))
+        self.form.pb_write_all_meshes.setEnabled(
+            self.analysis_obj is not None and len(CfdTools.getMeshObjects(self.analysis_obj)) > 1)
         
         utility = CfdMesh.MESHERS[self.form.cb_utility.currentIndex()]
         if utility == "snappyHexMesh":
@@ -195,6 +217,8 @@ class TaskPanelCfdMesh:
         storeIfChanged(self.mesh_obj, 'ImplicitEdgeDetection', self.form.radio_implicit_edge_detection.isChecked())
         storeIfChanged(self.mesh_obj, 'NumberOfProcesses', self.form.if_NumberOfProcesses.value())
         storeIfChanged(self.mesh_obj, 'NumberOfThreads', self.form.if_NumberOfThreads.value())
+        storeIfChanged(self.mesh_obj, 'RegionName', self.inputRegionName.text().strip())
+        storeIfChanged(self.mesh_obj, 'RegionType', self.comboRegionType.currentText())
 
         point_in_mesh = {'x': getQuantity(self.form.if_pointInMeshX),
                          'y': getQuantity(self.form.if_pointInMeshY),
@@ -293,6 +317,79 @@ class TaskPanelCfdMesh:
             QApplication.restoreOverrideCursor()
             # Update the UI
             self.updateUI()
+
+    def writeAllMeshes(self):
+        import importlib
+        importlib.reload(CfdMeshTools)
+        self.console_message_cart = ''
+        self.Start = time.time()
+        self.store()
+
+        mesh_objects = CfdTools.getMeshObjects(self.analysis_obj)
+        if not mesh_objects:
+            self.consoleMessage("No mesh objects found", 'Error')
+            return
+
+        try:
+            QApplication.setOverrideCursor(Qt.WaitCursor)
+            self.form.pb_run_mesh.setEnabled(False)
+            self.form.pb_write_mesh.setEnabled(False)
+            self.form.pb_write_all_meshes.setEnabled(False)
+            self.form.pb_check_mesh.setEnabled(False)
+            self.form.pb_paraview.setEnabled(False)
+            self.form.pb_load_mesh.setEnabled(False)
+
+            for mesh_obj in mesh_objects:
+                self.consoleMessage("Preparing mesh case for {} ...".format(mesh_obj.Label))
+                cart_mesh = CfdMeshTools.CfdMeshTools(mesh_obj)
+                mesh_obj.Proxy.cart_mesh = cart_mesh
+                cart_mesh.progressCallback = (
+                    lambda message, label=mesh_obj.Label: self.consoleMessage("{}: {}".format(label, message)))
+                print('Part to mesh:\n  Name: '
+                      + cart_mesh.part_obj.Name + ', Label: '
+                      + cart_mesh.part_obj.Label + ', ShapeType: '
+                      + cart_mesh.part_obj.Shape.ShapeType)
+                print('  CharacteristicLengthMax: ' + str(cart_mesh.clmax))
+                cart_mesh.writeMesh()
+                self.analysis_obj.NeedsMeshRerun = True
+
+                self.consoleMessage("Running mesher for {} ...".format(mesh_obj.Label))
+                self.runMeshForObject(mesh_obj, cart_mesh)
+
+            self.analysis_obj.NeedsMeshRerun = False
+            self.consoleMessage("All mesh cases written and meshed")
+        except Exception as ex:
+            self.consoleMessage("Error " + type(ex).__name__ + ": " + str(ex), 'Error')
+            raise
+        finally:
+            QApplication.restoreOverrideCursor()
+            self.mesh_obj.Proxy.cart_mesh = CfdMeshTools.CfdMeshTools(self.mesh_obj)
+            self.updateUI()
+
+    def runMeshForObject(self, mesh_obj, cart_mesh):
+        if CfdTools.getFoamRuntime() == "MinGW" or CfdTools.getFoamRuntime().startswith('BlueCFD'):
+            cmd = CfdTools.makeRunCommand('Allmesh.bat', source_env=False)
+        else:
+            cmd = CfdTools.makeRunCommand('./Allmesh', cart_mesh.mesh_case_dir, source_env=False)
+
+        mesh_process = CfdConsoleProcess(stdout_hook=self.gotOutputLines)
+        mesh_process.stderrHook = lambda lines: self.gotMeshObjectErrorLines(mesh_process, lines)
+        mesh_obj.Proxy.mesh_process = mesh_process
+        cart_mesh.error = False
+        mesh_process.start(cmd, env_vars=CfdTools.getRunEnvironment(), working_dir=cart_mesh.mesh_case_dir)
+        if not mesh_process.waitForStarted():
+            cart_mesh.error = True
+            raise RuntimeError("Error starting mesher for {}".format(mesh_obj.Label))
+        if not mesh_process.waitForFinished() or mesh_process.exitCode() != 0:
+            cart_mesh.error = True
+            raise RuntimeError("Mesher failed for {}".format(mesh_obj.Label))
+        self.consoleMessage("Meshing completed for {}".format(mesh_obj.Label))
+
+    def gotMeshObjectErrorLines(self, mesh_process, lines):
+        print_err = mesh_process.processErrorOutput(lines)
+        if print_err is not None:
+            self.consoleMessage(print_err, 'Error')
+        return print_err
 
     def progressCallback(self, message):
         self.consoleMessage(message)

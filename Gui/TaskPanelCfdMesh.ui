@@ -459,7 +459,7 @@
        </property>
       </widget>
      </item>
-     <item row="0" column="0" colspan="2">
+     <item row="0" column="0" colspan="3">
       <widget class="QLabel" name="label_5">
        <property name="font">
         <font>
@@ -483,6 +483,16 @@
       <widget class="QPushButton" name="pb_edit_mesh">
        <property name="text">
         <string>Edit</string>
+       </property>
+      </widget>
+     </item>
+     <item row="1" column="2">
+      <widget class="QPushButton" name="pb_write_all_meshes">
+       <property name="toolTip">
+        <string>Write and run all mesh cases using each mesh object's saved settings</string>
+       </property>
+       <property name="text">
+        <string>Mesh all</string>
        </property>
       </widget>
      </item>
