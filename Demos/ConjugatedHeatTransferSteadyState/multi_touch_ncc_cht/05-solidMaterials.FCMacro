@@ -1,0 +1,36 @@
+import FreeCAD as App
+
+from CfdOF import CfdTools
+from CfdOF.Solve import CfdSolidMaterial
+
+
+def add_solid_material(source_name, region_name, conductivity):
+    solid = CfdSolidMaterial.makeCfdSolidMaterial("{}_Material".format(region_name))
+    CfdTools.getActiveAnalysis().addObject(solid)
+    solid.Label = "{}_material".format(region_name)
+    solid.RegionName = region_name
+    solid.Material = {
+        "Author": "CfdOF NCC validation",
+        "AuthorAndLicense": "",
+        "CardName": "{}Solid".format(region_name),
+        "Density": "2699 kg/m^3",
+        "Description": "Synthetic solid material for multi-touch NCC validation",
+        "License": "",
+        "Name": "{}_solid".format(region_name),
+        "ReferenceSource": "",
+        "SourceURL": "",
+        "SpecificHeat": "897 J/kg/K",
+        "ThermalConductivity": "{} W/m/K".format(conductivity),
+        "Type": "Solid",
+    }
+    solid.HeatGeneration = "0 W/m^3"
+    solid.ShapeRefs = [(App.ActiveDocument.getObject("{}_slice".format(source_name)), ("Solid1",))]
+    return solid
+
+
+add_solid_material("SolidSourceA", "solid_a", 20)
+add_solid_material("SolidSourceB", "solid_b", 50)
+add_solid_material("SolidSourceC", "solid_c", 100)
+add_solid_material("SolidSourceD", "solid_d", 200)
+
+App.ActiveDocument.recompute()

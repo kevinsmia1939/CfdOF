@@ -1,0 +1,89 @@
+import FreeCAD as App
+
+from CfdOF import CfdTools
+from CfdOF.Mesh import CfdMesh
+from CfdOF.Solve import CfdImprintedNccRegions
+from CfdOF.Solve import CfdRegionCoupledInterface
+
+
+region_names = {
+    "FluidSource": "fluid",
+    "SolidSourceA": "solid_a",
+    "SolidSourceB": "solid_b",
+    "SolidSourceC": "solid_c",
+    "SolidSourceD": "solid_d",
+}
+
+
+def generated_regions_by_source_name():
+    regions = {}
+    for obj in App.ActiveDocument.Objects:
+        if getattr(obj, "GeneratedBy", "") != CfdImprintedNccRegions.GENERATED_BY:
+            continue
+        source = getattr(obj, "SourceObject", None)
+        if source is not None:
+            regions[source.Name] = obj
+    return regions
+
+
+def add_mesh(name, region_obj, region_name, region_type, case_name, length):
+    mesh = CfdMesh.makeCfdMesh(name)
+    mesh.Label = name
+    CfdTools.getActiveAnalysis().addObject(mesh)
+    mesh.Part = region_obj
+    mesh.PartSubShape = ""
+    mesh.RegionName = region_name
+    mesh.RegionType = region_type
+    mesh.CaseName = case_name
+    mesh.CharacteristicLengthMax = length
+    mesh.MeshUtility = "gmsh"
+    mesh.ElementDimension = "3D"
+    mesh.CellsBetweenLevels = 3
+    mesh.EdgeRefinement = 1.0
+    mesh.PointInMesh = {"x": "0 m", "y": "0 m", "z": "0 m"}
+    mesh.NumberOfProcesses = 1
+    mesh.NumberOfThreads = 0
+    return mesh
+
+
+source_objects = [
+    App.ActiveDocument.FluidSource,
+    App.ActiveDocument.SolidSourceA,
+    App.ActiveDocument.SolidSourceB,
+    App.ActiveDocument.SolidSourceC,
+    App.ActiveDocument.SolidSourceD,
+]
+
+_group, _regions, interface = CfdImprintedNccRegions.createImprintedNccRegions(source_objects)
+regions = generated_regions_by_source_name()
+
+for source_name, region_name in region_names.items():
+    regions[source_name].RegionName = region_name
+    regions[source_name].Label = "{}_imprinted".format(region_name)
+
+interface.Label = "MultiTouchRegionCoupledInterface"
+interface.RegionObjects = [regions[source.Name] for source in source_objects]
+interface.RegionNames = [regions[source.Name].RegionName for source in source_objects]
+interface.ShapeRefs, interface.InterfacePairs = CfdRegionCoupledInterface.generatePairedTouchingFaceData(
+    interface.RegionObjects
+)
+
+pairs = CfdRegionCoupledInterface._decode_interface_pairs(interface)
+thermal_modes = [
+    ("zeroGradient", ""),
+    ("fixedValue", "315 K"),
+    ("fixedGradient", "1200 W/m^2"),
+    ("totalPower", "1 W"),
+]
+for pair, thermal_mode in zip(pairs, thermal_modes):
+    pair["thermal_type"] = thermal_mode[0]
+    pair["thermal_value"] = thermal_mode[1]
+interface.InterfacePairs = [CfdRegionCoupledInterface.encodeInterfacePair(pair) for pair in pairs]
+
+add_mesh("Fluid_Mesh", regions["FluidSource"], "fluid", "fluid", "meshCaseMultiTouchNccFluid", "5 mm")
+add_mesh("SolidA_Mesh", regions["SolidSourceA"], "solid_a", "solid", "meshCaseMultiTouchNccSolidA", "3 mm")
+add_mesh("SolidB_Mesh", regions["SolidSourceB"], "solid_b", "solid", "meshCaseMultiTouchNccSolidB", "3 mm")
+add_mesh("SolidC_Mesh", regions["SolidSourceC"], "solid_c", "solid", "meshCaseMultiTouchNccSolidC", "3 mm")
+add_mesh("SolidD_Mesh", regions["SolidSourceD"], "solid_d", "solid", "meshCaseMultiTouchNccSolidD", "3 mm")
+
+App.ActiveDocument.recompute()

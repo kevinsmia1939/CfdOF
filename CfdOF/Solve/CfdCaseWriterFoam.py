@@ -519,12 +519,21 @@ class CfdCaseWriterFoam:
             settings['solidProperties'].append(mp)
             settings['multiRegionSolidNames'].append(region_name)
 
-        for material_obj in self.material_objs:
+        fluid_mesh_region_names = []
+        if is_multiregion and len(self.mesh_objs) > 1:
+            for mesh_obj in self.mesh_objs:
+                region_type = str(getattr(mesh_obj, 'RegionType', 'fluid'))
+                if region_type != 'solid':
+                    fluid_mesh_region_names.append(getattr(mesh_obj, 'RegionName', '') or mesh_obj.Label)
+
+        for material_index, material_obj in enumerate(self.material_objs):
             mp = material_obj.Material.copy()
             mp['Name'] = material_obj.Label
             explicit_region = getattr(material_obj, 'RegionName', '')
             if explicit_region:
                 region_name = explicit_region
+            elif fluid_mesh_region_names:
+                region_name = fluid_mesh_region_names[min(material_index, len(fluid_mesh_region_names) - 1)]
             elif is_multiregion:
                 # Derive fluid region name from the Internal mesh refinement zone label so the
                 # user does not have to set RegionName manually. Falls back to material Label.

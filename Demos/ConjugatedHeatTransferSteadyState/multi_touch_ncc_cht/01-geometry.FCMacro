@@ -1,0 +1,28 @@
+import FreeCAD as App
+
+
+document_name = "multi_touch_ncc_cht"
+
+if document_name in App.listDocuments():
+    App.closeDocument(document_name)
+doc = App.newDocument(document_name)
+App.setActiveDocument(doc.Name)
+
+
+def make_box(name, label, length, width, height, base):
+    obj = doc.addObject("Part::Box", name)
+    obj.Label = label
+    obj.Length = "{} mm".format(length)
+    obj.Width = "{} mm".format(width)
+    obj.Height = "{} mm".format(height)
+    obj.Placement.Base = App.Vector(*base)
+    return obj
+
+
+make_box("FluidSource", "fluid", 80, 20, 10, (0, 0, 0))
+make_box("SolidSourceA", "solid_a", 10, 10, 10, (20, 20, 0))
+make_box("SolidSourceB", "solid_b", 10, 10, 10, (20, 30, 0))
+make_box("SolidSourceC", "solid_c", 10, 10, 10, (20, 40, 0))
+make_box("SolidSourceD", "solid_d", 10, 10, 10, (20, 50, 0))
+
+doc.recompute()

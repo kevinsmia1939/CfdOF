@@ -690,6 +690,112 @@ class MicrochipCoolingNccMacroWorkflowTest(unittest.TestCase):
             FreeCAD.closeDocument(FreeCAD.ActiveDocument.Name)
 
 
+class MultiTouchNccChtWorkflowTest(unittest.TestCase):
+    __dir_name = os.path.join('ConjugatedHeatTransferSteadyState', 'multi_touch_ncc_cht')
+    __case_name = 'MultiTouchNccChtWorkflow'
+    __macros = ['01-geometry.FCMacro', '02-analysis.FCMacro', '03-meshes-and-interface.FCMacro',
+                '04-boundaries.FCMacro', '05-solidMaterials.FCMacro']
+
+    def test_run(self):
+        prefs = CfdTools.getPreferencesLocation()
+        original_append_setting = FreeCAD.ParamGet(prefs).GetBool("AppendDocNameToOutputPath", 0)
+        FreeCAD.ParamGet(prefs).SetBool("AppendDocNameToOutputPath", 0)
+        try:
+            fccPrint('--------------- Start of CFD tests ---------------')
+            for m in self.__class__.__macros:
+                macro_name = os.path.join(home_path, "Demos", self.__class__.__dir_name, m)
+                fccPrint('Running {} macro {} ...'.format(self.__class__.__dir_name, macro_name))
+                CfdTools.executeMacro(macro_name)
+
+            analysis = CfdTools.getActiveAnalysis()
+            self.assertIsNotNone(analysis, "CfdTest of multi-touch NCC active analysis failed")
+            analysis.OutputPath = temp_dir
+
+            meshes = CfdTools.getMeshObjects(analysis)
+            self.assertEqual(len(meshes), 5)
+            self.assertEqual(
+                {mesh.RegionName: mesh.RegionType for mesh in meshes},
+                {
+                    "fluid": "fluid",
+                    "solid_a": "solid",
+                    "solid_b": "solid",
+                    "solid_c": "solid",
+                    "solid_d": "solid",
+                },
+            )
+
+            interfaces = CfdTools.getRegionCoupledInterfaceGroup(analysis)
+            self.assertEqual(len(interfaces), 1)
+            interface = interfaces[0]
+            from CfdOF.Solve import CfdRegionCoupledInterface
+            pairs = CfdRegionCoupledInterface._decode_interface_pairs(interface)
+            self.assertEqual(len(pairs), 4)
+            self.assertEqual(
+                [(pair['region_a'], pair['region_b'], pair['thermal_type'], pair['thermal_value'])
+                 for pair in pairs],
+                [
+                    ("fluid", "solid_a", "zeroGradient", ""),
+                    ("solid_a", "solid_b", "fixedValue", "315 K"),
+                    ("solid_b", "solid_c", "fixedGradient", "1200 W/m^2"),
+                    ("solid_c", "solid_d", "totalPower", "1 W"),
+                ],
+            )
+
+            solver = CfdTools.getSolver(analysis)
+            solver.InputCaseName = "case" + self.__class__.__case_name
+
+            fccPrint('Writing {} mesh files ...'.format(self.__class__.__dir_name))
+            for mesh in meshes:
+                CfdMeshTools.CfdMeshTools(mesh).writeMesh()
+
+            fccPrint('Writing {} case files ...'.format(self.__class__.__dir_name))
+            writer = CfdCaseWriterFoam.CfdCaseWriterFoam(analysis)
+            writer.writeCase()
+            self.assertTrue(writer, "CfdTest of multi-touch NCC case writer failed")
+
+            create_patch_dict = os.path.join(writer.case_folder, "system", "createPatchDict")
+            self.assertTrue(os.path.exists(create_patch_dict), "createPatchDict was not written")
+            with open(create_patch_dict, 'r') as patch_file:
+                create_patch_text = patch_file.read()
+            for patch_name_pattern in [
+                r"MultiTouchRegionCoupledInterface_fluid_to_solid_a_Face\d+",
+                r"MultiTouchRegionCoupledInterface_solid_a_to_fluid_Face\d+",
+                r"MultiTouchRegionCoupledInterface_solid_a_to_solid_b_Face\d+",
+                r"MultiTouchRegionCoupledInterface_solid_b_to_solid_a_Face\d+",
+                r"MultiTouchRegionCoupledInterface_solid_b_to_solid_c_Face\d+",
+                r"MultiTouchRegionCoupledInterface_solid_c_to_solid_b_Face\d+",
+                r"MultiTouchRegionCoupledInterface_solid_c_to_solid_d_Face\d+",
+                r"MultiTouchRegionCoupledInterface_solid_d_to_solid_c_Face\d+",
+            ]:
+                self.assertRegex(create_patch_text, patch_name_pattern)
+
+            region_properties = os.path.join(writer.case_folder, "constant", "regionProperties")
+            with open(region_properties, 'r') as region_file:
+                region_text = region_file.read()
+            for region_name in ["fluid", "solid_a", "solid_b", "solid_c", "solid_d"]:
+                self.assertIn(region_name, region_text)
+            self.assertNotIn("FluidProperties", region_text)
+
+            t_files = []
+            for root, _dirs, files in os.walk(os.path.join(writer.case_folder, "0")):
+                if "T" in files:
+                    t_files.append(os.path.join(root, "T"))
+            self.assertTrue(t_files, "No temperature boundary files were written")
+            t_text = "\n".join(open(t_file, 'r').read() for t_file in t_files)
+            self.assertIn("mode            power;", t_text)
+            self.assertIn("Q               1.0;", t_text)
+            self.assertIn("mode            flux;", t_text)
+            self.assertIn("q               uniform 1200.0;", t_text)
+            self.assertIn("value       uniform 315.0;", t_text)
+            fccPrint('--------------- End of CFD tests ---------------')
+        finally:
+            FreeCAD.ParamGet(prefs).SetBool("AppendDocNameToOutputPath", original_append_setting)
+
+    def tearDown(self):
+        if FreeCAD.ActiveDocument is not None:
+            FreeCAD.closeDocument(FreeCAD.ActiveDocument.Name)
+
+
 class ImprintedNccRegionsWorkflowTest(unittest.TestCase):
     __dir_name = os.path.join('ConjugatedHeatTransferSteadyState', 'simple_heat_fin_ncc')
     __macros = ['01-geometry.FCMacro', '02-analysis.FCMacro']

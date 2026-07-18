@@ -66,6 +66,11 @@ def defaultThermalValue(interface_obj, thermal_type):
     return str(value)
 
 
+def _quantity_to_template_scalar(value):
+    q = FreeCAD.Units.Quantity(value)
+    return q.Value / 1000 ** q.Unit.Signature[0] / (180 / 3.141592653589793) ** q.Unit.Signature[7]
+
+
 def _safe_label(label):
     return str(label).replace(" ", "_")
 
@@ -660,10 +665,10 @@ class _GeneratedRegionCoupledBoundary:
             'TurbulenceIntensityPercentage': 1.0,
             'TurbulenceInletSpecification': 'intensityAndLengthScale',
             'TurbulenceLengthScale': FreeCAD.Units.Quantity('1 mm'),
-            'Temperature': self.Temperature,
-            'HeatFlux': self.HeatFlux,
-            'Power': self.Power,
-            'HeatTransferCoeff': self.HeatTransferCoeff,
+            'Temperature': _quantity_to_template_scalar(self.Temperature),
+            'HeatFlux': _quantity_to_template_scalar(self.HeatFlux),
+            'Power': _quantity_to_template_scalar(self.Power),
+            'HeatTransferCoeff': _quantity_to_template_scalar(self.HeatTransferCoeff),
             'ShapeRefs': self.ShapeRefs,
         }
 

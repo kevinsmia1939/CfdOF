@@ -1,0 +1,98 @@
+import FreeCAD as App
+
+from CfdOF import CfdTools
+from CfdOF.Solve import CfdFluidBoundary
+
+
+def add_boundary(label, region_name, boundary_type, subtype, thermal_type, refs,
+                 temperature="293 K", velocity=(0, 0, 0), pressure="100 kPa"):
+    boundary = CfdFluidBoundary.makeCfdFluidBoundary()
+    CfdTools.getActiveAnalysis().addObject(boundary)
+    boundary.Label = label
+    boundary.RegionName = region_name
+    boundary.BoundaryType = boundary_type
+    boundary.BoundarySubType = subtype
+    boundary.ThermalBoundaryType = thermal_type
+    boundary.Temperature = temperature
+    boundary.Pressure = pressure
+    boundary.Ux = "{} mm/s".format(velocity[0])
+    boundary.Uy = "{} mm/s".format(velocity[1])
+    boundary.Uz = "{} mm/s".format(velocity[2])
+    boundary.TurbulenceIntensityPercentage = 1.0
+    boundary.TurbulenceLengthScale = "10 mm"
+    boundary.ShapeRefs = refs
+    return boundary
+
+
+def faces_on_plane(obj, axis, value, predicate=None, tol=1e-7):
+    face_names = []
+    for face_index, face in enumerate(obj.Shape.Faces, 1):
+        bb = face.BoundBox
+        on_plane = (
+            (axis == "x" and abs(bb.XMin - value) <= tol and abs(bb.XMax - value) <= tol) or
+            (axis == "y" and abs(bb.YMin - value) <= tol and abs(bb.YMax - value) <= tol) or
+            (axis == "z" and abs(bb.ZMin - value) <= tol and abs(bb.ZMax - value) <= tol)
+        )
+        if on_plane and (predicate is None or predicate(face.CenterOfMass)):
+            face_names.append("Face{}".format(face_index))
+    return tuple(face_names)
+
+
+fluid = App.ActiveDocument.FluidSource_slice
+
+add_boundary(
+    "inlet",
+    "fluid",
+    "inlet",
+    "uniformVelocityInlet",
+    "fixedValue",
+    [(fluid, faces_on_plane(fluid, "x", 0.0))],
+    temperature="293 K",
+    velocity=(200, 0, 0),
+)
+add_boundary(
+    "fluid_wall",
+    "fluid",
+    "wall",
+    "fixedWall",
+    "zeroGradient",
+    [(fluid, faces_on_plane(fluid, "y", 0.0) +
+             faces_on_plane(fluid, "y", 20.0,
+                            lambda c: c.x < 20.0 - 1e-7 or c.x > 30.0 + 1e-7) +
+             faces_on_plane(fluid, "z", 0.0) +
+             faces_on_plane(fluid, "z", 10.0))],
+)
+add_boundary(
+    "outlet",
+    "fluid",
+    "outlet",
+    "staticPressureOutlet",
+    "zeroGradient",
+    [(fluid, faces_on_plane(fluid, "x", 80.0))],
+    pressure="100 kPa",
+)
+
+for source_name, region_name, ymin, ymax in [
+        ("SolidSourceA", "solid_a", 20.0, 30.0),
+        ("SolidSourceB", "solid_b", 30.0, 40.0),
+        ("SolidSourceC", "solid_c", 40.0, 50.0),
+        ("SolidSourceD", "solid_d", 50.0, 60.0)]:
+    solid = App.ActiveDocument.getObject("{}_slice".format(source_name))
+    exposed = (
+        faces_on_plane(solid, "x", 20.0) +
+        faces_on_plane(solid, "x", 30.0) +
+        faces_on_plane(solid, "z", 0.0) +
+        faces_on_plane(solid, "z", 10.0)
+    )
+    if source_name == "SolidSourceD":
+        exposed += faces_on_plane(solid, "y", ymax)
+    add_boundary(
+        "{}_outer_wall".format(region_name),
+        region_name,
+        "wall",
+        "fixedWall",
+        "zeroGradient",
+        [(solid, exposed)],
+    )
+
+App.ActiveDocument.recompute()
