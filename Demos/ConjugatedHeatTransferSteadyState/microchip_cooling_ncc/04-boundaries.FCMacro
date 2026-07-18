@@ -2,14 +2,35 @@ import FreeCAD as App
 
 from CfdOF import CfdTools
 from CfdOF.Solve import CfdFluidBoundary
+from CfdOF.Solve import CfdImprintedNccRegions
 
 
-def face_names(faces):
-    return tuple("Face{}".format(i) for i in faces)
+def generated_region_for_source(source_name):
+    for obj in App.ActiveDocument.Objects:
+        if getattr(obj, "GeneratedBy", "") != CfdImprintedNccRegions.GENERATED_BY:
+            continue
+        source = getattr(obj, "SourceObject", None)
+        if source is not None and source.Name == source_name and obj.Name != "NccImprintTopology":
+            return obj
+    raise RuntimeError("No generated imprinted region for source '{}'".format(source_name))
 
 
-def add_boundary(label, boundary_type, subtype, thermal_type, faces,
-                 region_name="", velocity=(0, 0, 0), pressure="100 kPa"):
+def faces_on_plane(shape_obj, axis, value, tol=1e-6):
+    faces = []
+    for index, face in enumerate(shape_obj.Shape.Faces, 1):
+        bb = face.BoundBox
+        if axis == "x" and abs(bb.XMin - value) <= tol and abs(bb.XMax - value) <= tol:
+            faces.append("Face{}".format(index))
+        elif axis == "y" and abs(bb.YMin - value) <= tol and abs(bb.YMax - value) <= tol:
+            faces.append("Face{}".format(index))
+        elif axis == "z" and abs(bb.ZMin - value) <= tol and abs(bb.ZMax - value) <= tol:
+            faces.append("Face{}".format(index))
+    if not faces:
+        raise RuntimeError("No faces found on {}={}".format(axis, value))
+    return tuple(faces)
+
+
+def add_boundary(label, boundary_type, subtype, thermal_type, refs, velocity=(0, 0, 0)):
     boundary = CfdFluidBoundary.makeCfdFluidBoundary()
     CfdTools.getActiveAnalysis().addObject(boundary)
     boundary.Label = label
@@ -17,147 +38,47 @@ def add_boundary(label, boundary_type, subtype, thermal_type, faces,
     boundary.BoundarySubType = subtype
     boundary.ThermalBoundaryType = thermal_type
     boundary.Temperature = "293 K"
-    boundary.Pressure = pressure
+    boundary.Pressure = "100 kPa"
     boundary.Ux = "{} mm/s".format(velocity[0])
     boundary.Uy = "{} mm/s".format(velocity[1])
     boundary.Uz = "{} mm/s".format(velocity[2])
     boundary.TurbulenceIntensityPercentage = 1.0
     boundary.TurbulenceLengthScale = "100 mm"
-    boundary.RegionName = region_name
-    boundary.ShapeRefs = [(App.ActiveDocument.BooleanFragments, face_names(faces))]
+    boundary.RegionName = "FluidProperties001"
+    boundary.ShapeRefs = refs
     return boundary
 
 
-def close_to(value, target, tol=1e-6):
-    return abs(value - target) <= tol
-
-
-def on_plane(face, axis, value, tol=1e-6):
-    bb = face.BoundBox
-    if axis == "x":
-        return abs(bb.XMin - value) <= tol and abs(bb.XMax - value) <= tol
-    if axis == "y":
-        return abs(bb.YMin - value) <= tol and abs(bb.YMax - value) <= tol
-    return abs(bb.ZMin - value) <= tol and abs(bb.ZMax - value) <= tol
-
-
-def solid_name(predicate, description):
-    solids = App.ActiveDocument.BooleanFragments.Shape.Solids
-    matches = [i for i, solid in enumerate(solids, 1) if predicate(solid.BoundBox)]
-    if len(matches) != 1:
-        raise RuntimeError("Expected one {} solid, found {}".format(description, len(matches)))
-    return "Solid{}".format(matches[0])
-
-
-def region_solids():
-    fragments = App.ActiveDocument.BooleanFragments
-    solids = fragments.Shape.Solids
-    fluid_index = max(range(1, len(solids) + 1), key=lambda i: solids[i - 1].Volume)
-    return {
-        "FluidProperties001": fragments.Shape.getElement("Solid{}".format(fluid_index)),
-        "heat_sink_volume001": fragments.Shape.getElement(solid_name(
-            lambda bb: close_to(bb.XMin, 135) and close_to(bb.XMax, 165)
-            and close_to(bb.YMin, 135) and close_to(bb.YMax, 165)
-            and close_to(bb.ZMin, 12) and close_to(bb.ZMax, 24),
-            "heat sink",
-        )),
-        "PCB_volume001": fragments.Shape.getElement(solid_name(
-            lambda bb: close_to(bb.XMin, 100) and close_to(bb.XMax, 200)
-            and close_to(bb.YMin, 100) and close_to(bb.YMax, 200)
-            and close_to(bb.ZMin, 10) and close_to(bb.ZMax, 11),
-            "PCB",
-        )),
-        "hot_microchip_volume001": fragments.Shape.getElement(solid_name(
-            lambda bb: close_to(bb.XMin, 135) and close_to(bb.XMax, 165)
-            and close_to(bb.YMin, 135) and close_to(bb.YMax, 165)
-            and close_to(bb.ZMin, 11) and close_to(bb.ZMax, 12),
-            "microchip",
-        )),
-        "Polypropylene_solid001": fragments.Shape.getElement(solid_name(
-            lambda bb: close_to(bb.XMin, 135) and close_to(bb.XMax, 165)
-            and close_to(bb.YMin, 135) and close_to(bb.YMax, 165)
-            and close_to(bb.ZMin, 24) and close_to(bb.ZMax, 34),
-            "fan case",
-        )),
-    }
-
-
-def fragment_faces_matching(shape, predicate, tol=1e-5):
-    faces = []
-    for index, face in enumerate(App.ActiveDocument.BooleanFragments.Shape.Faces, 1):
-        if not predicate(face):
-            continue
-        try:
-            common_area = face.common(shape).Area
-        except Exception:
-            common_area = 0.0
-        if common_area > tol:
-            faces.append(index)
-    return faces
-
-
-def shared_faces(shape_a, shape_b, tol=1e-5):
-    faces = []
-    for index, face in enumerate(App.ActiveDocument.BooleanFragments.Shape.Faces, 1):
-        try:
-            area_a = face.common(shape_a).Area
-            area_b = face.common(shape_b).Area
-        except Exception:
-            continue
-        if area_a > tol and area_b > tol:
-            faces.append(index)
-    return faces
-
-
-regions = region_solids()
-fluid = regions["FluidProperties001"]
-fluid_bb = fluid.BoundBox
-
-fluid_inlet = fragment_faces_matching(fluid, lambda f: on_plane(f, "z", fluid_bb.ZMin))
-fluid_outlet = fragment_faces_matching(fluid, lambda f: on_plane(f, "z", fluid_bb.ZMax))
-fluid_sides = fragment_faces_matching(
-    fluid,
-    lambda f: on_plane(f, "x", fluid_bb.XMin) or on_plane(f, "x", fluid_bb.XMax)
-    or on_plane(f, "y", fluid_bb.YMin) or on_plane(f, "y", fluid_bb.YMax),
+fluid = generated_region_for_source("Box")
+bb = fluid.Shape.BoundBox
+side_faces = (
+    faces_on_plane(fluid, "y", bb.YMin) +
+    faces_on_plane(fluid, "y", bb.YMax) +
+    faces_on_plane(fluid, "z", bb.ZMin) +
+    faces_on_plane(fluid, "z", bb.ZMax)
 )
 
 add_boundary(
-    "inlet",
+    "wall",
     "wall",
     "fixedWall",
-    "zeroGradient",
-    fluid_inlet,
-    region_name="FluidProperties001",
-    velocity=(0, 0, 20),
+    "fixedValue",
+    [(fluid, side_faces)],
 )
 add_boundary(
     "outlet",
     "outlet",
     "staticPressureOutlet",
-    "zeroGradient",
-    fluid_outlet,
-    region_name="FluidProperties001",
-)
-
-# The isothermal casing gives the steady CHT problem a robust thermal reference.
-add_boundary(
-    "side_walls",
-    "wall",
-    "slipWall",
     "fixedValue",
-    fluid_sides,
-    region_name="FluidProperties001",
+    [(fluid, faces_on_plane(fluid, "x", bb.XMax))],
 )
-
-# Non-conformal region coupling workflow:
-# Mark one BooleanFragments face as region-coupled. CfdOF infers the regions on
-# both sides and writes the OpenFOAM pair internally.
-region_items = list(regions.items())
-for ai, (region_a, shape_a) in enumerate(region_items):
-    for region_b, shape_b in region_items[ai + 1:]:
-        faces = shared_faces(shape_a, shape_b)
-        if faces:
-            add_boundary("{}_to_{}".format(region_a, region_b), "wall", "regionCoupledWall",
-                         "zeroGradient", faces)
+add_boundary(
+    "inlet",
+    "inlet",
+    "uniformVelocityInlet",
+    "fixedValue",
+    [(fluid, faces_on_plane(fluid, "x", bb.XMin))],
+    velocity=(50, 0, 0),
+)
 
 App.ActiveDocument.recompute()

@@ -2,6 +2,7 @@
 # SPDX-FileNotice: Part of the CfdOF addon.
 
 import os
+import json
 
 import FreeCAD
 import Part
@@ -24,6 +25,45 @@ INTERFACE_FACE_COLORS = [
     (0.0, 0.75, 0.75),   # cyan
 ]
 DEFAULT_INTERFACE_FACE_COLOR = (0.0, 0.6, 0.6)
+IMPRINTED_NCC_GENERATED_BY = "CfdOF_ImprintedNccRegions"
+THERMAL_BOUNDARY_TYPES = [
+    "zeroGradient",
+    "fixedValue",
+    "fixedGradient",
+    "totalPower",
+    "externalWallHeatFluxTemperature",
+]
+THERMAL_VALUE_FIELDS = {
+    "fixedValue": "Temperature",
+    "fixedGradient": "HeatFlux",
+    "totalPower": "Power",
+    "externalWallHeatFluxTemperature": "HeatTransferCoeff",
+}
+THERMAL_VALUE_DISPLAY_UNITS = {
+    "fixedValue": "K",
+    "fixedGradient": "W/m^2",
+    "totalPower": "W",
+    "externalWallHeatFluxTemperature": "W/m^2/K",
+}
+
+
+def defaultThermalValue(interface_obj, thermal_type):
+    value_field = THERMAL_VALUE_FIELDS.get(thermal_type)
+    if not value_field:
+        return ""
+    value = getattr(interface_obj, value_field, "")
+    display_unit = THERMAL_VALUE_DISPLAY_UNITS.get(thermal_type)
+    if display_unit:
+        try:
+            value = value.getValueAs(display_unit)
+        except Exception:
+            try:
+                value = FreeCAD.Units.Quantity(value).getValueAs(display_unit)
+            except Exception:
+                pass
+        value_text = str(value)
+        return value_text if display_unit in value_text else "{} {}".format(value_text, display_unit)
+    return str(value)
 
 
 def _safe_label(label):
@@ -73,6 +113,39 @@ def getRegionShape(obj):
     return None
 
 
+def isImprintedNccGeneratedObject(obj):
+    return getattr(obj, 'GeneratedBy', '') == IMPRINTED_NCC_GENERATED_BY
+
+
+def isFinalImprintedRegionObject(obj):
+    if not isImprintedNccGeneratedObject(obj):
+        return False
+    name = getattr(obj, 'Name', '')
+    if name.startswith('NccSourceClone_') or name.startswith('NccSlice_'):
+        return False
+    return hasattr(obj, 'Shape') and not obj.Shape.isNull()
+
+
+def getImprintedRegionForSource(source_obj):
+    """Return the final imprinted slice generated from a source object, if any."""
+    if source_obj is None or getattr(source_obj, 'Document', None) is None:
+        return None
+    if isFinalImprintedRegionObject(source_obj):
+        return source_obj
+    exact_name = "{}_slice".format(source_obj.Name)
+    fallback = None
+    for obj in source_obj.Document.Objects:
+        if not isFinalImprintedRegionObject(obj):
+            continue
+        if getattr(obj, 'SourceObject', None) is not source_obj:
+            continue
+        if obj.Name == exact_name:
+            return obj
+        if fallback is None:
+            fallback = obj
+    return fallback
+
+
 def _candidate_container(region_objects):
     parts = [getattr(obj, 'Part', None) for obj in region_objects if getattr(obj, 'Part', None)]
     parts = [part for part in parts if hasattr(part, 'Shape')]
@@ -117,29 +190,198 @@ def _touching_region_key(face, region_objects, tolerance=1e-5):
     return tuple(touching)
 
 
-def generateTouchingFaceRefs(region_objects, tolerance=1e-5):
-    region_shapes = []
+def _shape_refs_for_region(interface_obj, region_name, tolerance=1e-5):
+    region_objects = [
+        obj for obj in interface_obj.RegionObjects
+        if getRegionName(obj) == region_name
+    ]
+    region_shapes = [getRegionShape(obj) for obj in region_objects if getRegionShape(obj) is not None]
+    if not region_objects or not region_shapes:
+        return interface_obj.ShapeRefs
+
+    direct_ref_objects = set()
     for obj in region_objects:
-        shape = getRegionShape(obj)
-        if shape is not None:
-            region_shapes.append((getRegionName(obj), shape))
-    if len(region_shapes) < 2:
+        if hasattr(obj, 'Shape'):
+            direct_ref_objects.add(obj)
+        part_obj = getattr(obj, 'Part', None)
+        if part_obj is not None and hasattr(part_obj, 'Shape'):
+            direct_ref_objects.add(part_obj)
+
+    direct_refs = [
+        (ref_obj, subnames)
+        for ref_obj, subnames in interface_obj.ShapeRefs
+        if ref_obj in direct_ref_objects
+    ]
+    if direct_refs:
+        return direct_refs
+
+    region_refs = []
+    for ref_obj, subnames in interface_obj.ShapeRefs:
+        matched_subnames = []
+        for subname in subnames:
+            try:
+                face = ref_obj.Shape.getElement(subname)
+            except Exception:
+                continue
+            if any(_face_touches_shape(face, shape, tolerance) for shape in region_shapes):
+                matched_subnames.append(subname)
+        if matched_subnames:
+            region_refs.append((ref_obj, tuple(matched_subnames)))
+
+    return region_refs if region_refs else interface_obj.ShapeRefs
+
+
+def _decode_interface_pairs(interface_obj):
+    pairs = []
+    for entry in getattr(interface_obj, 'InterfacePairs', []):
+        try:
+            pair = json.loads(entry)
+        except Exception:
+            continue
+        required = {'region_a', 'object_a', 'face_a', 'region_b', 'object_b', 'face_b'}
+        if required.issubset(pair):
+            if pair.get('thermal_type') not in THERMAL_BOUNDARY_TYPES:
+                pair['thermal_type'] = "zeroGradient"
+            if 'thermal_value' not in pair:
+                pair['thermal_value'] = defaultThermalValue(interface_obj, pair['thermal_type'])
+            pairs.append(pair)
+    return pairs
+
+
+def encodeInterfacePair(pair):
+    return json.dumps(pair, sort_keys=True)
+
+
+def makeInterfacePair(region_a, object_a, face_a, region_b, object_b, face_b,
+                      thermal_type="zeroGradient", thermal_value=""):
+    if thermal_type not in THERMAL_BOUNDARY_TYPES:
+        thermal_type = "zeroGradient"
+    return encodeInterfacePair({
+        'region_a': region_a,
+        'object_a': object_a.Name,
+        'face_a': face_a,
+        'region_b': region_b,
+        'object_b': object_b.Name,
+        'face_b': face_b,
+        'thermal_type': thermal_type,
+        'thermal_value': thermal_value,
+    })
+
+
+def updateInterfacePairThermalType(interface_obj, pair_index, thermal_type):
+    if thermal_type not in THERMAL_BOUNDARY_TYPES:
+        thermal_type = "zeroGradient"
+    pairs = _decode_interface_pairs(interface_obj)
+    if pair_index < 0 or pair_index >= len(pairs):
+        return False
+    old_field = THERMAL_VALUE_FIELDS.get(pairs[pair_index].get('thermal_type'))
+    new_field = THERMAL_VALUE_FIELDS.get(thermal_type)
+    pairs[pair_index]['thermal_type'] = thermal_type
+    if not new_field:
+        pairs[pair_index]['thermal_value'] = ""
+    elif old_field != new_field or not pairs[pair_index].get('thermal_value', ''):
+        pairs[pair_index]['thermal_value'] = defaultThermalValue(interface_obj, thermal_type)
+    interface_obj.InterfacePairs = [encodeInterfacePair(pair) for pair in pairs]
+    return True
+
+
+def _paired_shape_refs_for_region_partner(interface_obj, region_name, partner_name):
+    doc = interface_obj.Document
+    refs_by_object = {}
+    for pair in _decode_interface_pairs(interface_obj):
+        if pair['region_a'] == region_name and pair['region_b'] == partner_name:
+            obj_name = pair['object_a']
+            face_name = pair['face_a']
+        elif pair['region_b'] == region_name and pair['region_a'] == partner_name:
+            obj_name = pair['object_b']
+            face_name = pair['face_b']
+        else:
+            continue
+        ref_obj = doc.getObject(obj_name)
+        if ref_obj is None:
+            continue
+        refs_by_object.setdefault(ref_obj, []).append(face_name)
+    return [(ref_obj, tuple(face_names)) for ref_obj, face_names in refs_by_object.items()]
+
+
+def _shape_refs_for_pair_side(interface_obj, pair, region_name):
+    doc = interface_obj.Document
+    if pair['region_a'] == region_name:
+        ref_obj = doc.getObject(pair['object_a'])
+        face_name = pair['face_a']
+    elif pair['region_b'] == region_name:
+        ref_obj = doc.getObject(pair['object_b'])
+        face_name = pair['face_b']
+    else:
+        return []
+    if ref_obj is None:
+        return []
+    if not face_name:
+        return []
+    return [(ref_obj, (face_name,))]
+
+
+def _face_overlap_fraction(face_a, face_b):
+    area_a = abs(getattr(face_a, 'Area', 0.0))
+    area_b = abs(getattr(face_b, 'Area', 0.0))
+    if area_a <= 0 or area_b <= 0:
+        return 0.0
+    try:
+        return abs(face_a.common(face_b).Area) / min(area_a, area_b)
+    except Exception:
+        return 0.0
+
+
+def _faces_are_paired(face_a, face_b, tolerance=1e-5, overlap_threshold=0.5):
+    try:
+        if face_a.distToShape(face_b)[0] > tolerance:
+            return False
+    except Exception:
+        return False
+    return _face_overlap_fraction(face_a, face_b) > overlap_threshold
+
+
+def generatePairedTouchingFaceData(region_objects, tolerance=1e-5):
+    """Return shape refs and explicit face pairs for touching generated regions."""
+    valid_region_objects = [obj for obj in region_objects if getRegionShape(obj) is not None]
+    if len(valid_region_objects) < 2:
         raise ValueError("At least two region objects with valid shapes are required")
 
-    container = _candidate_container(region_objects)
-    if container is None or not hasattr(container, 'Shape'):
-        raise ValueError("Could not find a BooleanFragments object from the selected regions")
+    refs_by_object = {}
+    interface_pairs = []
+    for i, obj_a in enumerate(valid_region_objects):
+        shape_a = getRegionShape(obj_a)
+        for obj_b in valid_region_objects[i + 1:]:
+            shape_b = getRegionShape(obj_b)
+            for face_id_a, face_a in enumerate(shape_a.Faces, 1):
+                for face_id_b, face_b in enumerate(shape_b.Faces, 1):
+                    if not _faces_are_paired(face_a, face_b, tolerance):
+                        continue
+                    face_name_a = "Face{}".format(face_id_a)
+                    face_name_b = "Face{}".format(face_id_b)
+                    refs_by_object.setdefault(obj_a, set()).add(face_name_a)
+                    refs_by_object.setdefault(obj_b, set()).add(face_name_b)
+                    interface_pairs.append(makeInterfacePair(
+                        getRegionName(obj_a),
+                        obj_a,
+                        face_name_a,
+                        getRegionName(obj_b),
+                        obj_b,
+                        face_name_b,
+                    ))
 
-    face_names = []
-    for face_id, face in enumerate(container.Shape.Faces, 1):
-        touched = [region_name for region_name, shape in region_shapes
-                   if _face_touches_shape(face, shape, tolerance)]
-        if len(touched) >= 2:
-            face_names.append("Face{}".format(face_id))
+    if not interface_pairs:
+        raise ValueError("No paired touching faces were found between the selected regions")
+    shape_refs = [
+        (ref_obj, tuple(sorted(face_names, key=lambda name: int(name[4:]))))
+        for ref_obj, face_names in refs_by_object.items()
+    ]
+    return shape_refs, interface_pairs
 
-    if not face_names:
-        raise ValueError("No touching BooleanFragments faces were found for the selected regions")
-    return container, tuple(face_names)
+
+def generateTouchingFaceRefs(region_objects, tolerance=1e-5):
+    shape_refs, _interface_pairs = generatePairedTouchingFaceData(region_objects, tolerance)
+    return shape_refs
 
 
 def makeCfdRegionCoupledInterface(name="RegionCoupledInterface"):
@@ -193,7 +435,7 @@ class CfdRegionCoupledInterface:
             "App::PropertyLinkSubListGlobal",
             "Region-coupled interface",
             QT_TRANSLATE_NOOP("App::Property",
-                              "Shared/generated BooleanFragments interface faces"),
+                              "Paired generated region interface faces"),
         )
         addObjectProperty(
             obj,
@@ -212,6 +454,15 @@ class CfdRegionCoupledInterface:
             "Region-coupled interface",
             QT_TRANSLATE_NOOP("App::Property",
                               "Mesh or material objects participating in this interface"),
+        )
+        addObjectProperty(
+            obj,
+            "InterfacePairs",
+            [],
+            "App::PropertyStringList",
+            "Region-coupled interface",
+            QT_TRANSLATE_NOOP("App::Property",
+                              "JSON encoded paired interface faces between generated regions"),
         )
         if addObjectProperty(
             obj,
@@ -302,11 +553,48 @@ class CfdRegionCoupledInterface:
         region_names = [r for r in obj.RegionNames if r]
         if len(region_names) < 2:
             return []
+        interface_pairs = _decode_interface_pairs(obj)
         generated = []
+        if interface_pairs:
+            for pair_index, pair in enumerate(interface_pairs, 1):
+                if pair['region_a'] not in region_names or pair['region_b'] not in region_names:
+                    continue
+                for region_name, partner_name, face_name in (
+                    (pair['region_a'], pair['region_b'], pair['face_a']),
+                    (pair['region_b'], pair['region_a'], pair['face_b']),
+                ):
+                    shape_refs = _shape_refs_for_pair_side(obj, pair, region_name)
+                    if not shape_refs:
+                        continue
+                    label = "{}_{}_to_{}_{}".format(
+                        _safe_label(obj.Label),
+                        _safe_label(region_name),
+                        _safe_label(partner_name),
+                        _safe_label(face_name),
+                    )
+                    generated.append(_GeneratedRegionCoupledBoundary(
+                        obj,
+                        label,
+                        region_name,
+                        [partner_name],
+                        shape_refs,
+                        pair['thermal_type'],
+                        pair.get('thermal_value', defaultThermalValue(obj, pair['thermal_type'])),
+                    ))
+            return generated
+
         for i, region_name in enumerate(region_names):
             partner_names = region_names[:i] + region_names[i + 1:]
             label = "{}_{}".format(_safe_label(obj.Label), _safe_label(region_name))
-            generated.append(_GeneratedRegionCoupledBoundary(obj, label, region_name, partner_names))
+            generated.append(_GeneratedRegionCoupledBoundary(
+                obj,
+                label,
+                region_name,
+                partner_names,
+                _shape_refs_for_region(obj, region_name),
+                obj.ThermalBoundaryType,
+                defaultThermalValue(obj, obj.ThermalBoundaryType),
+            ))
         return generated
 
     def __getstate__(self):
@@ -325,16 +613,28 @@ class CfdRegionCoupledInterface:
 class _GeneratedRegionCoupledBoundary:
     """Boundary-like adapter consumed by the existing OpenFOAM case writer."""
 
-    def __init__(self, interface_obj, label, region_name, partner_names):
+    def __init__(self, interface_obj, label, region_name, partner_names, shape_refs,
+                 thermal_boundary_type, thermal_value):
         self.InterfaceObject = interface_obj
         self.Name = "{}_{}".format(interface_obj.Name, _safe_label(region_name))
         self.Label = label
-        self.ShapeRefs = interface_obj.ShapeRefs
+        self.ShapeRefs = shape_refs
         self.RegionName = region_name
         self.PartnerRegionNames = partner_names
         self.BoundaryType = "wall"
         self.BoundarySubType = "regionCoupledWall"
-        self.ThermalBoundaryType = interface_obj.ThermalBoundaryType
+        self.ThermalBoundaryType = thermal_boundary_type
+        self.ThermalValue = thermal_value
+        self.Temperature = interface_obj.Temperature
+        self.HeatFlux = interface_obj.HeatFlux
+        self.Power = interface_obj.Power
+        self.HeatTransferCoeff = interface_obj.HeatTransferCoeff
+        value_field = THERMAL_VALUE_FIELDS.get(thermal_boundary_type)
+        if value_field and thermal_value:
+            try:
+                setattr(self, value_field, FreeCAD.Units.Quantity(thermal_value))
+            except Exception:
+                setattr(self, value_field, thermal_value)
         self.DefaultBoundary = False
 
     def toDict(self):
@@ -360,10 +660,10 @@ class _GeneratedRegionCoupledBoundary:
             'TurbulenceIntensityPercentage': 1.0,
             'TurbulenceInletSpecification': 'intensityAndLengthScale',
             'TurbulenceLengthScale': FreeCAD.Units.Quantity('1 mm'),
-            'Temperature': self.InterfaceObject.Temperature,
-            'HeatFlux': self.InterfaceObject.HeatFlux,
-            'Power': self.InterfaceObject.Power,
-            'HeatTransferCoeff': self.InterfaceObject.HeatTransferCoeff,
+            'Temperature': self.Temperature,
+            'HeatFlux': self.HeatFlux,
+            'Power': self.Power,
+            'HeatTransferCoeff': self.HeatTransferCoeff,
             'ShapeRefs': self.ShapeRefs,
         }
 

@@ -1,82 +1,95 @@
+import FreeCAD as App
+
 from CfdOF import CfdTools
 from CfdOF.Mesh import CfdMesh
+from CfdOF.Solve import CfdImprintedNccRegions
+from CfdOF.Solve import CfdRegionCoupledInterface
 
 
-def close_to(value, target, tol=1e-6):
-    return abs(value - target) <= tol
+def generated_regions_by_source_name():
+    regions = {}
+    for obj in App.ActiveDocument.Objects:
+        if getattr(obj, "GeneratedBy", "") != CfdImprintedNccRegions.GENERATED_BY:
+            continue
+        source = getattr(obj, "SourceObject", None)
+        if source is not None and obj.Name != "NccImprintTopology":
+            regions[source.Name] = obj
+    return regions
 
 
-def solid_name(predicate, description):
-    solids = App.ActiveDocument.BooleanFragments.Shape.Solids
-    matches = [i for i, solid in enumerate(solids, 1) if predicate(solid.BoundBox)]
-    if len(matches) != 1:
-        raise RuntimeError("Expected one {} solid, found {}".format(description, len(matches)))
-    return "Solid{}".format(matches[0])
-
-
-def region_solid_names():
-    solids = App.ActiveDocument.BooleanFragments.Shape.Solids
-    fluid_index = max(range(1, len(solids) + 1), key=lambda i: solids[i - 1].Volume)
-    return {
-        "FluidProperties001": "Solid{}".format(fluid_index),
-        "heat_sink_volume001": solid_name(
-            lambda bb: close_to(bb.XMin, 135) and close_to(bb.XMax, 165)
-            and close_to(bb.YMin, 135) and close_to(bb.YMax, 165)
-            and close_to(bb.ZMin, 12) and close_to(bb.ZMax, 24),
-            "heat sink",
-        ),
-        "PCB_volume001": solid_name(
-            lambda bb: close_to(bb.XMin, 100) and close_to(bb.XMax, 200)
-            and close_to(bb.YMin, 100) and close_to(bb.YMax, 200)
-            and close_to(bb.ZMin, 10) and close_to(bb.ZMax, 11),
-            "PCB",
-        ),
-        "hot_microchip_volume001": solid_name(
-            lambda bb: close_to(bb.XMin, 135) and close_to(bb.XMax, 165)
-            and close_to(bb.YMin, 135) and close_to(bb.YMax, 165)
-            and close_to(bb.ZMin, 11) and close_to(bb.ZMax, 12),
-            "microchip",
-        ),
-        "Polypropylene_solid001": solid_name(
-            lambda bb: close_to(bb.XMin, 135) and close_to(bb.XMax, 165)
-            and close_to(bb.YMin, 135) and close_to(bb.YMax, 165)
-            and close_to(bb.ZMin, 24) and close_to(bb.ZMax, 34),
-            "fan case",
-        ),
-    }
-
-
-def add_mesh(name, region_name, region_type, case_name, part_sub_shape):
-    CfdMesh.makeCfdMesh(name)
-    mesh = App.ActiveDocument.ActiveObject
-    mesh.Label = name + "001"
-    mesh.Part = App.ActiveDocument.BooleanFragments
-    mesh.PartSubShape = part_sub_shape
+def add_mesh(name, region_obj, region_name, region_type, case_name):
+    mesh = CfdMesh.makeCfdMesh(name)
+    mesh.Label = name
+    mesh.Part = region_obj
+    mesh.PartSubShape = ""
     mesh.RegionName = region_name
     mesh.RegionType = region_type
     mesh.CaseName = case_name
     CfdTools.getActiveAnalysis().addObject(mesh)
-    mesh.CharacteristicLengthMax = "3 mm"
+    mesh.CharacteristicLengthMax = "3.94 mm"
     mesh.MeshUtility = "gmsh"
     mesh.ElementDimension = "3D"
     mesh.CellsBetweenLevels = 3
     mesh.EdgeRefinement = 1.0
     mesh.PointInMesh = {"x": "0 m", "y": "0 m", "z": "0 m"}
     mesh.NumberOfProcesses = 1
+    mesh.NumberOfThreads = 0
+    mesh.ImplicitEdgeDetection = False
+    mesh.ConvertToDualMesh = False
+    mesh.STLAngularMeshDensity = 100.0
+    mesh.STLRelativeLinearDeflection = 0.001
     return mesh
 
 
-solid_names = region_solid_names()
+source_objects = [
+    App.ActiveDocument.Box,
+    App.ActiveDocument.Box001,
+    App.ActiveDocument.Box002,
+    App.ActiveDocument.Body,
+    App.ActiveDocument.Fusion,
+]
+_group, _regions, interface = CfdImprintedNccRegions.createImprintedNccRegions(source_objects)
 
-add_mesh("Fluid_Mesh", "FluidProperties001", "fluid",
-         "meshCaseMicrochipCoolingNccFluid", solid_names["FluidProperties001"])
-add_mesh("HeatSink_Mesh", "heat_sink_volume001", "solid",
-         "meshCaseMicrochipCoolingNccHeatSink", solid_names["heat_sink_volume001"])
-add_mesh("PCB_Mesh", "PCB_volume001", "solid",
-         "meshCaseMicrochipCoolingNccPCB", solid_names["PCB_volume001"])
-add_mesh("Microchip_Mesh", "hot_microchip_volume001", "solid",
-         "meshCaseMicrochipCoolingNccMicrochip", solid_names["hot_microchip_volume001"])
-add_mesh("FanCase_Mesh", "Polypropylene_solid001", "solid",
-         "meshCaseMicrochipCoolingNccFanCase", solid_names["Polypropylene_solid001"])
+regions = generated_regions_by_source_name()
+region_names = {
+    "Box": "FluidProperties001",
+    "Box001": "PCB",
+    "Box002": "microchip",
+    "Body": "fan case",
+    "Fusion": "heat_sink",
+}
+for source_name, region_name in region_names.items():
+    regions[source_name].RegionName = region_name
+    regions[source_name].Label = "{}_imprinted".format(region_name)
+
+interface.Label = "RegionCoupledInterface001"
+interface.RegionObjects = [
+    regions["Box001"],
+    regions["Box002"],
+    regions["Body"],
+    regions["Fusion"],
+]
+interface.RegionNames = [
+    regions["Box001"].RegionName,
+    regions["Box002"].RegionName,
+    regions["Body"].RegionName,
+    regions["Fusion"].RegionName,
+]
+interface.ThermalBoundaryType = "zeroGradient"
+interface.Temperature = "293 K"
+interface.ShapeRefs, interface.InterfacePairs = CfdRegionCoupledInterface.generatePairedTouchingFaceData(
+    interface.RegionObjects
+)
+
+add_mesh("Fluid_Mesh", regions["Box"], "FluidProperties001", "fluid",
+         "meshCaseMicrochipCoolingNccFluid")
+add_mesh("PCB_Mesh", regions["Box001"], "PCB", "solid",
+         "meshCaseMicrochipCoolingNccPCB")
+add_mesh("Microchip_Mesh", regions["Box002"], "microchip", "solid",
+         "meshCaseMicrochipCoolingNccMicrochip")
+add_mesh("FanCase_Mesh", regions["Body"], "fan case", "solid",
+         "meshCaseMicrochipCoolingNccFanCase")
+add_mesh("HeatSink_Mesh", regions["Fusion"], "heat_sink", "solid",
+         "meshCaseMicrochipCoolingNccHeatSink")
 
 App.ActiveDocument.recompute()
