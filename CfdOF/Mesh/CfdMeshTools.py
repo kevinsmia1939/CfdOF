@@ -335,6 +335,8 @@ class CfdMeshTools:
         filter_boundaries_by_region = bool(
             mesh_region_name and analysis_obj and len(CfdTools.getMeshObjects(analysis_obj)) > 1)
         boundary_applies = []
+        seen_region_interface_refs = set()
+        skipped_region_interface_bc_ids = set()
         for bc_id, bc_obj in enumerate(bc_group):
             bc_region_name = getattr(bc_obj, 'RegionName', '')
             applies = not filter_boundaries_by_region or not bc_region_name or bc_region_name == mesh_region_name
@@ -347,6 +349,20 @@ class CfdMeshTools:
                 except RuntimeError as re:
                     raise RuntimeError("Error processing boundary condition {}: {}".format(bc_obj.Label, str(re)))
                 for si, s in enumerate(bf):
+                    if (not filter_boundaries_by_region and
+                            hasattr(bc_obj, 'InterfaceObject') and
+                            ri < len(bc_obj.ShapeRefs) and
+                            si < len(bc_obj.ShapeRefs[ri][1])):
+                        source_ref = bc_obj.ShapeRefs[ri]
+                        interface_ref_key = (
+                            id(bc_obj.InterfaceObject),
+                            source_ref[0].Name,
+                            source_ref[1][si],
+                        )
+                        if interface_ref_key in seen_region_interface_refs:
+                            skipped_region_interface_bc_ids.add(bc_id)
+                            continue
+                        seen_region_interface_refs.add(interface_ref_key)
                     boundary_face_list += [(sf, (bc_id, ri, si)) for sf in s[0].Faces]
 
         # Match them up to faces in the main geometry
@@ -355,6 +371,8 @@ class CfdMeshTools:
         # Check for and filter duplicates
         bc_match_per_shape_face = [-1] * len(mesh_face_list)
         bc_matched = [False] * len(bc_group)
+        for bc_id in skipped_region_interface_bc_ids:
+            bc_matched[bc_id] = True
         for k in range(len(bc_matched_faces)):
             match = bc_matched_faces[k][1]
             prev_k = bc_match_per_shape_face[match]

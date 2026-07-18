@@ -64,7 +64,6 @@ SUBNAMES = [
         translate("Subnames", "Rotating"),
         translate("Subnames", "Translating"),
         translate("Subnames", "Rough"),
-        translate("Subnames", "Region-coupled"),
     ],
     [
         translate("Subnames", "Uniform velocity"),
@@ -85,8 +84,7 @@ SUBNAMES = [
 
 # NOTE: don't translate this
 SUBTYPES = [
-    ["fixedWall", "slipWall", "partialSlipWall", "rotatingWall", "translatingWall", "roughWall",
-     "regionCoupledWall"],
+    ["fixedWall", "slipWall", "partialSlipWall", "rotatingWall", "translatingWall", "roughWall"],
     [
         "uniformVelocityInlet",
         "volumetricFlowRateInlet",
@@ -108,7 +106,6 @@ SUBTYPES_HELPTEXT = [
         translate("Subtypes", "Fixed velocity corresponding to rotation about an axis"),
         translate("Subtypes", "Fixed velocity tangential to wall; zero normal velocity"),
         translate("Subtypes", "Wall roughness function"),
-        translate("Subtypes", "Coupled heat transfer interface between two mesh regions"),
     ],
     [
         translate("Subtypes", "Velocity specified; normal component imposed for reverse flow"),
@@ -150,8 +147,7 @@ BOUNDARY_UI = [[[False, [], False, False, False, True, None, False],  # No slip
                 [True, [2], False, False, False, True, None, False],  # Partial slip
                 [True, [8], False, False, False, True, None, False],  # Rotating wall
                 [True, [0], False, False, False, True, None, False],  # Translating wall
-                [True, [0, 6], False, False, False, True, None, False],  # Rough
-                [False, [], False, False, False, True, None, False]],  # Region-coupled
+                [True, [0, 6], False, False, False, True, None, False]],  # Rough
                [[True, [0, 1], True, True, True, True, [2], False],  # Velocity
                 [True, [3], False, True, True, True, [2], False],  # Vol flow rate
                 [True, [4], False, True, True, True, [2], False],  # Mass Flow rate

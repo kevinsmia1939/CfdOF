@@ -553,6 +553,359 @@ class SimpleHeatFinTest(unittest.TestCase, MacroTest):
         self.closeDoc()
 
 
+class MicrochipCoolingNccMacroWorkflowTest(unittest.TestCase):
+    __dir_name = os.path.join('ConjugatedHeatTransferSteadyState', 'microchip_cooling_ncc')
+    __case_name = 'MicrochipCoolingNccMacroWorkflow'
+    __macros = ['01-geometry.FCMacro', '02-analysis.FCMacro', '03-meshes.FCMacro', '04-boundaries.FCMacro',
+                '05-solidMaterials.FCMacro', '06-meanVelocityForce.FCMacro']
+
+    def test_run(self):
+        prefs = CfdTools.getPreferencesLocation()
+        original_append_setting = FreeCAD.ParamGet(prefs).GetBool("AppendDocNameToOutputPath", 0)
+        FreeCAD.ParamGet(prefs).SetBool("AppendDocNameToOutputPath", 0)
+
+        original_warning = CfdTools.cfdWarning
+        original_case_message = CfdCaseWriterFoam.cfdMessage
+        warnings = []
+        case_messages = []
+
+        def capture_warning(message):
+            warnings.append(str(message))
+            original_warning(message)
+
+        def capture_case_message(message):
+            case_messages.append(str(message))
+            original_case_message(message)
+
+        CfdTools.cfdWarning = capture_warning
+        CfdCaseWriterFoam.cfdMessage = capture_case_message
+        try:
+            fccPrint('--------------- Start of CFD tests ---------------')
+            for m in self.__class__.__macros:
+                macro_name = os.path.join(home_path, "Demos", self.__class__.__dir_name, m)
+                fccPrint('Running {} macro {} ...'.format(self.__class__.__dir_name, macro_name))
+                CfdTools.executeMacro(macro_name)
+
+            analysis = CfdTools.getActiveAnalysis()
+            self.assertIsNotNone(analysis, "CfdTest of microchip NCC active analysis failed")
+            analysis.OutputPath = temp_dir
+
+            meshes = CfdTools.getMeshObjects(analysis)
+            self.assertEqual(len(meshes), 5, "Microchip NCC user workflow should generate one mesh per region")
+            expected_mesh_regions = {
+                "FluidProperties001": "fluid",
+                "PCB": "solid",
+                "microchip": "solid",
+                "fan case": "solid",
+                "heat_sink": "solid",
+            }
+            self.assertEqual(
+                {getattr(mesh, 'RegionName', ''): getattr(mesh, 'RegionType', '') for mesh in meshes},
+                expected_mesh_regions,
+            )
+            self.assertEqual(
+                {mesh.Part.Name for mesh in meshes},
+                {"Box_slice", "Box001_slice", "Box002_slice", "Body_slice", "Fusion_slice"},
+            )
+            for mesh in meshes:
+                self.assertNotEqual(mesh.Part.Name, "BooleanFragments")
+                self.assertEqual(getattr(mesh.Part, 'GeneratedBy', ''), "CfdOF_ImprintedNccRegions")
+                self.assertTrue(mesh.Part.Shape.Solids)
+
+            interfaces = CfdTools.getRegionCoupledInterfaceGroup(analysis)
+            self.assertEqual(len(interfaces), 1, "Microchip NCC workflow should expose one interface object")
+            self.assertTrue(interfaces[0].ShapeRefs, "Microchip NCC interface has no generated face refs")
+            self.assertTrue(interfaces[0].InterfacePairs, "Microchip NCC interface has no paired face metadata")
+
+            solver = CfdTools.getSolver(analysis)
+            solver.InputCaseName = "case" + self.__class__.__case_name
+
+            fccPrint('Writing {} mesh files ...'.format(self.__class__.__dir_name))
+            for mesh in meshes:
+                meshwriter = CfdMeshTools.CfdMeshTools(mesh)
+                meshwriter.writeMesh()
+
+            fccPrint('Writing {} case files ...'.format(self.__class__.__dir_name))
+            writer = CfdCaseWriterFoam.CfdCaseWriterFoam(analysis)
+            writer.writeCase()
+            self.assertTrue(writer, "CfdTest of microchip NCC case writer failed")
+
+            create_patch_dict = os.path.join(writer.case_folder, "system", "createPatchDict")
+            self.assertTrue(os.path.exists(create_patch_dict), "createPatchDict was not written")
+            with open(create_patch_dict, 'r') as patch_file:
+                create_patch_text = patch_file.read()
+            for patch_name in [
+                "RegionCoupledInterface001_PCB_to_microchip",
+                "RegionCoupledInterface001_microchip_to_PCB",
+            ]:
+                self.assertIn(patch_name, create_patch_text)
+
+            region_properties = os.path.join(writer.case_folder, "constant", "regionProperties")
+            self.assertTrue(os.path.exists(region_properties), "regionProperties was not written")
+            with open(region_properties, 'r') as region_file:
+                region_text = region_file.read()
+            for region_name in [
+                "FluidProperties001",
+                "PCB",
+                "microchip",
+                "fan case",
+                "heat_sink",
+            ]:
+                self.assertIn(region_name, region_text)
+
+            conflict_warnings = [
+                w for w in warnings
+                if "also assigned as boundary" in w or
+                "ignoring duplicate" in w or
+                "No part of the boundary" in w
+            ]
+            self.assertEqual(conflict_warnings, [])
+            conformality_warnings = [
+                m for m in case_messages
+                if "appears to be enclosed inside fluid body" in m
+            ]
+            self.assertEqual(conformality_warnings, [])
+            fccPrint('--------------- End of CFD tests ---------------')
+        finally:
+            CfdTools.cfdWarning = original_warning
+            CfdCaseWriterFoam.cfdMessage = original_case_message
+            FreeCAD.ParamGet(prefs).SetBool("AppendDocNameToOutputPath", original_append_setting)
+
+    def tearDown(self):
+        if FreeCAD.ActiveDocument is not None:
+            FreeCAD.closeDocument(FreeCAD.ActiveDocument.Name)
+
+
+class ImprintedNccRegionsWorkflowTest(unittest.TestCase):
+    __dir_name = os.path.join('ConjugatedHeatTransferSteadyState', 'simple_heat_fin_ncc')
+    __macros = ['01-geometry.FCMacro', '02-analysis.FCMacro']
+
+    def test_create_imprinted_regions(self):
+        fccPrint('--------------- Start of CFD tests ---------------')
+        for m in self.__class__.__macros:
+            macro_name = os.path.join(home_path, "Demos", self.__class__.__dir_name, m)
+            fccPrint('Running {} macro {} ...'.format(self.__class__.__dir_name, macro_name))
+            CfdTools.executeMacro(macro_name)
+
+        from CfdOF.Solve import CfdImprintedNccRegions
+
+        source_objects = [
+            FreeCAD.ActiveDocument.FluidRegion,
+            FreeCAD.ActiveDocument.SolidRegion,
+        ]
+        group, region_objects, interface = CfdImprintedNccRegions.createImprintedNccRegions(source_objects)
+        analysis = CfdTools.getActiveAnalysis()
+
+        self.assertIsNone(group)
+        self.assertEqual(len(region_objects), 2)
+        self.assertEqual(len(interface.RegionObjects), 2)
+        self.assertTrue(interface.ShapeRefs)
+        self.assertTrue(interface.InterfacePairs)
+        self.assertIn(interface, analysis.Group)
+        for source_obj, region_obj in zip(source_objects, region_objects):
+            self.assertEqual(region_obj.Name, "{}_slice".format(source_obj.Name))
+            self.assertNotIn(region_obj, analysis.Group)
+            self.assertTrue(region_obj.Shape.Solids)
+            self.assertEqual(getattr(region_obj, 'GeneratedBy', ''), CfdImprintedNccRegions.GENERATED_BY)
+            self.assertEqual(region_obj.SourceObject, source_obj)
+            self.assertEqual(getattr(region_obj.Proxy, 'Type', ''), "FeatureSlice")
+            self.assertIsNotNone(region_obj.Base)
+            self.assertTrue(region_obj.Tools)
+            self.assertNotEqual(region_obj.Base, source_obj)
+
+        from CfdOF.Solve import CfdRegionCoupledInterface
+        self.assertEqual(
+            [CfdRegionCoupledInterface.getImprintedRegionForSource(obj) for obj in source_objects],
+            region_objects,
+        )
+        shape_refs, interface_pairs = CfdRegionCoupledInterface.generatePairedTouchingFaceData(
+            [CfdRegionCoupledInterface.getImprintedRegionForSource(obj) for obj in source_objects]
+        )
+        self.assertTrue(shape_refs)
+        self.assertTrue(interface_pairs)
+        self.assertEqual({ref_obj.Name for ref_obj, _subnames in shape_refs},
+                         {region_obj.Name for region_obj in region_objects})
+        decoded_pairs = CfdRegionCoupledInterface._decode_interface_pairs(interface)
+        self.assertTrue(decoded_pairs)
+        self.assertEqual(
+            {pair['thermal_type'] for pair in decoded_pairs},
+            {"zeroGradient"},
+        )
+        for pair_index in range(len(decoded_pairs)):
+            self.assertTrue(CfdRegionCoupledInterface.updateInterfacePairThermalType(
+                interface,
+                pair_index,
+                "fixedValue",
+            ))
+        self.assertEqual(
+            {pair['thermal_value'] for pair in CfdRegionCoupledInterface._decode_interface_pairs(interface)},
+            {str(interface.Temperature)},
+        )
+        generated_boundaries = interface.Proxy.makeBoundaryObjects(interface)
+        self.assertEqual(
+            {boundary.ThermalBoundaryType for boundary in generated_boundaries},
+            {"fixedValue"},
+        )
+        self.assertEqual(
+            {str(boundary.Temperature) for boundary in generated_boundaries},
+            {str(interface.Temperature)},
+        )
+        self.assertEqual(len(generated_boundaries), 2 * len(decoded_pairs))
+        self.assertTrue(CfdRegionCoupledInterface.updateInterfacePairThermalType(
+            interface,
+            0,
+            "fixedGradient",
+        ))
+        self.assertIn(
+            "W/m^2",
+            CfdRegionCoupledInterface._decode_interface_pairs(interface)[0]['thermal_value'],
+        )
+
+        if FreeCAD.GuiUp:
+            interface.RegionObjects = region_objects
+            interface.RegionNames = [getattr(region_obj, 'RegionName', '') for region_obj in region_objects]
+            interface.ShapeRefs = CfdImprintedNccRegions.generateImprintedInterfaceFaceRefs(region_objects)
+            interface.InterfacePairs = interface_pairs
+            from CfdOF.Solve import TaskPanelCfdRegionCoupledInterface
+            task_panel = TaskPanelCfdRegionCoupledInterface.TaskPanelCfdRegionCoupledInterface(interface)
+            self.assertEqual(task_panel.faceTable.columnCount(), 4)
+            self.assertEqual(
+                task_panel.faceTable.cellWidget(0, 2).currentText(),
+                "zeroGradient",
+            )
+            self.assertEqual(task_panel.faceTable.item(0, 3).text(), "")
+            task_panel.faceTable.cellWidget(0, 2).setCurrentIndex(
+                task_panel.faceTable.cellWidget(0, 2).findText("fixedValue")
+            )
+            self.assertEqual(
+                CfdRegionCoupledInterface._decode_interface_pairs(interface)[0]['thermal_type'],
+                "fixedValue",
+            )
+            self.assertEqual(
+                task_panel.faceTable.item(0, 3).text(),
+                str(interface.Temperature),
+            )
+            task_panel.faceTable.item(0, 3).setText("350 K")
+            self.assertEqual(
+                CfdRegionCoupledInterface._decode_interface_pairs(interface)[0]['thermal_value'],
+                "350 K",
+            )
+            self.assertEqual(task_panel.selectFaceButton.text(), "Select face")
+            self.assertEqual(task_panel.removeFaceButton.text(), "Remove face")
+            self.assertEqual(task_panel.addPairButton.text(), "Add pair")
+            self.assertEqual(task_panel.removePairButton.text(), "Remove pair")
+            initial_pair_count = task_panel.faceTable.rowCount()
+            task_panel.addInterfacePair()
+            self.assertEqual(task_panel.faceTable.rowCount(), initial_pair_count + 1)
+            added_row = task_panel.faceTable.rowCount() - 1
+            self.assertTrue(task_panel._setInterfacePairFace(
+                added_row,
+                0,
+                region_objects[0],
+                interface.ShapeRefs[0][1][0],
+            ))
+            self.assertTrue(
+                CfdRegionCoupledInterface._decode_interface_pairs(interface)[added_row]['face_a']
+            )
+            task_panel.faceTable.setCurrentCell(added_row, 0)
+            task_panel.removeSelectedInterfaceFaceCell()
+            self.assertEqual(
+                CfdRegionCoupledInterface._decode_interface_pairs(interface)[added_row]['face_a'],
+                '',
+            )
+            task_panel.faceTable.selectRow(added_row)
+            task_panel.removeSelectedInterfacePairs()
+            self.assertEqual(task_panel.faceTable.rowCount(), initial_pair_count)
+            self.assertEqual({(ref_obj.Name, subname) for ref_obj, subnames in interface.ShapeRefs
+                              for subname in subnames},
+                             {(pair_obj.Name, face_name)
+                              for pair_entry in CfdRegionCoupledInterface._decode_interface_pairs(interface)
+                              for pair_obj, face_name in (
+                                  (interface.Document.getObject(pair_entry['object_a']), pair_entry['face_a']),
+                                  (interface.Document.getObject(pair_entry['object_b']), pair_entry['face_b']),
+                              )})
+            task_panel.form.close()
+
+            interface.RegionObjects = source_objects
+            interface.RegionNames = [source_obj.Label for source_obj in source_objects]
+            interface.ShapeRefs = [(source_objects[0], ("Face1",))]
+            interface.InterfacePairs = []
+            task_panel = TaskPanelCfdRegionCoupledInterface.TaskPanelCfdRegionCoupledInterface(interface)
+            self.assertEqual(list(interface.RegionObjects), region_objects)
+            self.assertEqual({ref_obj.Name for ref_obj, _subnames in interface.ShapeRefs},
+                             {region_obj.Name for region_obj in region_objects})
+            self.assertTrue(interface.InterfacePairs)
+            task_panel.form.close()
+
+        fccPrint('--------------- End of CFD tests ---------------')
+
+    def test_touching_pair_order_drives_slice_chain(self):
+        fccPrint('--------------- Start of CFD tests ---------------')
+        for m in self.__class__.__macros:
+            macro_name = os.path.join(home_path, "Demos", self.__class__.__dir_name, m)
+            fccPrint('Running {} macro {} ...'.format(self.__class__.__dir_name, macro_name))
+            CfdTools.executeMacro(macro_name)
+
+        from CfdOF.Solve import CfdImprintedNccRegions
+        import Part
+
+        doc = FreeCAD.ActiveDocument
+        cube = doc.addObject("Part::Feature", "TouchCube")
+        cube.Shape = Part.makeBox(10, 10, 10)
+        cylinder = doc.addObject("Part::Feature", "TouchCylinder")
+        cylinder.Shape = Part.makeCylinder(5, 10, FreeCAD.Vector(10, 5, 0), FreeCAD.Vector(1, 0, 0))
+        cone = doc.addObject("Part::Feature", "TouchCone")
+        cone.Shape = Part.makeCone(5, 0, 10, FreeCAD.Vector(20, 5, 0), FreeCAD.Vector(1, 0, 0))
+        doc.recompute()
+
+        source_objects = [cube, cylinder, cone]
+        touching_pairs = CfdImprintedNccRegions.findTouchingShapePairs(source_objects)
+        self.assertEqual(
+            [(a.Name, b.Name) for a, b in touching_pairs],
+            [("TouchCube", "TouchCylinder"), ("TouchCylinder", "TouchCone")],
+        )
+
+        _group, region_objects, _interface = CfdImprintedNccRegions.createImprintedNccRegions(source_objects)
+        regions = {region.SourceObject.Name: region for region in region_objects}
+        self.assertTrue(_interface.InterfacePairs)
+
+        def generated_slice_depth(obj):
+            depth = 0
+            while getattr(getattr(obj, 'Proxy', None), 'Type', '') == "FeatureSlice":
+                depth += 1
+                obj = obj.Base
+            return depth
+
+        self.assertEqual(generated_slice_depth(regions["TouchCube"]), 1)
+        self.assertEqual(generated_slice_depth(regions["TouchCylinder"]), 2)
+        self.assertEqual(generated_slice_depth(regions["TouchCone"]), 1)
+        self.assertFalse(any(
+            getattr(obj, 'GeneratedBy', '') == CfdImprintedNccRegions.GENERATED_BY
+            and getattr(obj, 'TypeId', '') == 'App::Link'
+            for obj in doc.Objects
+        ))
+        generated_clones = [
+            obj for obj in doc.Objects
+            if getattr(obj, 'GeneratedBy', '') == CfdImprintedNccRegions.GENERATED_BY
+            and obj.Name.startswith("NccSourceClone_")
+        ]
+        self.assertEqual(len(generated_clones), 3)
+        for source_obj in source_objects:
+            self.assertIsNotNone(doc.getObject("NccSourceClone_{}".format(source_obj.Name)))
+
+        from CfdOF.Solve import CfdRegionCoupledInterface
+        shape_refs, interface_pairs = CfdRegionCoupledInterface.generatePairedTouchingFaceData(region_objects)
+        self.assertTrue(shape_refs)
+        self.assertTrue(interface_pairs)
+        self.assertNotIn("BooleanFragments", [ref_obj.Name for ref_obj, _subnames in shape_refs])
+
+        fccPrint('--------------- End of CFD tests ---------------')
+
+    def tearDown(self):
+        if FreeCAD.ActiveDocument is not None:
+            FreeCAD.closeDocument(FreeCAD.ActiveDocument.Name)
+
+
 def compareInpFiles(file_name1, file_name2):
     file1 = open(file_name1, 'r')
     f1 = file1.readlines()

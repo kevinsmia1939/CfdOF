@@ -1,13 +1,6 @@
-from CfdOF import CfdTools
-from CfdOF.Solve import CfdMeanVelocityForce
+import FreeCAD as App
 
-force = CfdMeanVelocityForce.makeCfdMeanVelocityForce()
-CfdTools.getActiveAnalysis().addObject(force)
-force.Label = "MeanVelocityForce001"
-force.SelectionMode = "cellZone"
-force.CellZoneShapeNames = ["Cylinder"]
-force.CellZoneCylinderSpecs = ["Cylinder,13,8,150,150,26"]
-force.Direction = App.Vector(0, 0, 1)
-force.Ubar = App.Vector(0, 0, 0.2)
-force.Relaxation = 0.05
+# The source document /home/kevin/Desktop/microchip_cooling_ncc.FCStd does not
+# contain a mean-velocity-force object. This file is kept as a no-op so older
+# demo runners that expect step 06 continue to work.
 App.ActiveDocument.recompute()

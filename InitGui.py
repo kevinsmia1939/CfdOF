@@ -65,6 +65,7 @@ class CfdOFWorkbench(Workbench):
         import CfdOF.Solve.CfdInitialiseFlowField
         import CfdOF.Solve.CfdFluidBoundary
         import CfdOF.Solve.CfdRegionCoupledInterface
+        import CfdOF.Solve.CfdImprintedNccRegions
         import CfdOF.Solve.CfdZone
         import CfdOF.Mesh.CfdDynamicMeshRefinement
         import CfdOF.PostProcess.CfdReportingFunction
@@ -113,6 +114,7 @@ class CfdOFWorkbench(Workbench):
                   ('T', 'CfdOF_GroupDynamicMeshRefinement',),
                   'CfdOF_PhysicsModel', 'CfdOF_FluidMaterial', 'CfdOF_SolidMaterial',
                   'CfdOF_FluidBoundary', 'CfdOF_RegionCoupledInterface',
+                  'CfdOF_ImprintedNccRegions',
                   'CfdOF_InitialiseInternal',
                   'CfdOF_InitialisationZone', 'CfdOF_PorousZone', 'CfdOF_MeanVelocityForce',
                   'CfdOF_ReportingFunctions', 'CfdOF_ScalarTransportFunctions',

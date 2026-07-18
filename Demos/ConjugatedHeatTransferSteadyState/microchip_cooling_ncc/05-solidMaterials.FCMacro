@@ -1,68 +1,53 @@
+import FreeCAD as App
+
 from CfdOF import CfdTools
 from CfdOF.Solve import CfdSolidMaterial
+from CfdOF.Solve import CfdImprintedNccRegions
+
+
+def generated_region_for_source(source_name):
+    for obj in App.ActiveDocument.Objects:
+        if getattr(obj, "GeneratedBy", "") != CfdImprintedNccRegions.GENERATED_BY:
+            continue
+        source = getattr(obj, "SourceObject", None)
+        if source is not None and source.Name == source_name and obj.Name != "NccImprintTopology":
+            return obj
+    raise RuntimeError("No generated imprinted region for source '{}'".format(source_name))
+
+
+def add_solid(name, label, region_name, region_obj, material, heat_generation="0 W/m^3"):
+    solid = CfdSolidMaterial.makeCfdSolidMaterial(name)
+    CfdTools.getActiveAnalysis().addObject(solid)
+    solid.Label = label
+    solid.RegionName = region_name
+    solid.Material = material
+    solid.HeatGeneration = heat_generation
+    solid.ShapeRefs = [(region_obj, ("Solid1",))]
+    return solid
+
 
 aluminium = {
     "Author": "AluminiumSolid", "AuthorAndLicense": "",
     "CardName": "AluminiumSolid", "Density": "2699 kg/m^3",
     "Description": "Aluminium solid thermal properties for CHT simulation",
-    "License": "", "Name": "Aluminium_solid", "ReferenceSource": "",
+    "License": "", "Name": "Aluminium_solid",
+    "ReferenceSource": "https://www.matweb.com/search/DataSheet.aspx?MatGUID=0cd1edf33ac145ee93a0aa6fc666c0e0",
     "SourceURL": "", "SpecificHeat": "897 J/kg/K",
     "ThermalConductivity": "237 W/m/K", "Type": "Solid",
 }
 
-
-def close_to(value, target, tol=1e-6):
-    return abs(value - target) <= tol
-
-
-def solid_name(predicate, description):
-    solids = App.ActiveDocument.BooleanFragments.Shape.Solids
-    matches = [i for i, solid in enumerate(solids, 1) if predicate(solid.BoundBox)]
-    if len(matches) != 1:
-        raise RuntimeError("Expected one {} solid, found {}".format(description, len(matches)))
-    return "Solid{}".format(matches[0])
-
-
-def add_solid(name, label, solid_ref, material, heat_generation="0 W/m^3"):
-    solid = CfdSolidMaterial.makeCfdSolidMaterial(name)
-    CfdTools.getActiveAnalysis().addObject(solid)
-    solid.Label = label
-    solid.RegionName = label
-    solid.Material = material
-    solid.HeatGeneration = heat_generation
-    solid.ShapeRefs = [(App.ActiveDocument.BooleanFragments, (solid_ref,))]
-    return solid
-
-
-add_solid("SolidProperties", "heat_sink_volume001",
-          solid_name(
-              lambda bb: close_to(bb.XMin, 135) and close_to(bb.XMax, 165)
-              and close_to(bb.YMin, 135) and close_to(bb.YMax, 165)
-              and close_to(bb.ZMin, 12) and close_to(bb.ZMax, 24),
-              "heat sink",
-          ), aluminium)
-add_solid("SolidProperties", "PCB_volume001", solid_name(
-    lambda bb: close_to(bb.XMin, 100) and close_to(bb.XMax, 200)
-    and close_to(bb.YMin, 100) and close_to(bb.YMax, 200)
-    and close_to(bb.ZMin, 10) and close_to(bb.ZMax, 11),
-    "PCB",
-), {
-    "Density": "1.1e-06 kg/mm^3", "Description": "User-entered properties",
-    "Name": "Custom", "SpecificHeat": "200000000.0 mm^2/(s^2*K)",
-    "ThermalConductivity": "200.0 mm*kg/(s^3*K)", "Type": "Solid",
+add_solid("SolidProperties", "SolidProperties", "heat_sink",
+          generated_region_for_source("Fusion"), aluminium)
+add_solid("SolidProperties", "Acrylic_solid", "PCB", generated_region_for_source("Box001"), {
+    "Author": "AcrylicSolid", "AuthorAndLicense": "",
+    "CardName": "AcrylicSolid", "Density": "1180 kg/m^3",
+    "Description": "Acrylic PMMA solid thermal properties", "License": "",
+    "Name": "Acrylic_solid",
+    "ReferenceSource": "https://www.matweb.com/search/DataSheet.aspx?MatGUID=a5e93a1f1fff43bcbac5b6ca51b8981f",
+    "SourceURL": "", "SpecificHeat": "1500 J/kg/K",
+    "ThermalConductivity": "0.189 W/m/K", "Type": "Solid",
 })
-add_solid("SolidProperties", "hot_microchip_volume001", solid_name(
-    lambda bb: close_to(bb.XMin, 135) and close_to(bb.XMax, 165)
-    and close_to(bb.YMin, 135) and close_to(bb.YMax, 165)
-    and close_to(bb.ZMin, 11) and close_to(bb.ZMax, 12),
-    "microchip",
-), aluminium, "1e+09 W/m^3")
-add_solid("SolidProperties", "Polypropylene_solid001", solid_name(
-    lambda bb: close_to(bb.XMin, 135) and close_to(bb.XMax, 165)
-    and close_to(bb.YMin, 135) and close_to(bb.YMax, 165)
-    and close_to(bb.ZMin, 24) and close_to(bb.ZMax, 34),
-    "fan case",
-), {
+add_solid("SolidProperties", "Polypropylene_solid", "fan case", generated_region_for_source("Body"), {
     "Author": "PolypropyleneSolid", "AuthorAndLicense": "",
     "CardName": "PolypropyleneSolid", "Density": "918 kg/m^3",
     "Description": "Polypropylene solid thermal properties", "License": "",
@@ -71,4 +56,14 @@ add_solid("SolidProperties", "Polypropylene_solid001", solid_name(
     "SourceURL": "", "SpecificHeat": "1920 J/kg/K",
     "ThermalConductivity": "0.249 W/m/K", "Type": "Solid",
 })
+add_solid("SolidProperties", "Brass_solid", "microchip", generated_region_for_source("Box002"), {
+    "Author": "BrassSolid", "AuthorAndLicense": "",
+    "CardName": "BrassSolid", "Density": "8510 kg/m^3",
+    "Description": "Brass solid thermal properties", "License": "",
+    "Name": "Brass_solid",
+    "ReferenceSource": "https://www.matweb.com/search/DataSheet.aspx?MatGUID=d3bd4617903543ada92f4c101c2a20e5",
+    "SourceURL": "", "SpecificHeat": "379 J/kg/K",
+    "ThermalConductivity": "85.1 W/m/K", "Type": "Solid",
+}, "300000 kg/(mm*s^3)")
+
 App.ActiveDocument.recompute()

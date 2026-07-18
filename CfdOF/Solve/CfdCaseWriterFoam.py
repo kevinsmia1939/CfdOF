@@ -47,6 +47,11 @@ def _getCompoundLinks(part_obj):
     return [part_obj]
 
 
+def _isBooleanFragmentsObject(part_obj):
+    proxy_type = getattr(getattr(part_obj, 'Proxy', None), 'Type', '')
+    return proxy_type == 'FeatureBooleanFragments'
+
+
 def _face_overlaps_any_shape(face, shapes):
     face_area = abs(getattr(face, 'Area', 0.0))
     if face_area <= 0:
@@ -985,6 +990,8 @@ class CfdCaseWriterFoam:
         if not self.solid_material_objs:
             return
         mesh_part = self.mesh_obj.Part
+        if _isBooleanFragmentsObject(mesh_part):
+            return
         links = _getCompoundLinks(mesh_part)
         if len(links) < 2:
             return

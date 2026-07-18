@@ -20,8 +20,10 @@ class TaskPanelCfdRegionCoupledInterface:
         self.RegionNamesOrig = list(obj.RegionNames)
         self.RegionObjectsOrig = list(getattr(obj, 'RegionObjects', []))
         self.ShapeRefsOrig = list(obj.ShapeRefs)
+        self.InterfacePairsOrig = list(getattr(obj, 'InterfacePairs', []))
         self.ThermalBoundaryTypeOrig = obj.ThermalBoundaryType
         self.NeedsCaseRewriteOrig = self.analysis_obj.NeedsCaseRewrite
+        self.candidates_by_selection_object = {}
         self.candidates = self._collect_candidates()
         self.candidates_by_object = dict((candidate[1].Name, candidate) for candidate in self.candidates)
         self.choosing_regions = False
@@ -31,7 +33,7 @@ class TaskPanelCfdRegionCoupledInterface:
         self.form.setWindowTitle("Region-coupled interface")
         layout = QtGui.QVBoxLayout(self.form)
 
-        self.regionHelpLabel = QtGui.QLabel("Select multiple region objects by holding crtl and clicking any part of the object, press Generate touching patches to automatically detect shared face on boolean fragment objject")
+        self.regionHelpLabel = QtGui.QLabel("Select multiple generated region objects, then press Generate interface faces to automatically detect paired touching faces.")
 
         layout.addWidget(QtGui.QLabel("Region objects"))
         choose_layout = QtGui.QHBoxLayout()
@@ -78,37 +80,50 @@ class TaskPanelCfdRegionCoupledInterface:
         self.availableRegionList.setVisible(False)
         layout.addWidget(self.availableRegionList)
 
-        thermal_layout = QtGui.QHBoxLayout()
-        thermal_layout.addWidget(QtGui.QLabel("Thermal type"))
         self.thermalCombo = QtGui.QComboBox()
-        for item in ["zeroGradient", "fixedValue", "fixedGradient", "totalPower",
-                     "externalWallHeatFluxTemperature"]:
+        for item in CfdRegionCoupledInterface.THERMAL_BOUNDARY_TYPES:
             self.thermalCombo.addItem(item)
-        thermal_layout.addWidget(self.thermalCombo)
-        layout.addLayout(thermal_layout)
 
         self.generateButton = QtGui.QPushButton("Generate interface faces")
         self.generateButton.clicked.connect(self.generateTouchingPatches)
         layout.addWidget(self.generateButton)
 
         layout.addWidget(QtGui.QLabel("Interface faces"))
-        self.faceList = QtGui.QListWidget()
-        self.faceList.setSelectionMode(QtGui.QAbstractItemView.ExtendedSelection)
-        self.faceList.currentRowChanged.connect(self.setInterfaceFaceListSelection)
-        layout.addWidget(self.faceList)
+        self.faceTable = QtGui.QTableWidget()
+        self.faceTable.setColumnCount(4)
+        self.faceTable.setHorizontalHeaderLabels(["Face A", "Face B", "Thermal type", "Value"])
+        self.faceTable.setSelectionBehavior(QtGui.QAbstractItemView.SelectRows)
+        self.faceTable.setSelectionMode(QtGui.QAbstractItemView.ExtendedSelection)
+        self.faceTable.setEditTriggers(QtGui.QAbstractItemView.DoubleClicked |
+                                       QtGui.QAbstractItemView.EditKeyPressed)
+        self.faceTable.itemChanged.connect(self.interfaceFaceTableItemChanged)
+        self.faceTable.currentCellChanged.connect(self.setInterfaceFaceTableSelection)
+        self.faceTable.horizontalHeader().setStretchLastSection(True)
+        resize_mode = getattr(self.faceTable.horizontalHeader(), 'setSectionResizeMode',
+                              self.faceTable.horizontalHeader().setResizeMode)
+        resize_mode(0, QtGui.QHeaderView.Stretch)
+        resize_mode(1, QtGui.QHeaderView.Stretch)
+        resize_mode(3, QtGui.QHeaderView.Stretch)
+        layout.addWidget(self.faceTable)
 
         face_edit_layout = QtGui.QGridLayout()
         face_edit_layout.setColumnStretch(0, 1)
         face_edit_layout.setColumnStretch(1, 1)
         face_edit_layout.setColumnStretch(3, 1)
         face_edit_layout.setColumnStretch(5, 1)
-        self.addFaceButton = QtGui.QPushButton("Add")
-        self.addFaceButton.setCheckable(True)
-        self.addFaceButton.clicked.connect(self.addFaceButtonClicked)
-        face_edit_layout.addWidget(self.addFaceButton, 0, 2)
-        self.removeFaceButton = QtGui.QPushButton("Remove")
-        self.removeFaceButton.clicked.connect(self.removeSelectedInterfaceFaces)
-        face_edit_layout.addWidget(self.removeFaceButton, 0, 4)
+        self.selectFaceButton = QtGui.QPushButton("Select face")
+        self.selectFaceButton.setCheckable(True)
+        self.selectFaceButton.clicked.connect(self.selectFaceButtonClicked)
+        face_edit_layout.addWidget(self.selectFaceButton, 0, 1)
+        self.removeFaceButton = QtGui.QPushButton("Remove face")
+        self.removeFaceButton.clicked.connect(self.removeSelectedInterfaceFaceCell)
+        face_edit_layout.addWidget(self.removeFaceButton, 0, 2)
+        self.addPairButton = QtGui.QPushButton("Add pair")
+        self.addPairButton.clicked.connect(self.addInterfacePair)
+        face_edit_layout.addWidget(self.addPairButton, 0, 3)
+        self.removePairButton = QtGui.QPushButton("Remove pair")
+        self.removePairButton.clicked.connect(self.removeSelectedInterfacePairs)
+        face_edit_layout.addWidget(self.removePairButton, 0, 4)
         layout.addLayout(face_edit_layout)
 
         self.statusLabel = QtGui.QLabel("")
@@ -116,43 +131,83 @@ class TaskPanelCfdRegionCoupledInterface:
         layout.addWidget(self.statusLabel)
 
         self._load()
-        self._refreshFaceList()
+        self._refreshFaceTable()
 
     def _collect_candidates(self):
         candidates = []
+        candidate_names = set()
         names_seen = set()
         represented_shapes = set()
+
+        def add_candidate(region_name, region_obj, shape, selection_objects=()):
+            if region_obj.Name in candidate_names:
+                return
+            candidate = (region_name, region_obj, shape)
+            candidates.append(candidate)
+            candidate_names.add(region_obj.Name)
+            for selection_obj in selection_objects:
+                if selection_obj is not None:
+                    self.candidates_by_selection_object[selection_obj.Name] = candidate
+
         if self.analysis_obj is None:
             return candidates
         for mesh_obj in CfdTools.getMeshObjects(self.analysis_obj):
             region_name = CfdRegionCoupledInterface.getRegionName(mesh_obj)
+            region_obj = mesh_obj
             shape = CfdRegionCoupledInterface.getRegionShape(mesh_obj)
+            part = getattr(mesh_obj, 'Part', None)
+            imprinted_region = CfdRegionCoupledInterface.getImprintedRegionForSource(part)
+            if imprinted_region is not None:
+                region_obj = imprinted_region
+                shape = imprinted_region.Shape
             if region_name and shape is not None:
-                candidates.append((region_name, mesh_obj, shape))
+                add_candidate(region_name, region_obj, shape, (mesh_obj, part))
                 names_seen.add(region_name)
-                part = getattr(mesh_obj, 'Part', None)
                 if part is not None:
                     represented_shapes.add(part.Name)
+                represented_shapes.add(region_obj.Name)
         for solid_obj in CfdTools.getSolidMaterials(self.analysis_obj):
             region_name = CfdRegionCoupledInterface.getRegionName(solid_obj)
+            region_obj = solid_obj
             shape = CfdRegionCoupledInterface.getRegionShape(solid_obj)
+            source_ref = None
+            refs = getattr(solid_obj, 'ShapeRefs', [])
+            if refs:
+                source_ref = refs[0][0]
+                imprinted_region = CfdRegionCoupledInterface.getImprintedRegionForSource(source_ref)
+                if imprinted_region is not None:
+                    region_obj = imprinted_region
+                    shape = imprinted_region.Shape
             if region_name and shape is not None and region_name not in names_seen:
-                candidates.append((region_name, solid_obj, shape))
-                for ref_obj, _subnames in getattr(solid_obj, 'ShapeRefs', []):
+                add_candidate(region_name, region_obj, shape, (solid_obj, source_ref))
+                for ref_obj, _subnames in refs:
                     represented_shapes.add(ref_obj.Name)
+                represented_shapes.add(region_obj.Name)
         for shape_obj in self.obj.Document.Objects:
             if shape_obj.Name in represented_shapes or shape_obj is self.obj:
                 continue
             if not hasattr(shape_obj, 'Shape') or shape_obj.Shape.isNull():
                 continue
+            if CfdRegionCoupledInterface.isImprintedNccGeneratedObject(shape_obj) and \
+                    not CfdRegionCoupledInterface.isFinalImprintedRegionObject(shape_obj):
+                continue
+            imprinted_region = CfdRegionCoupledInterface.getImprintedRegionForSource(shape_obj)
+            if imprinted_region is not None and imprinted_region is not shape_obj:
+                represented_shapes.add(shape_obj.Name)
+                continue
             if hasattr(shape_obj, 'Proxy') and getattr(shape_obj.Proxy, 'Type', '').startswith('Cfd'):
                 continue
-            candidates.append((shape_obj.Label, shape_obj, shape_obj.Shape))
+            add_candidate(CfdRegionCoupledInterface.getRegionName(shape_obj), shape_obj, shape_obj.Shape,
+                          (shape_obj, getattr(shape_obj, 'SourceObject', None)))
         return candidates
 
     def _load(self):
         selected_names = set(self.obj.RegionNames)
-        selected_objects = list(getattr(self.obj, 'RegionObjects', []))
+        selected_objects = []
+        for selected_obj in getattr(self.obj, 'RegionObjects', []):
+            selected_objects.append(
+                CfdRegionCoupledInterface.getImprintedRegionForSource(selected_obj) or selected_obj
+            )
         self.availableRegionList.blockSignals(True)
         if not self.candidates:
             item = QtGui.QListWidgetItem("No region shapes found")
@@ -169,6 +224,9 @@ class TaskPanelCfdRegionCoupledInterface:
                 if checked:
                     self._addCandidateToSelectedList((region_name, region_obj, _shape), update_object=False)
         self.availableRegionList.blockSignals(False)
+        if self.selectedRegionList.count():
+            self._syncObjectFromSelectedList(clear_interface_faces=False)
+            self._ensureGeneratedInterfaceFaces(report_errors=False)
         idx = self.thermalCombo.findText(str(self.obj.ThermalBoundaryType))
         self.thermalCombo.setCurrentIndex(idx if idx >= 0 else 0)
 
@@ -181,12 +239,14 @@ class TaskPanelCfdRegionCoupledInterface:
                 selected.append(candidate)
         return selected
 
-    def _syncObjectFromSelectedList(self):
+    def _syncObjectFromSelectedList(self, clear_interface_faces=True):
         selected = self._selected_candidates()
         self.obj.RegionNames = [region_name for region_name, _obj, _shape in selected]
         self.obj.RegionObjects = [obj for _region_name, obj, _shape in selected]
-        self.obj.ShapeRefs = []
-        self._refreshFaceList()
+        if clear_interface_faces:
+            self.obj.ShapeRefs = []
+            self.obj.InterfacePairs = []
+            self._refreshFaceTable()
         self._recomputeInterfaceObject()
         return selected
 
@@ -206,6 +266,9 @@ class TaskPanelCfdRegionCoupledInterface:
         return "{} ({})".format(region_obj.Label, region_name)
 
     def _candidate_for_selection(self, selected_object, subname):
+        candidate = self.candidates_by_selection_object.get(selected_object.Name)
+        if candidate is not None:
+            return candidate
         for candidate in self.candidates:
             _region_name, region_obj, _shape = candidate
             if selected_object is region_obj:
@@ -361,7 +424,8 @@ class TaskPanelCfdRegionCoupledInterface:
         self.obj.RegionNames = []
         self.obj.RegionObjects = []
         self.obj.ShapeRefs = []
-        self._refreshFaceList()
+        self.obj.InterfacePairs = []
+        self._refreshFaceTable()
         self.statusLabel.setText("Region selection cleared.")
 
     def removeSelectedRegions(self):
@@ -399,42 +463,194 @@ class TaskPanelCfdRegionCoupledInterface:
         elif self.choosing_faces:
             self._addFaceSelection(doc_name, obj_name, sub)
 
-    def _refreshFaceList(self):
-        self.faceList.clear()
-        pair_colors = {}
-        for ref_obj, subnames in self.obj.ShapeRefs:
-            for subname in subnames:
-                item = QtGui.QListWidgetItem("{}:{}".format(ref_obj.Label, subname))
-                item.setData(QtCore.Qt.UserRole, (ref_obj.Name, subname))
-                try:
-                    face = ref_obj.Shape.getElement(subname)
-                    pair_key = CfdRegionCoupledInterface._touching_region_key(face, self.obj.RegionObjects)
-                except Exception:
-                    pair_key = None
-                if pair_key is not None:
-                    if pair_key not in pair_colors:
-                        color_index = len(pair_colors) % len(CfdRegionCoupledInterface.INTERFACE_FACE_COLORS)
-                        pair_colors[pair_key] = CfdRegionCoupledInterface.INTERFACE_FACE_COLORS[color_index]
-                    r, g, b = pair_colors[pair_key]
-                    item.setBackground(QtGui.QBrush(QtGui.QColor.fromRgbF(r, g, b, 0.35)))
-                    item.setToolTip("{} interface".format("-".join(pair_key)))
-                self.faceList.addItem(item)
+    def _decodedInterfacePairs(self):
+        return CfdRegionCoupledInterface._decode_interface_pairs(self.obj)
 
-    def setInterfaceFaceListSelection(self, row):
+    def _encodeInterfacePairs(self, pairs):
+        self.obj.InterfacePairs = [
+            CfdRegionCoupledInterface.encodeInterfacePair(pair)
+            for pair in pairs
+        ]
+        self._syncShapeRefsFromPairs(pairs)
+
+    def _syncShapeRefsFromPairs(self, pairs=None):
+        if pairs is None:
+            pairs = self._decodedInterfacePairs()
+        refs_by_object = {}
+        for pair in pairs:
+            for object_key, face_key in (('object_a', 'face_a'), ('object_b', 'face_b')):
+                obj_name = pair.get(object_key, '')
+                face_name = pair.get(face_key, '')
+                if not obj_name or not face_name:
+                    continue
+                ref_obj = self.obj.Document.getObject(obj_name)
+                if ref_obj is not None:
+                    refs_by_object.setdefault(ref_obj, set()).add(face_name)
+        self.obj.ShapeRefs = [
+            (ref_obj, tuple(sorted(face_names, key=lambda name: int(name[4:]))))
+            for ref_obj, face_names in refs_by_object.items()
+        ]
+
+    def _blankInterfacePair(self):
+        return {
+            'region_a': '',
+            'object_a': '',
+            'face_a': '',
+            'region_b': '',
+            'object_b': '',
+            'face_b': '',
+            'thermal_type': 'zeroGradient',
+            'thermal_value': '',
+        }
+
+    def _selectedFaceCell(self):
+        row = self.faceTable.currentRow()
+        column = self.faceTable.currentColumn()
+        if row < 0 or column not in (0, 1):
+            selected_indexes = self.faceTable.selectedIndexes()
+            for index in selected_indexes:
+                if index.column() in (0, 1):
+                    return index.row(), index.column()
+            return None, None
+        return row, column
+
+    def _makeFaceLabel(self, object_name, face_name):
+        ref_obj = self.obj.Document.getObject(object_name)
+        if ref_obj is None:
+            return "{}:{}".format(object_name, face_name)
+        return "{}:{}".format(ref_obj.Label, face_name)
+
+    def _addFaceTableItem(self, row, column, text, data=None):
+        item = QtGui.QTableWidgetItem(text)
+        if data is not None:
+            item.setData(QtCore.Qt.UserRole, data)
+        self.faceTable.setItem(row, column, item)
+        return item
+
+    def _setPairThermalType(self, pair_index, thermal_type):
+        pairs = self._decodedInterfacePairs()
+        if pair_index < 0 or pair_index >= len(pairs):
+            return
+        if thermal_type not in CfdRegionCoupledInterface.THERMAL_BOUNDARY_TYPES:
+            thermal_type = "zeroGradient"
+        old_field = CfdRegionCoupledInterface.THERMAL_VALUE_FIELDS.get(
+            pairs[pair_index].get('thermal_type')
+        )
+        new_field = CfdRegionCoupledInterface.THERMAL_VALUE_FIELDS.get(thermal_type)
+        pairs[pair_index]['thermal_type'] = thermal_type
+        if not new_field:
+            pairs[pair_index]['thermal_value'] = ''
+        elif old_field != new_field or not pairs[pair_index].get('thermal_value', ''):
+            pairs[pair_index]['thermal_value'] = CfdRegionCoupledInterface.defaultThermalValue(
+                self.obj,
+                thermal_type,
+            )
+        self._encodeInterfacePairs(pairs)
+        self._refreshFaceTable()
+        self._recomputeInterfaceObject()
+
+    def _setPairThermalValue(self, pair_index, thermal_value):
+        pairs = self._decodedInterfacePairs()
+        if pair_index < 0 or pair_index >= len(pairs):
+            return
+        pairs[pair_index]['thermal_value'] = thermal_value
+        self._encodeInterfacePairs(pairs)
+        self._recomputeInterfaceObject()
+
+    def interfaceFaceTableItemChanged(self, item):
+        if item.column() != 3:
+            return
+        pair_index = item.data(QtCore.Qt.UserRole)
+        if pair_index is None:
+            return
+        self._setPairThermalValue(pair_index, item.text())
+
+    def _refreshFaceTable(self):
+        self.faceTable.blockSignals(True)
+        self.faceTable.setRowCount(0)
+        interface_pairs = self._decodedInterfacePairs()
+        if interface_pairs:
+            self.faceTable.setRowCount(len(interface_pairs))
+            for row, pair in enumerate(interface_pairs):
+                self._addFaceTableItem(
+                    row,
+                    0,
+                    self._makeFaceLabel(pair['object_a'], pair['face_a']) if pair['object_a'] and pair['face_a']
+                    else "",
+                    (pair['object_a'], pair['face_a'], row),
+                )
+                self._addFaceTableItem(
+                    row,
+                    1,
+                    self._makeFaceLabel(pair['object_b'], pair['face_b']) if pair['object_b'] and pair['face_b']
+                    else "",
+                    (pair['object_b'], pair['face_b'], row),
+                )
+                combo = QtGui.QComboBox()
+                combo.addItems(CfdRegionCoupledInterface.THERMAL_BOUNDARY_TYPES)
+                combo.setCurrentIndex(max(
+                    0,
+                    combo.findText(pair.get('thermal_type', "zeroGradient")),
+                ))
+                combo.currentIndexChanged.connect(
+                    lambda _index, pair_index=row, widget=combo:
+                    self._setPairThermalType(pair_index, widget.currentText())
+                )
+                self.faceTable.setCellWidget(row, 2, combo)
+                value_item = self._addFaceTableItem(
+                    row,
+                    3,
+                    pair.get('thermal_value', ''),
+                    row,
+                )
+                if pair.get('thermal_type', "zeroGradient") not in \
+                        CfdRegionCoupledInterface.THERMAL_VALUE_FIELDS:
+                    value_item.setFlags(value_item.flags() & ~QtCore.Qt.ItemIsEditable)
+                    value_item.setText("")
+        else:
+            rows = [
+                (ref_obj, subname)
+                for ref_obj, subnames in self.obj.ShapeRefs
+                for subname in subnames
+            ]
+            self.faceTable.setRowCount(len(rows))
+            for row, (ref_obj, subname) in enumerate(rows):
+                self._addFaceTableItem(row, 0, "{}:{}".format(ref_obj.Label, subname),
+                                       (ref_obj.Name, subname, None))
+                self._addFaceTableItem(row, 1, "")
+                combo = QtGui.QComboBox()
+                combo.addItems(CfdRegionCoupledInterface.THERMAL_BOUNDARY_TYPES)
+                combo.setCurrentIndex(max(0, combo.findText(str(self.obj.ThermalBoundaryType))))
+                combo.setEnabled(False)
+                self.faceTable.setCellWidget(row, 2, combo)
+                self._addFaceTableItem(row, 3, "")
+        self.faceTable.resizeRowsToContents()
+        self.faceTable.blockSignals(False)
+
+    def setInterfaceFaceTableSelection(self, row, column, _previous_row, _previous_column):
         if row < 0:
             return
-        item = self.faceList.item(row)
-        if item is None:
-            return
-        ref_obj_name, subname = item.data(QtCore.Qt.UserRole)
-        ref_obj = self.obj.Document.getObject(ref_obj_name)
-        if ref_obj is None:
-            return
         FreeCADGui.Selection.clearSelection()
-        FreeCADGui.Selection.addSelection(ref_obj, subname)
+        columns = (column,) if column in (0, 1) else (0, 1)
+        for table_column in columns:
+            item = self.faceTable.item(row, table_column)
+            if item is None:
+                continue
+            data = item.data(QtCore.Qt.UserRole)
+            if not data:
+                continue
+            ref_obj_name, subname, _pair_index = data
+            ref_obj = self.obj.Document.getObject(ref_obj_name)
+            if ref_obj is not None and subname:
+                FreeCADGui.Selection.addSelection(ref_obj, subname)
 
-    def addFaceButtonClicked(self):
+    def selectFaceButtonClicked(self):
         choosing = not self.choosing_faces
+        row, column = self._selectedFaceCell()
+        if row is None:
+            self.statusLabel.setText("Select a Face A or Face B cell first.")
+            self.selectFaceButton.setChecked(False)
+            return
         if choosing and len(FreeCADGui.Selection.getSelectionEx()) >= 1:
             added = False
             for sel in FreeCADGui.Selection.getSelectionEx():
@@ -443,12 +659,12 @@ class TaskPanelCfdRegionCoupledInterface:
                         added = self._addFaceSelection(sel.DocumentName, sel.ObjectName, sub) or added
             choosing = False
             if not added:
-                self.statusLabel.setText("Select one or more faces before pressing Add.")
+                self.statusLabel.setText("Select one face before pressing Select face.")
         self._enableChoosingFaces(choosing)
 
     def _enableChoosingFaces(self, choosing):
         if self.choosing_faces == choosing:
-            self.addFaceButton.setChecked(choosing)
+            self.selectFaceButton.setChecked(choosing)
             return
         if choosing:
             self._enableChoosingRegions(False)
@@ -456,11 +672,11 @@ class TaskPanelCfdRegionCoupledInterface:
         if self.choosing_faces:
             FreeCADGui.Selection.clearSelection()
             FreeCADGui.Selection.addObserver(self)
-            self.statusLabel.setText("Select interface faces by single-clicking in the viewport.")
+            self.statusLabel.setText("Select one interface face for the highlighted table cell.")
         else:
             FreeCADGui.Selection.removeObserver(self)
             self.statusLabel.setText("")
-        self.addFaceButton.setChecked(self.choosing_faces)
+        self.selectFaceButton.setChecked(self.choosing_faces)
 
     def _addFaceSelection(self, doc_name, obj_name, sub):
         if FreeCADGui.activeDocument().Document.Name != self.obj.Document.Name:
@@ -469,42 +685,150 @@ class TaskPanelCfdRegionCoupledInterface:
             self.statusLabel.setText("Selection is not a face: {}".format(obj_name))
             return False
         selected_object = FreeCAD.getDocument(doc_name).getObject(obj_name)
-        self._appendShapeRef(selected_object, str(sub))
-        self._refreshFaceList()
+        row, column = self._selectedFaceCell()
+        if row is None:
+            self.statusLabel.setText("Select a Face A or Face B cell first.")
+            return False
+        if not self._setInterfacePairFace(row, column, selected_object, str(sub)):
+            return False
+        self._refreshFaceTable()
         self._recomputeInterfaceObject()
-        self.statusLabel.setText("Added interface face {}:{}.".format(selected_object.Label, sub))
+        self.statusLabel.setText("Set interface face {}:{}.".format(selected_object.Label, sub))
         return True
 
-    def _appendShapeRef(self, ref_obj, subname):
-        shape_refs = list(self.obj.ShapeRefs)
-        for idx, (existing_obj, subnames) in enumerate(shape_refs):
-            if existing_obj.Name == ref_obj.Name:
-                if subname not in subnames:
-                    shape_refs[idx] = (existing_obj, tuple(list(subnames) + [subname]))
-                self.obj.ShapeRefs = shape_refs
-                return
-        shape_refs.append((ref_obj, (subname,)))
-        self.obj.ShapeRefs = shape_refs
+    def _setInterfacePairFace(self, row, column, ref_obj, subname):
+        pairs = self._decodedInterfacePairs()
+        if row < 0 or row >= len(pairs) or column not in (0, 1):
+            return False
+        try:
+            ref_obj.Shape.getElement(subname)
+        except Exception:
+            self.statusLabel.setText("{}:{} is not a valid face.".format(ref_obj.Label, subname))
+            return False
+        region_name = CfdRegionCoupledInterface.getRegionName(ref_obj)
+        if column == 0:
+            pairs[row]['region_a'] = region_name
+            pairs[row]['object_a'] = ref_obj.Name
+            pairs[row]['face_a'] = subname
+        else:
+            pairs[row]['region_b'] = region_name
+            pairs[row]['object_b'] = ref_obj.Name
+            pairs[row]['face_b'] = subname
+        self._encodeInterfacePairs(pairs)
+        return True
 
-    def removeSelectedInterfaceFaces(self):
-        selected_items = list(self.faceList.selectedItems())
-        if not selected_items:
+    def removeSelectedInterfaceFaceCell(self):
+        row, column = self._selectedFaceCell()
+        if row is None:
+            self.statusLabel.setText("Select a Face A or Face B cell first.")
             return
-        remove_refs = set(item.data(QtCore.Qt.UserRole) for item in selected_items)
-        new_shape_refs = []
-        for ref_obj, subnames in self.obj.ShapeRefs:
-            remaining = tuple(subname for subname in subnames
-                              if (ref_obj.Name, subname) not in remove_refs)
-            if remaining:
-                new_shape_refs.append((ref_obj, remaining))
-        self.obj.ShapeRefs = new_shape_refs
-        self._refreshFaceList()
+        pairs = self._decodedInterfacePairs()
+        if row < 0 or row >= len(pairs):
+            return
+        if column == 0:
+            pairs[row]['region_a'] = ''
+            pairs[row]['object_a'] = ''
+            pairs[row]['face_a'] = ''
+        else:
+            pairs[row]['region_b'] = ''
+            pairs[row]['object_b'] = ''
+            pairs[row]['face_b'] = ''
+        self._encodeInterfacePairs(pairs)
+        self._refreshFaceTable()
         self._recomputeInterfaceObject()
-        self.statusLabel.setText("Removed {} interface face(s).".format(len(selected_items)))
+        self.statusLabel.setText("Removed selected face cell.")
+
+    def addInterfacePair(self):
+        pairs = self._decodedInterfacePairs()
+        pairs.append(self._blankInterfacePair())
+        self._encodeInterfacePairs(pairs)
+        self._refreshFaceTable()
+        row = len(pairs) - 1
+        self.faceTable.setCurrentCell(row, 0)
+        self.statusLabel.setText("Added interface pair row.")
+
+    def removeSelectedInterfacePairs(self):
+        selected_rows = sorted(set(index.row() for index in self.faceTable.selectedIndexes()), reverse=True)
+        if not selected_rows:
+            return
+        remove_rows = set(selected_rows)
+        remaining_pairs = [
+            pair for row, pair in enumerate(self._decodedInterfacePairs())
+            if row not in remove_rows
+        ]
+        self._encodeInterfacePairs(remaining_pairs)
+        self._refreshFaceTable()
+        self._recomputeInterfaceObject()
+        self.statusLabel.setText("Removed {} interface pair row(s).".format(len(selected_rows)))
 
     def _recomputeInterfaceObject(self):
         self.obj.touch()
         self.obj.Document.recompute()
+
+    def _storedInterfaceFacesAreCurrent(self, selected):
+        if not self.obj.ShapeRefs:
+            return False
+        selected_object_names = set(obj.Name for _region_name, obj, _shape in selected)
+        for ref_obj, _subnames in self.obj.ShapeRefs:
+            if ref_obj.Name not in selected_object_names:
+                return False
+        current_refs = set(
+            (ref_obj.Name, subname)
+            for ref_obj, subnames in self.obj.ShapeRefs
+            for subname in subnames
+        )
+        paired_refs = set()
+        for pair in CfdRegionCoupledInterface._decode_interface_pairs(self.obj):
+            if pair['object_a'] not in selected_object_names or pair['object_b'] not in selected_object_names:
+                return False
+            paired_refs.add((pair['object_a'], pair['face_a']))
+            paired_refs.add((pair['object_b'], pair['face_b']))
+        return bool(paired_refs) and current_refs == paired_refs
+
+    def _ensureGeneratedInterfaceFaces(self, report_errors=True):
+        selected = self._selected_candidates()
+        if len(selected) < 2:
+            return False
+        if self._storedInterfaceFacesAreCurrent(selected):
+            return True
+
+        region_names = [region_name for region_name, _obj, _shape in selected]
+        region_objects = [obj for _region_name, obj, _shape in selected]
+        try:
+            shape_refs, interface_pairs = CfdRegionCoupledInterface.generatePairedTouchingFaceData(region_objects)
+        except ValueError as err:
+            if report_errors:
+                CfdTools.cfdErrorBox(str(err))
+            else:
+                self.statusLabel.setText(str(err))
+            return False
+
+        self.obj.RegionNames = region_names
+        self.obj.RegionObjects = region_objects
+        self.obj.ShapeRefs = shape_refs
+        self.obj.InterfacePairs = interface_pairs
+        face_count = sum(len(subnames) for _ref_obj, subnames in shape_refs)
+        self.statusLabel.setText(
+            "Generated {} paired interface face reference(s).".format(face_count))
+        self._refreshFaceTable()
+        self._recomputeInterfaceObject()
+        return True
+
+    def _incompletePairRows(self):
+        incomplete_rows = []
+        for row, pair in enumerate(self._decodedInterfacePairs(), 1):
+            if not all(pair.get(key, '') for key in (
+                    'region_a', 'object_a', 'face_a', 'region_b', 'object_b', 'face_b')):
+                incomplete_rows.append(row)
+        return incomplete_rows
+
+    def _missingThermalValueRows(self):
+        missing_rows = []
+        for row, pair in enumerate(self._decodedInterfacePairs(), 1):
+            if pair.get('thermal_type') in CfdRegionCoupledInterface.THERMAL_VALUE_FIELDS and \
+                    not pair.get('thermal_value', '').strip():
+                missing_rows.append(row)
+        return missing_rows
 
     def generateTouchingPatches(self):
         selected = self._selected_candidates()
@@ -515,17 +839,19 @@ class TaskPanelCfdRegionCoupledInterface:
         region_names = [region_name for region_name, _obj, _shape in selected]
         region_objects = [obj for _region_name, obj, _shape in selected]
         try:
-            container, face_names = CfdRegionCoupledInterface.generateTouchingFaceRefs(region_objects)
+            shape_refs, interface_pairs = CfdRegionCoupledInterface.generatePairedTouchingFaceData(region_objects)
         except ValueError as err:
             CfdTools.cfdErrorBox(str(err))
             return
 
         self.obj.RegionNames = region_names
         self.obj.RegionObjects = region_objects
-        self.obj.ShapeRefs = [(container, tuple(face_names))]
+        self.obj.ShapeRefs = shape_refs
+        self.obj.InterfacePairs = interface_pairs
+        face_count = sum(len(subnames) for _ref_obj, subnames in shape_refs)
         self.statusLabel.setText(
-            "Generated {} interface face(s) from {}.".format(len(face_names), container.Label))
-        self._refreshFaceList()
+            "Generated {} paired interface face reference(s).".format(face_count))
+        self._refreshFaceTable()
         self._recomputeInterfaceObject()
 
     def accept(self):
@@ -538,6 +864,24 @@ class TaskPanelCfdRegionCoupledInterface:
         selected = self._selected_candidates()
         if len(selected) < 2:
             CfdTools.cfdErrorBox("Select at least two region objects to couple.")
+            return False
+        if not self._decodedInterfacePairs():
+            self._ensureGeneratedInterfaceFaces(report_errors=True)
+        incomplete_rows = self._incompletePairRows()
+        if incomplete_rows:
+            CfdTools.cfdErrorBox(
+                "Complete or remove incomplete interface pair row(s): {}".format(
+                    ", ".join(str(row) for row in incomplete_rows)
+                )
+            )
+            return False
+        missing_value_rows = self._missingThermalValueRows()
+        if missing_value_rows:
+            CfdTools.cfdErrorBox(
+                "Enter thermal value for interface pair row(s): {}".format(
+                    ", ".join(str(row) for row in missing_value_rows)
+                )
+            )
             return False
         if not self.obj.ShapeRefs:
             CfdTools.cfdErrorBox("Generate touching patches before closing the task panel.")
@@ -561,6 +905,7 @@ class TaskPanelCfdRegionCoupledInterface:
         self.obj.RegionNames = self.RegionNamesOrig
         self.obj.RegionObjects = self.RegionObjectsOrig
         self.obj.ShapeRefs = self.ShapeRefsOrig
+        self.obj.InterfacePairs = self.InterfacePairsOrig
         self.obj.ThermalBoundaryType = self.ThermalBoundaryTypeOrig
         self.analysis_obj.NeedsCaseRewrite = self.NeedsCaseRewriteOrig
         doc = FreeCADGui.getDocument(self.obj.Document)
