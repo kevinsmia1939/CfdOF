@@ -29,6 +29,7 @@
 from __future__ import print_function
 
 import os
+import re
 import FreeCAD
 from FreeCAD import Units
 from CfdOF import CfdTools
@@ -191,12 +192,13 @@ class CfdRunnableFoam(CfdRunnable):
         prev_niter = self.niter
         for line in log_lines:
             line = line.rstrip()
+            stripped_line = line.strip()
             split = line.split()
 
             # Only record the first residual per outer iteration
-            if line.startswith(u"Time = "):
+            if stripped_line.startswith(u"Time = "):
                 try:
-                    time_val = float(line.lstrip(u"Time = ").rstrip("s"))
+                    time_val = float(stripped_line.lstrip(u"Time = ").rstrip("s"))
                 except ValueError:
                     pass
                 else:
@@ -227,18 +229,34 @@ class CfdRunnableFoam(CfdRunnable):
                         self.time[-(self.latest_outer_iter-i)] = self.prev_time + (
                             self.latest_time-self.prev_time)*((i+1)/self.prev_num_outer_iters)
 
-            if "Ux," in split and self.niter > len(self.UxResiduals):
-                self.UxResiduals.append(float(split[7].split(',')[0]))
-            if "Uy," in split and self.niter > len(self.UyResiduals):
-                self.UyResiduals.append(float(split[7].split(',')[0]))
-            if "Uz," in split and self.niter > len(self.UzResiduals):
-                self.UzResiduals.append(float(split[7].split(',')[0]))
-            if "p," in split and self.niter > len(self.pResiduals):
-                self.pResiduals.append(float(split[7].split(',')[0]))
-            if "p_rgh," in split and self.niter > len(self.pResiduals):
-                self.pResiduals.append(float(split[7].split(',')[0]))
-            if "h," in split and self.niter > len(self.EResiduals):
-                self.EResiduals.append(float(split[7].split(',')[0]))
+            residual_match = re.search(
+                r'\bSolving\s+for\s+([^,\s]+),\s+Initial\s+residual\s+=\s+([^,\s]+)',
+                line)
+            if residual_match:
+                field = residual_match.group(1)
+                initial_residual = float(residual_match.group(2))
+                if field == "Ux" and self.niter > len(self.UxResiduals):
+                    self.UxResiduals.append(initial_residual)
+                if field == "Uy" and self.niter > len(self.UyResiduals):
+                    self.UyResiduals.append(initial_residual)
+                if field == "Uz" and self.niter > len(self.UzResiduals):
+                    self.UzResiduals.append(initial_residual)
+                if field in ("p", "p_rgh") and self.niter > len(self.pResiduals):
+                    self.pResiduals.append(initial_residual)
+                if field in ("h", "e") and self.niter > len(self.EResiduals):
+                    self.EResiduals.append(initial_residual)
+                if field == "k" and self.niter > len(self.kResiduals):
+                    self.kResiduals.append(initial_residual)
+                if field == "epsilon" and self.niter > len(self.epsilonResiduals):
+                    self.epsilonResiduals.append(initial_residual)
+                if field == "omega" and self.niter > len(self.omegaResiduals):
+                    self.omegaResiduals.append(initial_residual)
+                if field == "nuTilda" and self.niter > len(self.nuTildaResiduals):
+                    self.nuTildaResiduals.append(initial_residual)
+                if field == "gammaInt" and self.niter > len(self.gammaIntResiduals):
+                    self.gammaIntResiduals.append(initial_residual)
+                if field == "ReThetat" and self.niter > len(self.ReThetatResiduals):
+                    self.ReThetatResiduals.append(initial_residual)
             # HiSA coupled residuals
             if "Residual:" in split and self.niter > len(self.rhoResiduals):
                 self.rhoResiduals.append(float(split[4]))
@@ -246,18 +264,6 @@ class CfdRunnableFoam(CfdRunnable):
                 self.UyResiduals.append(float(split[6]))
                 self.UzResiduals.append(float(split[7].rstrip(')')))
                 self.EResiduals.append(float(split[8]))
-            if "k," in split and self.niter > len(self.kResiduals):
-                self.kResiduals.append(float(split[7].split(',')[0]))
-            if "epsilon," in split and self.niter > len(self.epsilonResiduals):
-                self.epsilonResiduals.append(float(split[7].split(',')[0]))
-            if "omega," in split and self.niter > len(self.omegaResiduals):
-                self.omegaResiduals.append(float(split[7].split(',')[0]))
-            if "nuTilda," in split and self.niter > len(self.nuTildaResiduals):
-                self.nuTildaResiduals.append(float(split[7].split(',')[0]))
-            if "gammaInt," in split and self.niter > len(self.gammaIntResiduals):
-                self.gammaIntResiduals.append(float(split[7].split(',')[0]))
-            if "ReThetat," in split and self.niter > len(self.ReThetatResiduals):
-                self.ReThetatResiduals.append(float(split[7].split(',')[0]))
 
         # Update plots
         if self.niter > 1 and self.niter > prev_niter:
@@ -278,6 +284,45 @@ class CfdRunnableFoam(CfdRunnable):
         # postProcessing readers
         for r in self.postproc_readers:
             r.read()
+
+    def residualCount(self):
+        return sum(len(v) for v in [
+            self.UxResiduals,
+            self.UyResiduals,
+            self.UzResiduals,
+            self.pResiduals,
+            self.rhoResiduals,
+            self.EResiduals,
+            self.kResiduals,
+            self.epsilonResiduals,
+            self.omegaResiduals,
+            self.nuTildaResiduals,
+            self.gammaIntResiduals,
+            self.ReThetatResiduals,
+        ])
+
+    def plotResidualsFromLog(self, case_dir):
+        log_files = []
+        try:
+            for name in os.listdir(case_dir):
+                if name.startswith('log.'):
+                    log_files.append(os.path.join(case_dir, name))
+        except OSError:
+            return None, 0
+
+        log_files.sort(key=lambda p: os.path.getmtime(p), reverse=True)
+        for log_file in log_files:
+            self.initResiduals()
+            try:
+                with open(log_file, 'r', errors='replace') as f:
+                    self.processOutput(f.read() + '\n')
+            except OSError:
+                continue
+            residual_count = self.residualCount()
+            if residual_count and len(self.time) > 1:
+                self.solver.Proxy.residual_plotter.refresh()
+                return log_file, residual_count
+        return None, 0
 
     def solverFinished(self):
         for r in self.postproc_readers:

@@ -76,6 +76,7 @@ class TaskPanelCfdSolverControl:
         self.form.pb_edit_inp.clicked.connect(self.editSolverInputFile)
         self.form.pb_run_solver.clicked.connect(self.runSolverProcess)
         self.form.pb_paraview.clicked.connect(self.openParaview)
+        self.form.pb_plot_residuals.clicked.connect(self.openResidualPlot)
         self.form.inputParallel.stateChanged.connect(self.updateUI)
 
         self.Start = time.time()
@@ -94,10 +95,19 @@ class TaskPanelCfdSolverControl:
         self.form.pb_edit_inp.setEnabled(os.path.exists(solverDirectory))
         self.form.pb_paraview.setEnabled(os.path.exists(os.path.join(solverDirectory, "pv.foam")))
         self.form.pb_run_solver.setEnabled(os.path.exists(os.path.join(solverDirectory, "Allrun")))
+        self.form.pb_plot_residuals.setEnabled(self.hasSolverLog(solverDirectory))
         if self.form.inputParallel.isChecked():
             self.form.ParallelCoresFrame.setVisible(True)
         else:
             self.form.ParallelCoresFrame.setVisible(False)
+
+    def hasSolverLog(self, solverDirectory):
+        if not os.path.isdir(solverDirectory):
+            return False
+        try:
+            return any(name.startswith('log.') for name in os.listdir(solverDirectory))
+        except OSError:
+            return False
 
     def consoleMessage(self, message="", colour_type=None):
         self.console_message += \
@@ -324,6 +334,16 @@ class TaskPanelCfdSolverControl:
         print_err = self.solver_object.Proxy.solver_process.processErrorOutput(lines)
         if print_err is not None:
             self.consoleMessage(print_err, 'Error')
+
+    def openResidualPlot(self):
+        case_path = os.path.abspath(os.path.join(self.working_dir, self.solver_object.InputCaseName))
+        log_file, residual_count = self.solver_runner.plotResidualsFromLog(case_path)
+        if log_file:
+            self.consoleMessage(
+                "Loaded residual plot from {} ({} residual entries)".format(
+                    os.path.basename(log_file), residual_count))
+        else:
+            self.consoleMessage("No residual data found in solver logs", 'Error')
 
     def openParaview(self):
         QApplication.setOverrideCursor(Qt.WaitCursor)
