@@ -499,11 +499,33 @@ class CfdCaseWriterFoam:
         solver_name = settings['solver']['SolverName']
         is_multiregion = solver_name in ['chtMultiRegionSimpleFoam', 'chtMultiRegionFoam']
 
+        solid_mesh_region_by_part_name = {}
+        if is_multiregion and len(self.mesh_objs) > 1:
+            for mesh_obj in self.mesh_objs:
+                region_type = str(getattr(mesh_obj, 'RegionType', 'fluid'))
+                if region_type != 'solid':
+                    continue
+                region_name = getattr(mesh_obj, 'RegionName', '') or mesh_obj.Label
+                part_obj = getattr(mesh_obj, 'Part', None)
+                if part_obj is not None:
+                    solid_mesh_region_by_part_name[part_obj.Name] = region_name
+
+        def region_name_for_solid_material(solid_obj):
+            explicit_region = getattr(solid_obj, 'RegionName', '')
+            if explicit_region:
+                return explicit_region
+            for ref_obj, _subnames in getattr(solid_obj, 'ShapeRefs', []):
+                region_name = solid_mesh_region_by_part_name.get(ref_obj.Name)
+                if region_name:
+                    return region_name
+            return solid_obj.Label
+
         # Process dedicated CfdSolidMaterial objects (new path)
         for solid_obj in self.solid_material_objs:
             mp = solid_obj.Material.copy()
             mp['Name'] = solid_obj.Label
-            region_name = getattr(solid_obj, 'RegionName', '') or solid_obj.Label
+            region_name = region_name_for_solid_material(solid_obj)
+            mp['RegionName'] = region_name
             if 'ThermalConductivity' in mp:
                 mp['ThermalConductivity'] = Units.Quantity(mp['ThermalConductivity']).getValueAs("W/m/K").Value
             if 'Density' in mp:
@@ -598,6 +620,17 @@ class CfdCaseWriterFoam:
                                  .format(solver_name))
             settings['multiRegionEnabled'] = True
             self.processMultiRegionMeshObjects()
+            solid_property_regions = {mp.get('RegionName') for mp in settings['solidProperties']}
+            missing_solid_regions = [
+                region_name for region_name in settings['multiRegionSolidNames']
+                if region_name not in solid_property_regions
+            ]
+            if missing_solid_regions:
+                raise ValueError(
+                    "Missing Solid Properties for solid mesh region(s): {}. "
+                    "Add one Solid Properties object for each solid mesh region, select that region's sliced solid, "
+                    "or set the Solid Properties RegionName to the mesh region name.".format(
+                        ', '.join(missing_solid_regions)))
             settings['multiRegionFluidNamesDict'] = {n: {} for n in settings['multiRegionFluidNames']}
             settings['multiRegionSolidNamesDict'] = {n: {} for n in settings['multiRegionSolidNames']}
 
