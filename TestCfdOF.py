@@ -791,6 +791,50 @@ class MultiTouchNccChtWorkflowTest(unittest.TestCase):
         finally:
             FreeCAD.ParamGet(prefs).SetBool("AppendDocNameToOutputPath", original_append_setting)
 
+    def test_single_mesh_skips_unrelated_generated_interface_boundaries(self):
+        prefs = CfdTools.getPreferencesLocation()
+        original_append_setting = FreeCAD.ParamGet(prefs).GetBool("AppendDocNameToOutputPath", 0)
+        original_warning = CfdTools.cfdWarning
+        warnings = []
+
+        def capture_warning(message):
+            warnings.append(str(message))
+            original_warning(message)
+
+        FreeCAD.ParamGet(prefs).SetBool("AppendDocNameToOutputPath", 0)
+        CfdTools.cfdWarning = capture_warning
+        try:
+            fccPrint('--------------- Start of CFD tests ---------------')
+            for m in self.__class__.__macros[:3]:
+                macro_name = os.path.join(home_path, "Demos", self.__class__.__dir_name, m)
+                fccPrint('Running {} macro {} ...'.format(self.__class__.__dir_name, macro_name))
+                CfdTools.executeMacro(macro_name)
+
+            analysis = CfdTools.getActiveAnalysis()
+            self.assertIsNotNone(analysis, "CfdTest of multi-touch NCC active analysis failed")
+            analysis.OutputPath = temp_dir
+
+            meshes = CfdTools.getMeshObjects(analysis)
+            target_mesh = next(mesh for mesh in meshes if mesh.Label == "SolidD_Mesh")
+            for mesh in list(meshes):
+                if mesh is not target_mesh:
+                    analysis.removeObject(mesh)
+            target_mesh.RegionName = ""
+            target_mesh.CaseName = "meshCaseMultiTouchNccSingleSolidD"
+            self.assertEqual(len(CfdTools.getMeshObjects(analysis)), 1)
+
+            CfdMeshTools.CfdMeshTools(target_mesh).writeMesh()
+            unmatched_generated_interface_warnings = [
+                warning for warning in warnings
+                if "No part of the boundary 'MultiTouchRegionCoupledInterface_" in warning and
+                "matched any part of the geometry" in warning
+            ]
+            self.assertEqual(unmatched_generated_interface_warnings, [])
+            fccPrint('--------------- End of CFD tests ---------------')
+        finally:
+            CfdTools.cfdWarning = original_warning
+            FreeCAD.ParamGet(prefs).SetBool("AppendDocNameToOutputPath", original_append_setting)
+
     def tearDown(self):
         if FreeCAD.ActiveDocument is not None:
             FreeCAD.closeDocument(FreeCAD.ActiveDocument.Name)

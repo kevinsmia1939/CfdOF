@@ -337,9 +337,20 @@ class CfdMeshTools:
         boundary_applies = []
         seen_region_interface_refs = set()
         skipped_region_interface_bc_ids = set()
+        mesh_part_name = getattr(self.part_obj, 'Name', '')
+
+        def generated_interface_references_mesh_part(bc_obj):
+            if not hasattr(bc_obj, 'InterfaceObject'):
+                return True
+            for ref_obj, _subnames in getattr(bc_obj, 'ShapeRefs', []):
+                if ref_obj is self.part_obj or getattr(ref_obj, 'Name', '') == mesh_part_name:
+                    return True
+            return False
+
         for bc_id, bc_obj in enumerate(bc_group):
             bc_region_name = getattr(bc_obj, 'RegionName', '')
             applies = not filter_boundaries_by_region or not bc_region_name or bc_region_name == mesh_region_name
+            applies = applies and generated_interface_references_mesh_part(bc_obj)
             boundary_applies.append(applies)
             if not applies:
                 continue
