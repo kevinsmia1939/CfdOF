@@ -107,6 +107,7 @@ class TaskPanelCfdMesh:
         self.form.if_NumberOfProcesses.setToolTip("Number of parallel processes")
         self.form.if_NumberOfThreads.setToolTip("Number of parallel threads per process.\n0 means use all available (if NumberOfProcesses = 1) or use 1 (if NumberOfProcesses > 1)")
 
+        self.initMeshPartControls()
         self.initRegionControls()
         self.load()
         self.updateUI()
@@ -121,6 +122,15 @@ class TaskPanelCfdMesh:
     def reject(self):
         FreeCADGui.ActiveDocument.resetEdit()
         return True
+
+    def initMeshPartControls(self):
+        self.meshPartLabel = QtGui.QLabel("Part to mesh:")
+        self.comboMeshPart = QtGui.QComboBox()
+        self.comboMeshPart.setToolTip(
+            "Object to mesh. Defaults to the object selected when this CFD mesh was created.")
+        self.form.gridLayout.addWidget(self.meshPartLabel, 1, 0)
+        self.form.gridLayout.addWidget(self.comboMeshPart, 1, 1)
+        self.comboMeshPart.activated.connect(self.meshPartChanged)
 
     def initRegionControls(self):
         self.regionFrame = QtGui.QGroupBox("Multi-region")
@@ -137,6 +147,61 @@ class TaskPanelCfdMesh:
 
         self.form.layout().insertWidget(1, self.regionFrame)
 
+    def getMeshPartCandidates(self):
+        candidates = []
+        doc = self.mesh_obj.Document
+        for obj in doc.Objects:
+            if obj is self.mesh_obj:
+                continue
+            if not obj.isDerivedFrom("Part::Feature"):
+                continue
+            proxy_type = getattr(getattr(obj, 'Proxy', None), 'Type', '')
+            if proxy_type.startswith('Cfd'):
+                continue
+            shape = getattr(obj, 'Shape', None)
+            if shape is None or shape.isNull():
+                continue
+            candidates.append(obj)
+        return candidates
+
+    def populateMeshPartCombo(self):
+        self.comboMeshPart.blockSignals(True)
+        self.comboMeshPart.clear()
+        current_part = getattr(self.mesh_obj, 'Part', None)
+        candidates = self.getMeshPartCandidates()
+        if current_part is not None and current_part not in candidates:
+            candidates.insert(0, current_part)
+        for obj in candidates:
+            label = obj.Label
+            if obj.Label != obj.Name:
+                label = "{} ({})".format(obj.Label, obj.Name)
+            self.comboMeshPart.addItem(label, obj.Name)
+        if current_part is not None:
+            index = self.comboMeshPart.findData(current_part.Name)
+            if index >= 0:
+                self.comboMeshPart.setCurrentIndex(index)
+        self.comboMeshPart.blockSignals(False)
+
+    def meshPartChanged(self, index):
+        if index < 0:
+            return
+        part_name = self.comboMeshPart.itemData(index)
+        part_obj = self.mesh_obj.Document.getObject(part_name)
+        if part_obj is None or part_obj is self.mesh_obj:
+            return
+        storeIfChanged(self.mesh_obj, 'Part', part_obj)
+        self.mesh_obj.Proxy.cart_mesh = CfdMeshTools.CfdMeshTools(self.mesh_obj)
+        if FreeCAD.GuiUp:
+            try:
+                initPrevPoint(self.prev_point_node, self.prev_point_move_node,
+                              getPrevPointSize(part_obj.Shape), 0, 1, 0,
+                              if2Float(self.form.if_pointInMeshX),
+                              if2Float(self.form.if_pointInMeshY),
+                              if2Float(self.form.if_pointInMeshZ))
+            except Exception:
+                pass
+        self.updateUI()
+
     def closed(self):
         # We call this from unsetEdit to ensure cleanup
         utility = CfdMesh.MESHERS[self.form.cb_utility.currentIndex()]
@@ -150,6 +215,7 @@ class TaskPanelCfdMesh:
 
     def load(self):
         """ Fills the widgets """
+        self.populateMeshPartCombo()
         setQuantity(self.form.if_max, self.mesh_obj.CharacteristicLengthMax)
         point_in_mesh = self.mesh_obj.PointInMesh.copy()
         setQuantity(self.form.if_pointInMeshX, point_in_mesh.get('x'))
@@ -219,6 +285,12 @@ class TaskPanelCfdMesh:
         storeIfChanged(self.mesh_obj, 'NumberOfThreads', self.form.if_NumberOfThreads.value())
         storeIfChanged(self.mesh_obj, 'RegionName', self.inputRegionName.text().strip())
         storeIfChanged(self.mesh_obj, 'RegionType', self.comboRegionType.currentText())
+        current_part_index = self.comboMeshPart.currentIndex()
+        if current_part_index >= 0:
+            part_name = self.comboMeshPart.itemData(current_part_index)
+            part_obj = self.mesh_obj.Document.getObject(part_name)
+            if part_obj is not None:
+                storeIfChanged(self.mesh_obj, 'Part', part_obj)
 
         point_in_mesh = {'x': getQuantity(self.form.if_pointInMeshX),
                          'y': getQuantity(self.form.if_pointInMeshY),
