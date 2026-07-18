@@ -49,6 +49,7 @@ class CfdFaceSelectWidget:
         self.parent_widget.layout().addWidget(self.form)
 
         self.selecting_references = False
+        self._closed = False
         self.recompute_timer = QTimer()
         self.recompute_timer.setSingleShot(True)
         self.recompute_timer.timeout.connect(self.recomputeDocument)
@@ -249,6 +250,8 @@ class CfdFaceSelectWidget:
         Add the selected sub-element (face) of the part to the Reference list. Prevent selection in other
         document.
         """
+        if self._closed or not self._formIsAlive():
+            return
         if FreeCADGui.activeDocument().Document.Name != self.doc_name:
             return
         selected_object = FreeCAD.getDocument(doc_name).getObject(obj_name)
@@ -332,8 +335,13 @@ class CfdFaceSelectWidget:
         self.updateSelectionbuttonUI()
 
     def rebuildReferenceList(self):
+        if self._closed or not self._formIsAlive():
+            return
         # Disable change notifications while we add new items
-        self.form.objectListWidget.itemChanged.disconnect(self.objectListItemChanged)
+        try:
+            self.form.objectListWidget.itemChanged.disconnect(self.objectListItemChanged)
+        except (RuntimeError, TypeError):
+            pass
 
         # Initialise all to unchecked
         if self.allow_obj_sel:
@@ -516,17 +524,39 @@ class CfdFaceSelectWidget:
 
     def scheduleRecompute(self):
         """ Only do one (costly) recompute when done processing - call this in preference to document.recompute() """
+        if self._closed:
+            return
         self.recompute_timer.start()
 
     def recomputeDocument(self):
+        if self._closed:
+            return
         # Re-assign to force update of FreeCAD property
         self.obj.ShapeRefs = self.ShapeRefs
         FreeCAD.getDocument(self.doc_name).recompute()
 
+    def _formIsAlive(self):
+        try:
+            self.form.objectListWidget.count()
+            return True
+        except RuntimeError:
+            return False
+
     def closing(self):
         """ Call this on close to let the widget to its proper cleanup """
-        FreeCADGui.Selection.removeObserver(self)
+        self._closed = True
+        try:
+            self.recompute_timer.stop()
+        except RuntimeError:
+            pass
+        try:
+            FreeCADGui.Selection.removeObserver(self)
+        except Exception:
+            pass
 
     def __del__(self):
         # Just in case, make sure any stray selection observer is removed before object deleted
-        FreeCADGui.Selection.removeObserver(self)
+        try:
+            self.closing()
+        except Exception:
+            pass

@@ -85,6 +85,10 @@ class TaskPanelCfdSolidProperties:
         self.form.solidDescriptor.setText(self.material.get("Description", ""))
         self.form.material_name.setText(self.obj.Label)
 
+    def cleanupSelector(self):
+        if getattr(self, 'solidSelector', None) is not None:
+            self.solidSelector.closing()
+
     def populateMaterialsList(self):
         self.form.PredefinedMaterialLibraryComboBox.clear()
         self.materials, material_name_path_list = CfdTools.importMaterials()
@@ -166,6 +170,7 @@ class TaskPanelCfdSolidProperties:
             FreeCAD.Console.PrintMessage(translate("Console", "Custom solid material saved\n"))
 
     def accept(self):
+        self.cleanupSelector()
         doc = FreeCADGui.getDocument(self.obj.Document)
         doc.resetEdit()
         doc.Document.recompute()
@@ -186,9 +191,10 @@ class TaskPanelCfdSolidProperties:
             FreeCADGui.doCommand(refstr)
 
     def reject(self):
+        self.cleanupSelector()
         self.obj.ShapeRefs = self.ShapeRefsOrig
         doc = FreeCADGui.getDocument(self.obj.Document)
         doc.resetEdit()
 
     def closing(self):
-        return
+        self.cleanupSelector()
