@@ -211,14 +211,41 @@ Validation completed:
 
 Known remaining demo-blocking issues:
 
-- Foundation 14 cfMesh-style demos such as Elbow and ViscousTubeBundle fail
-  during meshing because generated Allmesh calls surfaceFeatureEdges, while
-  Foundation 14 provides surfaceFeatureExtract.
-- This should be handled in the case/mesh generation compatibility branch using
-  CfdOF's OpenFOAM capability settings. The demo macros should remain
-  version-neutral.
+- Foundation 14 cfMesh-style demos such as Elbow and ViscousTubeBundle do not
+  run unless cfMesh is installed for the selected Foundation environment.
+  Foundation 14 provides surfaceFeatures/surfaceFeatureExtract, but those are
+  not a direct replacement for cfMesh surfaceFeatureEdges because cartesianMesh
+  expects a .fms surface. The local Foundation 14 install also does not provide
+  cartesianMesh.
+- Current fix on foundation-case-generation:
+  - CfdOF detects cfMesh runtime tools through OpenFOAM capability settings.
+  - Mesh generation records whether cartesianMesh and surfaceFeatureEdges are
+    available.
+  - Generated Allmesh/Allmesh.ps1 now fail early with a clear message when
+    cfMesh is selected but the selected OpenFOAM environment lacks the required
+    cfMesh tools.
+  - OpenFOAM.com 2606, where cfMesh tools are available, still generates the
+    normal cfMesh workflow and passes the Duct smoke solve.
 - Full demo matrix has not yet been completed for Foundation 13, Foundation 14,
   and OpenFOAM.com 2606. Continue from the validated Duct/LESStep smoke tests.
+
+Additional validation:
+
+- Foundation 14, Elbow demo:
+  - Macro workflow generated the mesh case.
+  - Generated Allmesh now fails early with:
+    "cfMesh was selected, but cartesianMesh was not found in the selected
+    OpenFOAM environment."
+  - This confirms the old misleading "surfaceFeatureEdges: command not found"
+    failure is replaced by the actual missing cfMesh toolchain reason.
+
+- OpenFOAM.com 2606, Duct demo:
+  - Retested after adding the cfMesh capability guard.
+  - Macro workflow, mesh, case write, and solver all passed.
+
+- Built-in CfdOF tests:
+  - Ran TestCfdOF with OpenFOAM.com 2606 selected.
+  - Result: 13 tests passed.
 
 Definition Of Done
 ------------------

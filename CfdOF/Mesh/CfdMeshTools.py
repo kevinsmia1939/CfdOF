@@ -711,10 +711,19 @@ class CfdMeshTools:
         else:
             norm_inst_path = installation_path
 
+        foam_info = CfdTools.getFoamVersionInfo()
+        foam_capabilities = CfdTools.getFoamCapabilities(include_runtime_tools=True)
         self.settings = {
             'Name': self.part_obj.Name,
             'MeshPath': self.mesh_case_dir,
             'FoamRuntime': CfdTools.getFoamRuntime(),
+            'FoamFork': foam_info['fork'],
+            'FoamVersion': foam_info['version'],
+            'FoamMajorVersion': foam_info['major'],
+            'FoamApi': foam_info['api'],
+            'FoamCapabilities': foam_capabilities,
+            'CfMeshAvailable': foam_capabilities.get('cfMesh', False),
+            'CfMeshSurfaceFeatureEdgesAvailable': foam_capabilities.get('cfMeshSurfaceFeatureEdges', False),
             'FoamPath': norm_inst_path,
             'TranslatedFoamPath': CfdTools.translatePath(norm_inst_path),
             'MeshUtility': self.mesh_obj.MeshUtility,
