@@ -621,27 +621,13 @@ def getFoamFork():
     return getFoamVersionInfo()['fork']
 
 
-def foamCommandExists(command):
-    try:
-        result = runFoamCommand('command -v "{}" >/dev/null 2>&1 && echo true || echo false'.format(command))[0]
-        return result.splitlines()[-1].strip() == 'true'
-    except Exception:
-        return False
-
-
-def getFoamCapabilities(include_runtime_tools=False):
+def getFoamCapabilities():
     info = getFoamVersionInfo()
     fork = info['fork']
     major = info['major']
-    capabilities = {
+    return {
         'foundation14SinglePhaseTransport': fork == 'Foundation' and major >= 14,
     }
-    if include_runtime_tools:
-        capabilities.update({
-            'cfMesh': foamCommandExists('cartesianMesh'),
-            'cfMeshSurfaceFeatureEdges': foamCommandExists('surfaceFeatureEdges'),
-        })
-    return capabilities
 
 
 def findInDefaultPaths(paths):
