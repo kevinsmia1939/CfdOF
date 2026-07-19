@@ -308,6 +308,15 @@ class CfdCaseWriterFoam:
             if solver_settings['ParallelCores'] < 2:
                 solver_settings['ParallelCores'] = 2
         solver_settings['SolverName'] = self.getSolverName()
+        self.processVersionDependentSolverSettings()
+
+    def processVersionDependentSolverSettings(self):
+        system_settings = self.settings['system']
+        solver_name = self.settings['solver']['SolverName']
+        foam_capabilities = system_settings.get('FoamCapabilities', {})
+        system_settings['Foundation14SinglePhaseTransport'] = (
+            foam_capabilities.get('foundation14SinglePhaseTransport', False)
+            and solver_name in ['simpleFoam', 'porousSimpleFoam', 'SRFSimpleFoam', 'pimpleFoam'])
 
     def processSystemSettings(self):
         installation_path = CfdTools.getFoamDir()
@@ -317,7 +326,14 @@ class CfdCaseWriterFoam:
             norm_inst_path = installation_path
 
         system_settings = self.settings['system']
+        foam_info = CfdTools.getFoamVersionInfo()
         system_settings['FoamRuntime'] = CfdTools.getFoamRuntime()
+        system_settings['FoamFork'] = foam_info['fork']
+        system_settings['FoamVersion'] = foam_info['version']
+        system_settings['FoamMajorVersion'] = foam_info['major']
+        system_settings['FoamApi'] = foam_info['api']
+        system_settings['FoamCapabilities'] = CfdTools.getFoamCapabilities()
+        system_settings['Foundation14SinglePhaseTransport'] = False
         system_settings['CasePath'] = self.case_folder
         system_settings['FoamPath'] = norm_inst_path
         system_settings['TranslatedFoamPath'] = CfdTools.translatePath(installation_path)

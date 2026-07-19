@@ -1,5 +1,7 @@
 %{%(solver/SolverName%)
 %:simpleFoam porousSimpleFoam SRFSimpleFoam pimpleFoam interFoam multiphaseInterFoam
+%{%(system/Foundation14SinglePhaseTransport%)
+%:False
 %[_header%]
 FoamFile
 {
@@ -58,4 +60,5 @@ sigmas
 %}
 
 // ************************************************************************* //
+%}
 %}
