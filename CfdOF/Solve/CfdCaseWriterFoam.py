@@ -308,6 +308,20 @@ class CfdCaseWriterFoam:
             if solver_settings['ParallelCores'] < 2:
                 solver_settings['ParallelCores'] = 2
         solver_settings['SolverName'] = self.getSolverName()
+        self.processVersionDependentSolverSettings()
+
+    def processVersionDependentSolverSettings(self):
+        system_settings = self.settings['system']
+        solver_name = self.settings['solver']['SolverName']
+        foundation_version = system_settings.get('FoamFork') == 'Foundation'
+        try:
+            foam_major = int(system_settings.get('FoamVersion', '').lstrip('v').split('.')[0])
+        except ValueError:
+            foam_major = 0
+        system_settings['Foundation14SinglePhaseTransport'] = (
+            foundation_version
+            and foam_major >= 14
+            and solver_name in ['simpleFoam', 'porousSimpleFoam', 'SRFSimpleFoam', 'pimpleFoam'])
 
     def processSystemSettings(self):
         installation_path = CfdTools.getFoamDir()
@@ -318,6 +332,9 @@ class CfdCaseWriterFoam:
 
         system_settings = self.settings['system']
         system_settings['FoamRuntime'] = CfdTools.getFoamRuntime()
+        system_settings['FoamFork'] = ''
+        system_settings['FoamVersion'] = ''
+        system_settings['Foundation14SinglePhaseTransport'] = False
         system_settings['CasePath'] = self.case_folder
         system_settings['FoamPath'] = norm_inst_path
         system_settings['TranslatedFoamPath'] = CfdTools.translatePath(installation_path)
@@ -337,6 +354,19 @@ class CfdCaseWriterFoam:
                     if dir.is_dir() and dir.name.startswith('OpenFOAM-'):
                         system_settings['FoamVersion'] = os.path.split(dir.name)[-1].lstrip('OpenFOAM-')
                         break
+        elif CfdTools.getFoamRuntime() in ['Posix', 'PosixPreloaded', 'PosixDocker', 'BashWSL']:
+            try:
+                foam_env = CfdTools.runFoamCommand(
+                    'printf "%s\\n%s\\n" "$WM_PROJECT_VERSION" "${FOAM_API-}"')
+                foam_env = foam_env[0].splitlines()
+                if len(foam_env) > 0:
+                    system_settings['FoamVersion'] = foam_env[0].strip().lstrip('v')
+                if len(foam_env) > 1 and foam_env[1].strip():
+                    system_settings['FoamFork'] = 'OpenCFD'
+                elif system_settings['FoamVersion']:
+                    system_settings['FoamFork'] = 'Foundation'
+            except Exception:
+                pass
         system_settings['MPIOptionsOMPI'], system_settings['MPIOptionsMSMPI'] = CfdTools.getMPISettings()
 
     def setupMesh(self, updated_mesh_path, scale):
