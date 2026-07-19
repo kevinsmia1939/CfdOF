@@ -17,15 +17,15 @@ internalField   uniform %(initialValues/Temperature%);
 
 boundaryField
 {
-%{%(multiRegionFluidBoundaries%)
-%{%(multiRegionFluidBoundaries/%(0%)/BoundaryType%)
+%{%(multiRegionFluidBoundariesByRegion/%(multiRegionFluidNames/0%)%)
+%{%(multiRegionFluidBoundariesByRegion/%(multiRegionFluidNames/0%)/%(0%)/BoundaryType%)
 %:wall
-%{%(multiRegionFluidBoundaries/%(0%)/ThermalBoundaryType%)
+%{%(multiRegionFluidBoundariesByRegion/%(multiRegionFluidNames/0%)/%(0%)/ThermalBoundaryType%)
 %:fixedValue
     %(0%)
     {
         type        fixedValue;
-        value       uniform %(multiRegionFluidBoundaries/%(0%)/Temperature%);
+        value       uniform %(multiRegionFluidBoundariesByRegion/%(multiRegionFluidNames/0%)/%(0%)/Temperature%);
     }
 %:zeroGradient
     %(0%)
@@ -38,7 +38,7 @@ boundaryField
     {
         type            externalWallHeatFluxTemperature;
         mode            flux;
-        q               uniform %(multiRegionFluidBoundaries/%(0%)/HeatFlux%);
+        q               uniform %(multiRegionFluidBoundariesByRegion/%(multiRegionFluidNames/0%)/%(0%)/HeatFlux%);
         kappaMethod     fluidThermo;
         value           $internalField;
     }
@@ -47,7 +47,7 @@ boundaryField
     {
         type            externalWallHeatFluxTemperature;
         mode            power;
-        Q               %(multiRegionFluidBoundaries/%(0%)/Power%);
+        Q               %(multiRegionFluidBoundariesByRegion/%(multiRegionFluidNames/0%)/%(0%)/Power%);
         kappaMethod     fluidThermo;
         value           $internalField;
     }
@@ -56,8 +56,8 @@ boundaryField
     {
         type            externalWallHeatFluxTemperature;
         mode            coefficient;
-        Ta              constant %(multiRegionFluidBoundaries/%(0%)/Temperature%);
-        h               uniform %(multiRegionFluidBoundaries/%(0%)/HeatTransferCoeff%);
+        Ta              constant %(multiRegionFluidBoundariesByRegion/%(multiRegionFluidNames/0%)/%(0%)/Temperature%);
+        h               uniform %(multiRegionFluidBoundariesByRegion/%(multiRegionFluidNames/0%)/%(0%)/HeatTransferCoeff%);
         kappaMethod     fluidThermo;
         value           $internalField;
     }
@@ -66,21 +66,21 @@ boundaryField
     %(0%)
     {
         type        inletOutlet;
-        inletValue  uniform %(multiRegionFluidBoundaries/%(0%)/Temperature%);
-        value       uniform %(multiRegionFluidBoundaries/%(0%)/Temperature%);
+        inletValue  uniform %(multiRegionFluidBoundariesByRegion/%(multiRegionFluidNames/0%)/%(0%)/Temperature%);
+        value       uniform %(multiRegionFluidBoundariesByRegion/%(multiRegionFluidNames/0%)/%(0%)/Temperature%);
     }
 %:outlet
     %(0%)
     {
         type        inletOutlet;
-        inletValue  uniform %(multiRegionFluidBoundaries/%(0%)/Temperature%);
+        inletValue  uniform %(multiRegionFluidBoundariesByRegion/%(multiRegionFluidNames/0%)/%(0%)/Temperature%);
         value       $internalField;
     }
 %:open
     %(0%)
     {
         type        inletOutlet;
-        inletValue  uniform %(multiRegionFluidBoundaries/%(0%)/Temperature%);
+        inletValue  uniform %(multiRegionFluidBoundariesByRegion/%(multiRegionFluidNames/0%)/%(0%)/Temperature%);
         value       $internalField;
     }
 %:constraint

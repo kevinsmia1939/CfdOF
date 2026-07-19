@@ -174,18 +174,6 @@ class CfdMesh:
             ),
         )
 
-        addObjectProperty(
-            obj,
-            "RegionName",
-            "",
-            "App::PropertyString",
-            "Multi-region",
-            QT_TRANSLATE_NOOP(
-                "App::Property",
-                "OpenFOAM region name for multi-region cases. Defaults to the mesh label when empty.",
-            ),
-        )
-
         if addObjectProperty(
             obj,
             "RegionType",

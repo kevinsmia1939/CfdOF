@@ -17,10 +17,10 @@ internalField   uniform (%(initialValues/Ux%) %(initialValues/Uy%) %(initialValu
 
 boundaryField
 {
-%{%(multiRegionFluidBoundaries%)
-%{%(multiRegionFluidBoundaries/%(0%)/BoundaryType%)
+%{%(multiRegionFluidBoundariesByRegion/%(multiRegionFluidNames/0%)%)
+%{%(multiRegionFluidBoundariesByRegion/%(multiRegionFluidNames/0%)/%(0%)/BoundaryType%)
 %:wall
-%{%(multiRegionFluidBoundaries/%(0%)/BoundarySubType%)
+%{%(multiRegionFluidBoundariesByRegion/%(multiRegionFluidNames/0%)/%(0%)/BoundarySubType%)
 %:fixedWall roughWall
     %(0%)
     {
@@ -35,44 +35,44 @@ boundaryField
     %(0%)
     {
         type        partialSlip;
-        valueFraction %(multiRegionFluidBoundaries/%(0%)/SlipRatio%);
+        valueFraction %(multiRegionFluidBoundariesByRegion/%(multiRegionFluidNames/0%)/%(0%)/SlipRatio%);
         value       uniform (0 0 0);
     }
 %:translatingWall
     %(0%)
     {
         type        fixedValue;
-        value       uniform (%(multiRegionFluidBoundaries/%(0%)/Ux%) %(multiRegionFluidBoundaries/%(0%)/Uy%) %(multiRegionFluidBoundaries/%(0%)/Uz%));
+        value       uniform (%(multiRegionFluidBoundariesByRegion/%(multiRegionFluidNames/0%)/%(0%)/Ux%) %(multiRegionFluidBoundariesByRegion/%(multiRegionFluidNames/0%)/%(0%)/Uy%) %(multiRegionFluidBoundariesByRegion/%(multiRegionFluidNames/0%)/%(0%)/Uz%));
     }
 %:rotatingWall
     %(0%)
     {
         type        rotatingWallVelocity;
-        origin      (%(multiRegionFluidBoundaries/%(0%)/CentreOfRotationx%) %(multiRegionFluidBoundaries/%(0%)/CentreOfRotationy%) %(multiRegionFluidBoundaries/%(0%)/CentreOfRotationz%));
-        axis        (%(multiRegionFluidBoundaries/%(0%)/RotationAxisx%) %(multiRegionFluidBoundaries/%(0%)/RotationAxisy%) %(multiRegionFluidBoundaries/%(0%)/RotationAxisz%));
-        omega       %(multiRegionFluidBoundaries/%(0%)/AngularVelocity%);
+        origin      (%(multiRegionFluidBoundariesByRegion/%(multiRegionFluidNames/0%)/%(0%)/CentreOfRotationx%) %(multiRegionFluidBoundariesByRegion/%(multiRegionFluidNames/0%)/%(0%)/CentreOfRotationy%) %(multiRegionFluidBoundariesByRegion/%(multiRegionFluidNames/0%)/%(0%)/CentreOfRotationz%));
+        axis        (%(multiRegionFluidBoundariesByRegion/%(multiRegionFluidNames/0%)/%(0%)/RotationAxisx%) %(multiRegionFluidBoundariesByRegion/%(multiRegionFluidNames/0%)/%(0%)/RotationAxisy%) %(multiRegionFluidBoundariesByRegion/%(multiRegionFluidNames/0%)/%(0%)/RotationAxisz%));
+        omega       %(multiRegionFluidBoundariesByRegion/%(multiRegionFluidNames/0%)/%(0%)/AngularVelocity%);
     }
 %}
 %:inlet
-%{%(multiRegionFluidBoundaries/%(0%)/BoundarySubType%)
+%{%(multiRegionFluidBoundariesByRegion/%(multiRegionFluidNames/0%)/%(0%)/BoundarySubType%)
 %:uniformVelocityInlet
     %(0%)
     {
         type        fixedValue;
-        value       uniform (%(multiRegionFluidBoundaries/%(0%)/Ux%) %(multiRegionFluidBoundaries/%(0%)/Uy%) %(multiRegionFluidBoundaries/%(0%)/Uz%));
+        value       uniform (%(multiRegionFluidBoundariesByRegion/%(multiRegionFluidNames/0%)/%(0%)/Ux%) %(multiRegionFluidBoundariesByRegion/%(multiRegionFluidNames/0%)/%(0%)/Uy%) %(multiRegionFluidBoundariesByRegion/%(multiRegionFluidNames/0%)/%(0%)/Uz%));
     }
 %:volumetricFlowRateInlet
     %(0%)
     {
         type        flowRateInletVelocity;
-        volumetricFlowRate %(multiRegionFluidBoundaries/%(0%)/VolumetricFlowRate%);
+        volumetricFlowRate %(multiRegionFluidBoundariesByRegion/%(multiRegionFluidNames/0%)/%(0%)/VolumetricFlowRate%);
         value       uniform (0 0 0);
     }
 %:massFlowRateInlet
     %(0%)
     {
         type        flowRateInletVelocity;
-        massFlowRate %(multiRegionFluidBoundaries/%(0%)/MassFlowRate%);
+        massFlowRate %(multiRegionFluidBoundariesByRegion/%(multiRegionFluidNames/0%)/%(0%)/MassFlowRate%);
         rho         rho;
         value       uniform (0 0 0);
     }
@@ -84,7 +84,7 @@ boundaryField
     }
 %}
 %:outlet
-%{%(multiRegionFluidBoundaries/%(0%)/BoundarySubType%)
+%{%(multiRegionFluidBoundariesByRegion/%(multiRegionFluidNames/0%)/%(0%)/BoundarySubType%)
 %:staticPressureOutlet
     %(0%)
     {
@@ -95,7 +95,7 @@ boundaryField
     %(0%)
     {
         type        fixedValue;
-        value       uniform (%(multiRegionFluidBoundaries/%(0%)/Ux%) %(multiRegionFluidBoundaries/%(0%)/Uy%) %(multiRegionFluidBoundaries/%(0%)/Uz%));
+        value       uniform (%(multiRegionFluidBoundariesByRegion/%(multiRegionFluidNames/0%)/%(0%)/Ux%) %(multiRegionFluidBoundariesByRegion/%(multiRegionFluidNames/0%)/%(0%)/Uy%) %(multiRegionFluidBoundariesByRegion/%(multiRegionFluidNames/0%)/%(0%)/Uz%));
     }
 %:outFlowOutlet
     %(0%)

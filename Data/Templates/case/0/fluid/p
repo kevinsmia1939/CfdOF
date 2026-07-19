@@ -17,8 +17,8 @@ internalField   uniform %(initialValues/Pressure%);
 
 boundaryField
 {
-%{%(multiRegionFluidBoundaries%)
-%{%(multiRegionFluidBoundaries/%(0%)/BoundaryType%)
+%{%(multiRegionFluidBoundariesByRegion/%(multiRegionFluidNames/0%)%)
+%{%(multiRegionFluidBoundariesByRegion/%(multiRegionFluidNames/0%)/%(0%)/BoundaryType%)
 %:constraint
 %[0/_boundary_constraint%]
 %:default

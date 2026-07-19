@@ -21,8 +21,8 @@ internalField   uniform %(initialValues/k%);
 
 boundaryField
 {
-%{%(multiRegionFluidBoundaries%)
-%{%(multiRegionFluidBoundaries/%(0%)/BoundaryType%)
+%{%(multiRegionFluidBoundariesByRegion/%(multiRegionFluidNames/0%)%)
+%{%(multiRegionFluidBoundariesByRegion/%(multiRegionFluidNames/0%)/%(0%)/BoundaryType%)
 %:wall
     %(0%)
     {

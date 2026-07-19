@@ -17,12 +17,11 @@ def generated_regions_by_source_name():
     return regions
 
 
-def add_mesh(name, region_obj, region_name, region_type, case_name):
+def add_mesh(name, region_obj, region_type, case_name):
     mesh = CfdMesh.makeCfdMesh(name)
     mesh.Label = name
     mesh.Part = region_obj
     mesh.PartSubShape = ""
-    mesh.RegionName = region_name
     mesh.RegionType = region_type
     mesh.CaseName = case_name
     CfdTools.getActiveAnalysis().addObject(mesh)
@@ -70,10 +69,10 @@ interface.RegionObjects = [
     regions["Fusion"],
 ]
 interface.RegionNames = [
-    regions["Box001"].RegionName,
-    regions["Box002"].RegionName,
-    regions["Body"].RegionName,
-    regions["Fusion"].RegionName,
+    CfdRegionCoupledInterface.getRegionName(regions["Box001"]),
+    CfdRegionCoupledInterface.getRegionName(regions["Box002"]),
+    CfdRegionCoupledInterface.getRegionName(regions["Body"]),
+    CfdRegionCoupledInterface.getRegionName(regions["Fusion"]),
 ]
 interface.ThermalBoundaryType = "zeroGradient"
 interface.Temperature = "293 K"
@@ -81,15 +80,15 @@ interface.ShapeRefs, interface.InterfacePairs = CfdRegionCoupledInterface.genera
     interface.RegionObjects
 )
 
-add_mesh("Fluid_Mesh", regions["Box"], "FluidProperties001", "fluid",
+add_mesh("Fluid_Mesh", regions["Box"], "fluid",
          "meshCaseMicrochipCoolingNccFluid")
-add_mesh("PCB_Mesh", regions["Box001"], "PCB", "solid",
+add_mesh("PCB_Mesh", regions["Box001"], "solid",
          "meshCaseMicrochipCoolingNccPCB")
-add_mesh("Microchip_Mesh", regions["Box002"], "microchip", "solid",
+add_mesh("Microchip_Mesh", regions["Box002"], "solid",
          "meshCaseMicrochipCoolingNccMicrochip")
-add_mesh("FanCase_Mesh", regions["Body"], "fan case", "solid",
+add_mesh("FanCase_Mesh", regions["Body"], "solid",
          "meshCaseMicrochipCoolingNccFanCase")
-add_mesh("HeatSink_Mesh", regions["Fusion"], "heat_sink", "solid",
+add_mesh("HeatSink_Mesh", regions["Fusion"], "solid",
          "meshCaseMicrochipCoolingNccHeatSink")
 
 App.ActiveDocument.recompute()

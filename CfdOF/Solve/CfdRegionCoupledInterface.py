@@ -71,7 +71,16 @@ def _safe_label(label):
 
 
 def getRegionName(obj):
-    return getattr(obj, 'RegionName', '') or obj.Label
+    part_obj = getattr(obj, 'Part', None)
+    if part_obj is not None:
+        sub_shape = getattr(obj, 'PartSubShape', '')
+        region_name = getattr(part_obj, 'RegionName', '')
+        if region_name:
+            return _safe_label(region_name)
+        if sub_shape:
+            return _safe_label("{}_{}".format(part_obj.Label, sub_shape))
+        return _safe_label(part_obj.Label)
+    return _safe_label(getattr(obj, 'RegionName', '') or getattr(obj, 'Label', obj.Name))
 
 
 def _shape_from_mesh(mesh_obj):
@@ -321,6 +330,13 @@ def _shape_refs_for_pair_side(interface_obj, pair, region_name):
     return [(ref_obj, (face_name,))]
 
 
+def _shape_ref_for_pair_object_face(interface_obj, object_name, face_name):
+    ref_obj = interface_obj.Document.getObject(object_name)
+    if ref_obj is None or not face_name:
+        return []
+    return [(ref_obj, (face_name,))]
+
+
 def _face_overlap_fraction(face_a, face_b):
     area_a = abs(getattr(face_a, 'Area', 0.0))
     area_b = abs(getattr(face_b, 'Area', 0.0))
@@ -550,20 +566,29 @@ class CfdRegionCoupledInterface:
         obj.ViewObject.DiffuseColor = face_colors
 
     def makeBoundaryObjects(self, obj):
-        region_names = [r for r in obj.RegionNames if r]
+        region_objects_by_name = {
+            region_obj.Name: region_obj for region_obj in getattr(obj, 'RegionObjects', [])
+        }
+        region_names = [getRegionName(region_obj) for region_obj in getattr(obj, 'RegionObjects', [])]
+        if not region_names:
+            region_names = [r for r in obj.RegionNames if r]
         if len(region_names) < 2:
             return []
         interface_pairs = _decode_interface_pairs(obj)
         generated = []
         if interface_pairs:
             for pair_index, pair in enumerate(interface_pairs, 1):
-                if pair['region_a'] not in region_names or pair['region_b'] not in region_names:
+                obj_a = region_objects_by_name.get(pair['object_a'])
+                obj_b = region_objects_by_name.get(pair['object_b'])
+                region_a = getRegionName(obj_a) if obj_a is not None else _safe_label(pair['region_a'])
+                region_b = getRegionName(obj_b) if obj_b is not None else _safe_label(pair['region_b'])
+                if region_a not in region_names or region_b not in region_names:
                     continue
-                for region_name, partner_name, face_name in (
-                    (pair['region_a'], pair['region_b'], pair['face_a']),
-                    (pair['region_b'], pair['region_a'], pair['face_b']),
+                for region_name, partner_name, object_name, face_name in (
+                    (region_a, region_b, pair['object_a'], pair['face_a']),
+                    (region_b, region_a, pair['object_b'], pair['face_b']),
                 ):
-                    shape_refs = _shape_refs_for_pair_side(obj, pair, region_name)
+                    shape_refs = _shape_ref_for_pair_object_face(obj, object_name, face_name)
                     if not shape_refs:
                         continue
                     label = "{}_{}_to_{}_{}".format(

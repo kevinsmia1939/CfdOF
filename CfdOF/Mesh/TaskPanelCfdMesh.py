@@ -126,11 +126,6 @@ class TaskPanelCfdMesh:
         self.regionFrame = QtGui.QGroupBox("Multi-region")
         regionLayout = QtGui.QFormLayout(self.regionFrame)
 
-        self.inputRegionName = QtGui.QLineEdit()
-        self.inputRegionName.setToolTip(
-            "OpenFOAM region name. If left empty, the mesh label is used.")
-        regionLayout.addRow("Region name:", self.inputRegionName)
-
         self.comboRegionType = QtGui.QComboBox()
         self.comboRegionType.addItems(["fluid", "solid"])
         regionLayout.addRow("Region type:", self.comboRegionType)
@@ -162,7 +157,6 @@ class TaskPanelCfdMesh:
         self.form.radio_explicit_edge_detection.setChecked(not self.mesh_obj.ImplicitEdgeDetection)
         self.form.if_NumberOfProcesses.setValue(self.mesh_obj.NumberOfProcesses)
         self.form.if_NumberOfThreads.setValue(self.mesh_obj.NumberOfThreads)
-        self.inputRegionName.setText(getattr(self.mesh_obj, 'RegionName', ''))
         self.comboRegionType.setCurrentIndex(
             self.comboRegionType.findText(getattr(self.mesh_obj, 'RegionType', 'fluid')))
 
@@ -217,7 +211,6 @@ class TaskPanelCfdMesh:
         storeIfChanged(self.mesh_obj, 'ImplicitEdgeDetection', self.form.radio_implicit_edge_detection.isChecked())
         storeIfChanged(self.mesh_obj, 'NumberOfProcesses', self.form.if_NumberOfProcesses.value())
         storeIfChanged(self.mesh_obj, 'NumberOfThreads', self.form.if_NumberOfThreads.value())
-        storeIfChanged(self.mesh_obj, 'RegionName', self.inputRegionName.text().strip())
         storeIfChanged(self.mesh_obj, 'RegionType', self.comboRegionType.currentText())
 
         point_in_mesh = {'x': getQuantity(self.form.if_pointInMeshX),

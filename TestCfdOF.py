@@ -36,6 +36,7 @@ from CfdOF.Solve import CfdInitialiseFlowField
 from CfdOF.Solve import CfdFluidMaterial
 from CfdOF.Mesh import CfdMesh
 from CfdOF.Solve import CfdFluidBoundary
+from CfdOF.Solve import CfdRegionCoupledInterface
 from CfdOF import CfdTools
 from CfdOF.Solve import CfdCaseWriterFoam
 from CfdOF.Mesh import CfdMeshTools
@@ -596,11 +597,11 @@ class MicrochipCoolingNccMacroWorkflowTest(unittest.TestCase):
                 "FluidProperties001": "fluid",
                 "PCB": "solid",
                 "microchip": "solid",
-                "fan case": "solid",
+                "fan_case": "solid",
                 "heat_sink": "solid",
             }
             self.assertEqual(
-                {getattr(mesh, 'RegionName', ''): getattr(mesh, 'RegionType', '') for mesh in meshes},
+                {CfdRegionCoupledInterface.getRegionName(mesh): getattr(mesh, 'RegionType', '') for mesh in meshes},
                 expected_mesh_regions,
             )
             self.assertEqual(
@@ -763,7 +764,7 @@ class ImprintedNccRegionsWorkflowTest(unittest.TestCase):
 
         if FreeCAD.GuiUp:
             interface.RegionObjects = region_objects
-            interface.RegionNames = [getattr(region_obj, 'RegionName', '') for region_obj in region_objects]
+            interface.RegionNames = [CfdRegionCoupledInterface.getRegionName(region_obj) for region_obj in region_objects]
             interface.ShapeRefs = CfdImprintedNccRegions.generateImprintedInterfaceFaceRefs(region_objects)
             interface.InterfacePairs = interface_pairs
             from CfdOF.Solve import TaskPanelCfdRegionCoupledInterface

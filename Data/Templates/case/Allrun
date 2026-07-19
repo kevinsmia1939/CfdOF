@@ -312,6 +312,14 @@ for region, mesh_dir in region_meshes:
         shutil.rmtree(dst)
     os.makedirs(os.path.dirname(dst), exist_ok=True)
     shutil.copytree(src, dst)
+    global_g = os.path.join('constant', 'g')
+    if os.path.isfile(global_g):
+        with open(global_g) as f:
+            gravity = f.read()
+        location = 'location    "constant/' + region + '";'
+        gravity = re.sub(r'location\s+"constant"\s*;', location, gravity)
+        with open(os.path.join('constant', region, 'g'), 'w') as f:
+            f.write(gravity)
 
 def extract_boundary_patch_names(region):
     bfile = os.path.join('constant', region, 'polyMesh', 'boundary')

@@ -116,6 +116,21 @@ def _get_mesh_part_object(mesh_obj):
     return mesh_obj.Part
 
 
+def _get_mesh_part_source_object(part_obj):
+    return getattr(part_obj, 'Source', part_obj)
+
+
+def _reference_targets_mesh_part(shape_ref, part_obj):
+    ref_obj = shape_ref[0]
+    source_obj = _get_mesh_part_source_object(part_obj)
+    return ref_obj is source_obj or getattr(ref_obj, 'Name', None) == getattr(source_obj, 'Name', None)
+
+
+def _boundary_targets_mesh_part(boundary_obj, part_obj):
+    refs = getattr(boundary_obj, 'ShapeRefs', [])
+    return not refs or any(_reference_targets_mesh_part(ref, part_obj) for ref in refs)
+
+
 def _solid_belongs_to_reference(result_solid, reference_solids):
     """Return True if a BooleanFragments result solid belongs to a source solid.
 
@@ -331,15 +346,12 @@ class CfdMeshTools:
             analysis_obj = CfdTools.getActiveAnalysis()
         if analysis_obj:
             bc_group = CfdTools.getCfdBoundaryGroupWithRegionInterfaces(analysis_obj)
-        mesh_region_name = getattr(self.mesh_obj, 'RegionName', '') or self.mesh_obj.Label
-        filter_boundaries_by_region = bool(
-            mesh_region_name and analysis_obj and len(CfdTools.getMeshObjects(analysis_obj)) > 1)
+        multi_mesh_analysis = bool(analysis_obj and len(CfdTools.getMeshObjects(analysis_obj)) > 1)
         boundary_applies = []
         seen_region_interface_refs = set()
         skipped_region_interface_bc_ids = set()
         for bc_id, bc_obj in enumerate(bc_group):
-            bc_region_name = getattr(bc_obj, 'RegionName', '')
-            applies = not filter_boundaries_by_region or not bc_region_name or bc_region_name == mesh_region_name
+            applies = not multi_mesh_analysis or _boundary_targets_mesh_part(bc_obj, self.part_obj)
             boundary_applies.append(applies)
             if not applies:
                 continue
@@ -349,7 +361,7 @@ class CfdMeshTools:
                 except RuntimeError as re:
                     raise RuntimeError("Error processing boundary condition {}: {}".format(bc_obj.Label, str(re)))
                 for si, s in enumerate(bf):
-                    if (not filter_boundaries_by_region and
+                    if (not multi_mesh_analysis and
                             hasattr(bc_obj, 'InterfaceObject') and
                             ri < len(bc_obj.ShapeRefs) and
                             si < len(bc_obj.ShapeRefs[ri][1])):

@@ -12,8 +12,8 @@ This branch currently contains a large CHT implementation plus the NCC work.
 Before upstream submission, we must make the NCC work easy to review:
 
 1. Keep the branch based on current dev.
-2. Clearly separate pure NCC changes from unrelated CHT/legacy/backward-compatibility
-   changes where possible.
+2. Clearly separate pure NCC changes from unrelated CHT code and remove
+   legacy/backward-compatibility paths instead of preserving them.
 3. Keep the final user workflow small and general.
 4. Prefer existing CfdOF patterns: settings are prepared in Python, case text is
    written through templates, GUI task panels expose only the minimum needed
@@ -32,6 +32,17 @@ Hard requirements
    compatibility issues.
 5. Mesh mismatch failures unrelated to the NCC behavior should not block feature
    validation, but the generated OpenFOAM dictionaries must be deterministic.
+6. Backward-compatibility and legacy code should not be kept for this redesign
+   when it conflicts with the intended workflow. Prefer a clean current data
+   model and update demos/tests to that model.
+7. Validation must reproduce the user's real workflow: open the FCStd/FCMacro
+   demo, run "mesh all", write the case, and run the solver from the CfdOF GUI
+   path. A serial-only scripted write/run is not sufficient for CHT NCC
+   validation.
+8. Solver validation must cover both serial and parallel execution where CfdOF
+   exposes parallel solving. Foundation multi-region CHT must specifically test
+   the `decomposePar -allRegions` path and the generated `regionSolvers`
+   metadata.
 
 Suggested upstream-facing design
 --------------------------------
@@ -74,6 +85,9 @@ The user should not manually select every coincident face. Instead:
    operation history.
 6. User creates one mesh object per generated imprinted region and can choose
    different meshers/refinement settings for each region.
+   The mesh task panel should not expose a manual "Region name" field. CfdOF
+   derives OpenFOAM region names internally from the selected/generated region
+   object and sanitizes them for OpenFOAM where needed.
 7. User creates a region-coupled interface object, or CfdOF creates one
    automatically from the imprint operation.
 8. In the interface task panel, user inspects/selects region participants and
@@ -125,9 +139,10 @@ Implementation phases
 Phase 1: Audit and scope cleanup
 1. Compare cht-nonconformal-region-coupling-dev against dev.
 2. Identify changes that are strictly needed for NCC.
-3. Identify changes that are CHT-only, demo-only, or legacy/backward-compatibility
-   code.
-4. Remove or split unrelated code before asking for upstream review.
+3. Identify changes that are CHT-only, demo-only, or legacy code.
+4. Remove legacy/backward-compatibility code that conflicts with the intended
+   workflow; do not keep it solely to support older intermediate branch states.
+5. Remove or split unrelated code before asking for upstream review.
 
 Phase 2: OpenFOAM compatibility
 1. Confirm the exact patch fields and dictionary syntax for OpenFOAM ESI and
@@ -186,7 +201,19 @@ Phase 7: Demos and tests
    interfaces/boundaries, materials, and write/run.
 4. Tests should check generated dictionaries and patch names before solver runs.
 5. Solver tests should run at least a short transient/steady solve where practical.
-6. Include edge cases:
+6. Add a GUI-equivalent workflow test for each NCC demo: create or open the demo,
+   run all mesh objects through the same "mesh all" path used by the GUI, write
+   the case through CfdOF, and execute the generated Allrun.
+7. Run CHT NCC solver tests in serial and parallel for supported OpenFOAM
+   families. For Foundation, assert that `system/controlDict` includes
+   `regionSolvers`, `system/regionSolvers` maps each derived region to `fluid`
+   or `solid`, `decomposePar -allRegions` succeeds, and `foamMultiRun` enters
+   the time loop.
+8. The tests must fail on warnings/errors that indicate root generation defects,
+   including missing patch references, boundaries assigned to the wrong region,
+   stale region names, all interface patches appearing in every region field,
+   and OpenFOAM fork/version dictionary incompatibilities.
+9. Include edge cases:
    - one face coupled to multiple partner faces
    - multiple interfaces in one case
    - interface generated from touching but non-overlapping bodies

@@ -4,12 +4,11 @@ from CfdOF import CfdTools
 from CfdOF.Mesh import CfdMesh
 
 
-def add_mesh(name, part, region_name, region_type, case_name, length):
+def add_mesh(name, part, region_type, case_name, length):
     CfdMesh.makeCfdMesh(name)
     mesh = App.ActiveDocument.ActiveObject
     CfdTools.getActiveAnalysis().addObject(mesh)
     mesh.Part = part
-    mesh.RegionName = region_name
     mesh.RegionType = region_type
     mesh.CaseName = case_name
     mesh.CharacteristicLengthMax = length
@@ -25,7 +24,6 @@ def add_mesh(name, part, region_name, region_type, case_name, length):
 add_mesh(
     "Fluid_Mesh",
     App.ActiveDocument.FluidRegion,
-    "FluidProperties",
     "fluid",
     "meshCaseSimpleHeatFinNccFluid",
     "5 mm",
@@ -33,7 +31,6 @@ add_mesh(
 add_mesh(
     "Solid_Mesh",
     App.ActiveDocument.SolidRegion,
-    "aluminium",
     "solid",
     "meshCaseSimpleHeatFinNccSolid",
     "3 mm",
