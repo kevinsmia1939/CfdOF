@@ -1,0 +1,153 @@
+Foundation Version Support Plan
+================================
+
+Goal
+----
+
+Make CfdOF generate OpenFOAM cases that run correctly on both OpenCFD/ESI and
+OpenFOAM Foundation versions. Demo macros and demo case files should remain
+normal CfdOF workflows; they should not contain their own OpenFOAM-version
+detection logic. Version-specific behavior belongs in CfdOF case generation.
+
+Key Principle
+-------------
+
+The user selects physics, mesh, materials, boundaries, regions, and solver
+settings in the normal CfdOF workflow. CfdOF detects the configured OpenFOAM
+implementation and version, then writes the appropriate dictionaries, fields,
+scripts, and utility calls for that target.
+
+OpenFOAM Variant Model
+----------------------
+
+CfdOF should derive and store these internal generation settings:
+
+- OpenFOAM runtime: Posix, PosixDocker, BashWSL, MinGW, BlueCFD, etc.
+- OpenFOAM fork: Foundation or OpenCFD/ESI.
+- OpenFOAM version: normalized major version when possible.
+- Feature flags derived from fork/version, for example:
+  - uses foamRun solver wrappers
+  - uses physicalProperties for Foundation single-phase transport
+  - uses current Foundation multiphase dictionary names
+  - uses current turbulence/momentum transport library names
+  - supports createNonConformalCouples
+
+The feature flags should be internal writer settings. Templates should depend on
+these settings rather than re-detecting OpenFOAM independently.
+
+PR 1: OpenFOAM Fork And Version Detection
+----------------------------------------
+
+Branch:
+
+foundation-version-detection
+
+Scope:
+
+- Improve CfdOF detection of OpenFOAM fork and version.
+- Detect Foundation vs OpenCFD/ESI reliably from the selected installation.
+- Normalize versions into stable writer settings.
+- Add a small helper API, for example:
+  - getFoamVersion()
+  - getFoamFork()
+  - getFoamCapabilities()
+- Avoid scattering raw checks for FOAM_API or WM_PROJECT_VERSION across the
+  codebase where generation-time settings can be used instead.
+- Keep existing runtime detection behavior intact.
+
+Acceptance criteria:
+
+- Foundation 13 is detected as Foundation version 13.
+- Foundation 14 is detected as Foundation version 14.
+- OpenCFD/ESI installations are detected as OpenCFD/ESI with their version/API.
+- Existing CfdOF built-in tests still pass.
+- The detection result is available to case, mesh, and solver writers through a
+  consistent interface.
+
+PR 2: Version-Specific Case Generation
+-------------------------------------
+
+Branch:
+
+foundation-case-generation
+
+Scope:
+
+- Use the detection/capability settings from PR 1 to generate correct case files
+  from the beginning.
+- Do not patch generated cases in Allrun unless the operation is truly a runtime
+  action that cannot be known during generation.
+- Replace ad hoc version checks in templates with writer-provided feature flags
+  where practical.
+- Fix only the Foundation/OpenCFD property, file, and terminology differences
+  that currently cause demos to fail. Broader compatibility cleanup should be
+  handled later after the demo-blocking issues are resolved.
+- Initial demo-blocking items:
+  - Foundation 14 single-phase incompressible transport properties:
+    generate constant/physicalProperties instead of legacy
+    constant/transportProperties.
+  - Foundation foamRun solver invocation differences.
+  - Foundation/OpenCFD differences in turbulence and momentum transport files.
+  - Foundation/OpenCFD differences in multiphase transport and phase-property
+    dictionaries.
+  - Foundation/OpenCFD differences in utilities such as setFields,
+    createZones/topoSet, createPatch, and createNonConformalCouples.
+
+Acceptance criteria:
+
+- Generated cases contain the correct dictionaries before Allrun is executed.
+- Foundation-specific dictionaries are not emitted for OpenCFD/ESI cases.
+- OpenCFD/ESI-specific dictionaries are not emitted for Foundation cases.
+- No demo macro contains OpenFOAM-version detection logic.
+- Built-in generated reference cases are updated where case output intentionally
+  changes.
+
+PR 3: Demo Compatibility And Validation
+--------------------------------------
+
+Branch:
+
+foundation-demo-compatibility
+
+Scope:
+
+- Update demo macros and reference case files only after CfdOF case generation
+  supports the required version differences.
+- The demos should express the CfdOF workflow only:
+  - geometry
+  - mesh setup
+  - physics setup
+  - materials
+  - boundaries
+  - solver controls
+- Demos should not manually choose Foundation vs OpenCFD/ESI dictionary formats.
+- Add or update test coverage so demos are generated and smoke-run against both
+  OpenCFD/ESI and Foundation where the local environment provides them.
+
+Validation matrix:
+
+- Foundation 13: generate, mesh, write, and run demo cases for a short smoke
+  duration.
+- Foundation 14: generate, mesh, write, and run demo cases for a short smoke
+  duration.
+- OpenCFD/ESI: generate, mesh, write, and run demo cases for a short smoke
+  duration.
+
+Suggested smoke-run settings:
+
+- Run enough steps to validate case startup and field updates.
+- For transient demos, use a small end time and limited write interval.
+- For steady demos, use 5 iterations unless a demo needs more to initialize.
+
+Definition Of Done
+------------------
+
+- CfdOF detects OpenFOAM fork/version once and exposes stable generation
+  settings.
+- CfdOF emits correct cases directly for Foundation and OpenCFD/ESI.
+- Demo macros remain version-neutral workflows.
+- Built-in tests pass.
+- Demo smoke runs pass on Foundation 13, Foundation 14, and OpenCFD/ESI where
+  installations are available.
+- Remaining unsupported version combinations fail early with a clear message,
+  not with an OpenFOAM dictionary error during solver startup.

@@ -555,6 +555,81 @@ def getFoamRuntime():
     return runtime
 
 
+def _normaliseFoamVersion(version):
+    version = version.strip()
+    if version:
+        version = version.split()[-1].lstrip('v')
+    return version
+
+
+def _getFoamMajorVersion(version):
+    try:
+        return int(version.split('.')[0])
+    except (AttributeError, ValueError):
+        return 0
+
+
+def getFoamVersionInfo():
+    """
+    Return information about the configured OpenFOAM implementation.
+
+    The fork field is "Foundation" for openfoam.org releases and "OpenCFD" for
+    OpenFOAM.com/ESI releases when it can be detected.
+    """
+    runtime = getFoamRuntime()
+    info = {
+        'runtime': runtime,
+        'fork': '',
+        'version': '',
+        'api': '',
+        'major': 0,
+    }
+
+    try:
+        if runtime == "MinGW" or runtime.startswith("BlueCFD"):
+            version = runFoamCommand("echo !WM_PROJECT_VERSION!")[0]
+            info['version'] = _normaliseFoamVersion(version)
+            if info['version']:
+                info['fork'] = 'OpenCFD'
+        else:
+            foam_env = runFoamCommand(
+                'printf "%s\\n%s\\n" "$WM_PROJECT_VERSION" "${FOAM_API-}"')[0].splitlines()
+            if len(foam_env) > 0:
+                info['version'] = _normaliseFoamVersion(foam_env[0])
+            if len(foam_env) > 1:
+                info['api'] = foam_env[1].strip()
+            if info['api']:
+                info['fork'] = 'OpenCFD'
+            elif info['version']:
+                info['fork'] = 'Foundation'
+    except Exception:
+        pass
+
+    info['major'] = _getFoamMajorVersion(info['version'])
+    return info
+
+
+def getFoamVersion():
+    return getFoamVersionInfo()['version']
+
+
+def getFoamMajorVersion():
+    return getFoamVersionInfo()['major']
+
+
+def getFoamFork():
+    return getFoamVersionInfo()['fork']
+
+
+def getFoamCapabilities():
+    info = getFoamVersionInfo()
+    fork = info['fork']
+    major = info['major']
+    return {
+        'foundation14SinglePhaseTransport': fork == 'Foundation' and major >= 14,
+    }
+
+
 def findInDefaultPaths(paths):
     for d in paths.get(platform.system(), []):
         d = glob.glob(os.path.expandvars(os.path.expanduser(d)))
