@@ -51,22 +51,8 @@ $NPROC = foamDictionary -entry numberOfSubdomains -value system/decomposeParDict
 %}
 %{%(MeshUtility%)
 %:cfMesh
-%{%(CfMeshAvailable%)
-%:False
-Write-Error "Fatal error: cfMesh was selected, but cartesianMesh was not found in the selected OpenFOAM environment."
-Write-Error "Install cfMesh for this OpenFOAM installation or choose another mesh utility."
-exit 1
-%:True
-%{%(CfMeshSurfaceFeatureEdgesAvailable%)
-%:False
-Write-Error "Fatal error: cfMesh was selected, but surfaceFeatureEdges was not found in the selected OpenFOAM environment."
-Write-Error "Foundation surfaceFeatures/surfaceFeatureExtract cannot replace cfMesh surfaceFeatureEdges because cartesianMesh expects a .fms surface."
-exit 1
-%:True
 # Extract feature edges
 runCommand surfaceFeatureEdges -angle 60 "constant/triSurface/%(Name%)_Geometry.stl" "%(Name%)_Geometry.fms"
-%}
-%}
 
 %{%(ParallelMesh%)
 %:True

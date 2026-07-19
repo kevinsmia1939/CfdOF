@@ -162,17 +162,6 @@ def _run_script(script_dir, script_name):
         raise RuntimeError("{} failed in {}\n{}".format(script_name, script_dir, result.stdout[-8000:]))
 
 
-def _mesh_can_run(mesh_obj):
-    if mesh_obj.MeshUtility != "cfMesh":
-        return True, ""
-    capabilities = CfdTools.getFoamCapabilities(include_runtime_tools=True)
-    if not capabilities.get("cfMesh"):
-        return False, "cfMesh selected but cartesianMesh is not available"
-    if not capabilities.get("cfMeshSurfaceFeatureEdges"):
-        return False, "cfMesh selected but surfaceFeatureEdges is not available"
-    return True, ""
-
-
 class CfdSolveSmokeTest(unittest.TestCase):
     def test_demo_cases_solve_one_iteration(self):
         prefs = CfdTools.getPreferencesLocation()
@@ -207,11 +196,6 @@ class CfdSolveSmokeTest(unittest.TestCase):
                         _set_one_iteration_controls(solver)
 
                         mesh_obj = CfdTools.getMeshObject(analysis)
-                        can_run_mesh, skip_reason = _mesh_can_run(mesh_obj)
-                        if not can_run_mesh:
-                            fccPrint("Skipping {} for {}: {}".format(case_name, foam_name, skip_reason))
-                            continue
-
                         mesh_obj.CaseName = "meshCase" + case_name
                         mesh_writer = CfdMeshTools.CfdMeshTools(mesh_obj)
                         mesh_writer.writeMesh()
