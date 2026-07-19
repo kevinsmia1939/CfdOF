@@ -76,6 +76,7 @@ class TaskPanelCfdSolverControl:
         self.form.pb_edit_inp.clicked.connect(self.editSolverInputFile)
         self.form.pb_run_solver.clicked.connect(self.runSolverProcess)
         self.form.pb_paraview.clicked.connect(self.openParaview)
+        self.form.pb_plot_residuals.clicked.connect(self.openResidualPlot)
         self.form.inputParallel.stateChanged.connect(self.updateUI)
 
         self.Start = time.time()
@@ -324,6 +325,14 @@ class TaskPanelCfdSolverControl:
         print_err = self.solver_object.Proxy.solver_process.processErrorOutput(lines)
         if print_err is not None:
             self.consoleMessage(print_err, 'Error')
+
+    def openResidualPlot(self):
+        plotter = self.solver_object.Proxy.residual_plotter
+        if not plotter.times or not any(plotter.values.values()):
+            self.consoleMessage("No residual data available to plot", 'Error')
+            return
+        plotter.updated = True
+        plotter.refresh()
 
     def openParaview(self):
         QApplication.setOverrideCursor(Qt.WaitCursor)
