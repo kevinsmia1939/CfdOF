@@ -139,6 +139,63 @@ Suggested smoke-run settings:
 - For transient demos, use a small end time and limited write interval.
 - For steady demos, use 5 iterations unless a demo needs more to initialize.
 
+PR 4: Solve Smoke Test Suite
+----------------------------
+
+Branch:
+
+foundation-solve-smoke-tests
+
+Scope:
+
+- Add a separate test suite that actually runs generated OpenFOAM cases.
+- The test suite should reuse the same CfdOF macro workflow as TestCfdOF:
+  - run demo macros
+  - write mesh case
+  - run Allmesh
+  - write solver case
+  - patch solver controls down to a one-step smoke solve
+  - run Allrun
+- Do not duplicate generated reference files.
+- Do not compare against Data/TestFiles reference output; this suite validates
+  solver startup and one-step execution.
+- Support selecting OpenFOAM installations from the command line where FreeCAD
+  allows it, for example:
+  - FreeCAD -t TestCfdOF-solve openfoam2606 openfoam14
+- Also support environment-variable fallback:
+  - CFDOF_SOLVE_FOAMS="openfoam2606 openfoam14"
+  - CFDOF_SOLVE_DEMOS="Duct LESStep"
+- Keep the default suite small enough for routine smoke testing. Broader demo
+  solve coverage can be added incrementally after the version-specific case
+  generation stabilizes.
+
+Initial implementation:
+
+- Test suite file: TestCfdOF-solve.py
+- Default smoke demos:
+  - Duct
+  - LESStep
+- Supported aliases:
+  - openfoam2606, 2606
+  - openfoam14, foundation14, openfoam-foundation14, 14
+  - openfoam13, foundation13, openfoam-foundation13, 13
+- Uses temporary output directories and restores the user's CfdOF preferences
+  after the test.
+- Skips cfMesh cases when the selected OpenFOAM environment does not provide
+  the required cfMesh tools.
+
+Validation completed:
+
+- Command:
+  - /home/kevin/Dropbox/UAntwerp/PhD_thesis/FreeCAD/FreeCAD_1.1.1.AppImage
+    -t TestCfdOF-solve openfoam2606 openfoam14
+- Result:
+  - Duct solved with OpenFOAM.com 2606.
+  - LESStep solved with OpenFOAM.com 2606.
+  - Duct solved with Foundation 14.
+  - LESStep solved with Foundation 14.
+  - Test result: OK.
+
 Current Progress
 ----------------
 
