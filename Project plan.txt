@@ -139,6 +139,87 @@ Suggested smoke-run settings:
 - For transient demos, use a small end time and limited write interval.
 - For steady demos, use 5 iterations unless a demo needs more to initialize.
 
+Current Progress
+----------------
+
+Completed branches:
+
+- foundation-version-detection
+  - Commit: 123b84e Add OpenFOAM fork version detection helpers
+  - Pushed to origin.
+  - Adds shared OpenFOAM detection helpers in CfdTools:
+    - getFoamVersionInfo()
+    - getFoamVersion()
+    - getFoamMajorVersion()
+    - getFoamFork()
+    - getFoamCapabilities()
+  - Verified locally with Foundation 14:
+    - runtime: Posix
+    - fork: Foundation
+    - version: 14
+    - foundation14SinglePhaseTransport: True
+
+- foundation-case-generation
+  - Commit: 8dbd7ea Generate Foundation transport property files
+  - Pushed to origin.
+  - Stacked on foundation-version-detection.
+  - Uses the detection helper output in CfdCaseWriterFoam.
+  - Generates Foundation 14 single-phase incompressible transport data as
+    constant/physicalProperties.
+  - Suppresses legacy constant/transportProperties for that Foundation 14
+    single-phase branch.
+  - Keeps OpenCFD/ESI/OpenFOAM.com 2606 generation on legacy
+    constant/transportProperties for the tested single-phase incompressible
+    cases.
+
+Validation completed:
+
+- Foundation 14, Duct demo:
+  - Macro workflow generated successfully.
+  - Mesh generated successfully.
+  - Case wrote successfully.
+  - Solver ran successfully.
+  - Generated constant/physicalProperties.
+  - Did not generate constant/transportProperties.
+
+- Foundation 14, LESStep demo:
+  - Macro workflow generated successfully.
+  - Mesh generated successfully.
+  - Case wrote successfully.
+  - Solver ran successfully to Time = 5.
+
+- OpenFOAM.com 2606, LESStep demo:
+  - Detected as fork OpenCFD, version 2606, api 2606.
+  - Macro workflow generated successfully.
+  - Mesh generated successfully.
+  - Case wrote successfully.
+  - Solver ran successfully to Time = 5.
+  - Generated constant/transportProperties.
+  - Did not generate constant/physicalProperties.
+
+- OpenFOAM.com 2606, Duct demo:
+  - Initially blocked by local missing OpenMPI PT-Scotch ABI libraries:
+    libptscotch.so.7.0 and libptscotcherrexit.so.7.0.
+  - After installing libptscotch7_0-openmpi4, snappyHexMesh dependencies
+    resolved.
+  - Macro workflow generated successfully.
+  - Mesh generated successfully.
+  - Case wrote successfully.
+  - Solver ran successfully to Time = 5.
+  - Generated constant/transportProperties.
+  - Did not generate constant/physicalProperties.
+
+Known remaining demo-blocking issues:
+
+- Foundation 14 cfMesh-style demos such as Elbow and ViscousTubeBundle fail
+  during meshing because generated Allmesh calls surfaceFeatureEdges, while
+  Foundation 14 provides surfaceFeatureExtract.
+- This should be handled in the case/mesh generation compatibility branch using
+  CfdOF's OpenFOAM capability settings. The demo macros should remain
+  version-neutral.
+- Full demo matrix has not yet been completed for Foundation 13, Foundation 14,
+  and OpenFOAM.com 2606. Continue from the validated Duct/LESStep smoke tests.
+
 Definition Of Done
 ------------------
 
