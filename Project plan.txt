@@ -196,6 +196,31 @@ Validation completed:
   - LESStep solved with Foundation 14.
   - Test result: OK.
 
+PR 5: Foundation Residual Plot Button
+-------------------------------------
+
+Branch:
+
+fix-foundation-residual-plot-button
+
+Scope:
+
+- Add a manual Residuals button to the solver task panel so users can open the
+  residual plot after a solver run.
+- Fix Foundation residual plotting where automatic plotting does not appear
+  reliably after the solver finishes.
+- Keep the fix focused on the residual plot workflow only.
+- Do not include OpenFOAM case-generation changes in this branch.
+- This is the final PR in the current Foundation support improvement series.
+
+Acceptance criteria:
+
+- The solver task panel exposes a Residuals button.
+- Clicking the button opens or refreshes the residual plot for a completed
+  solver run.
+- Foundation solver logs are parsed correctly enough for residual plotting.
+- Existing OpenCFD/ESI residual plotting behavior is not regressed.
+
 Current Progress
 ----------------
 
@@ -314,5 +339,7 @@ Definition Of Done
 - Built-in tests pass.
 - Demo smoke runs pass on Foundation 13, Foundation 14, and OpenCFD/ESI where
   installations are available.
+- Foundation runs have a manual residual plotting path from the solver task
+  panel.
 - Remaining unsupported version combinations fail early with a clear message,
   not with an OpenFOAM dictionary error during solver startup.
