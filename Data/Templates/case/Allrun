@@ -44,6 +44,8 @@ then
 fi
 
 # Copy mesh from mesh case dir if available
+%{%(multiRegionUseSplitMeshRegions%)
+%:True
 MESHDIR="%(meshDir%)"
 if [ -f "$MESHDIR"/constant/polyMesh/faces ]
 then
@@ -54,6 +56,7 @@ then
     echo "Fatal error: Unable to find mesh in directory $MESHDIR" 1>&2
     exit 1
 fi
+%}
 
 # Detect available turbulence lib
 if [ -f "$FOAM_LIBBIN/libmomentumTransportModels.so" ] || [ -f "$FOAM_LIBBIN/libmomentumTransportModels.dll" ]
@@ -149,7 +152,10 @@ fi
 
 %}
 # Update patch name and type
+%{%(multiRegionUseSplitMeshRegions%)
+%:True
 runCommand createPatch -overwrite
+%}
 
 %{%(createPatchesForPeriodics%)
 %:True
@@ -176,6 +182,319 @@ then
 else
 	runCommand topoSet -dict system/topoSetZonesDict
 fi
+
+%}
+%{%(solver/SolverName%)
+%:chtMultiRegionSimpleFoam chtMultiRegionFoam
+%{%(multiRegionUseSplitMeshRegions%)
+%:True
+# Split combined mesh into fluid and solid regions
+runCommand splitMeshRegions -cellZonesOnly -overwrite
+
+%:False
+# Separate region meshes are expected in constant/<region>/polyMesh.
+# Configure automatically matched non-conformal region-coupled patch pairs.
+env -u PYTHONPATH -u PYTHONHOME python3 << 'PYEOF'
+import os, re, shutil, subprocess
+
+global_create_patch_dict = os.path.join('system', 'createPatchDict')
+
+region_meshes = [
+%{%(multiRegionMeshDirs%)
+    ("%(0%)", "%(multiRegionMeshDirs/%(0%)/MeshDir%)"),
+%}
+]
+
+couples = [
+%{%(multiRegionNonConformalCouples%)
+    ("%(multiRegionNonConformalCouples/%(0%)/MasterRegion%)",
+     "%(multiRegionNonConformalCouples/%(0%)/MasterPatch%)",
+     "%(multiRegionNonConformalCouples/%(0%)/SlaveRegion%)",
+     "%(multiRegionNonConformalCouples/%(0%)/SlavePatch%)"),
+%}
+]
+
+if not couples:
+    raise RuntimeError("Multi-mesh CHT requires at least one automatically matched region-coupled wall pair")
+
+for region, mesh_dir in region_meshes:
+    src = os.path.join(mesh_dir, 'constant', 'polyMesh')
+    dst = os.path.join('constant', region, 'polyMesh')
+    if not os.path.isdir(src):
+        raise RuntimeError("Mesh for region '{}' was not found at '{}'. Run that region's Allmesh first.".format(
+            region, src))
+    if os.path.isdir(dst):
+        shutil.rmtree(dst)
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
+    shutil.copytree(src, dst)
+    global_g = os.path.join('constant', 'g')
+    if os.path.isfile(global_g):
+        with open(global_g) as f:
+            gravity = f.read()
+        location = 'location    "constant/' + region + '";'
+        gravity = re.sub(r'location\s+"constant"\s*;', location, gravity)
+        with open(os.path.join('constant', region, 'g'), 'w') as f:
+            f.write(gravity)
+
+def extract_boundary_patch_names(region):
+    bfile = os.path.join('constant', region, 'polyMesh', 'boundary')
+    with open(bfile) as f:
+        txt = f.read()
+    return set(re.findall(r'\n\s*([A-Za-z_][A-Za-z0-9_]*)\s*\n\s*\{', txt))
+
+def extract_patch_blocks(txt):
+    patches_match = re.search(r'\npatches\s*\(', txt)
+    if not patches_match:
+        return []
+    blocks = []
+    i = patches_match.end()
+    depth = 0
+    start = None
+    while i < len(txt):
+        char = txt[i]
+        if char == '{':
+            if depth == 0:
+                start = i
+            depth += 1
+        elif char == '}':
+            depth -= 1
+            if depth == 0 and start is not None:
+                blocks.append(txt[start:i + 1])
+                start = None
+        elif char == ')' and depth == 0:
+            break
+        i += 1
+    return blocks
+
+def block_matches_region(block, patch_names):
+    match = re.search(r'\n\s*patches\s*\((.*?)\)\s*;', block, re.S)
+    if not match:
+        return False
+    patterns = re.findall(r'"([^"]+)"|([A-Za-z0-9_.*+-]+)', match.group(1))
+    for quoted, unquoted in patterns:
+        pattern = quoted or unquoted
+        for patch_name in patch_names:
+            if re.fullmatch(pattern, patch_name):
+                return True
+    return False
+
+def write_region_create_patch_dict(region):
+    with open(global_create_patch_dict) as f:
+        txt = f.read()
+    patch_names = extract_boundary_patch_names(region)
+    blocks = [
+        block for block in extract_patch_blocks(txt)
+        if block_matches_region(block, patch_names)
+    ]
+    region_system_dir = os.path.join('system', region)
+    os.makedirs(region_system_dir, exist_ok=True)
+    region_dict = os.path.join(region_system_dir, 'createPatchDict')
+    header = txt[:re.search(r'\npatches\s*\(', txt).start()]
+    with open(region_dict, 'w') as f:
+        f.write(header)
+        f.write("\npatches\n(\n")
+        for block in blocks:
+            f.write(block)
+            f.write("\n")
+        f.write(");\n\n// ************************************************************************* //\n")
+    return os.path.abspath(region_dict)
+
+for region, mesh_dir in region_meshes:
+    create_patch_dict = write_region_create_patch_dict(region)
+    subprocess.check_call(['createPatch', '-region', region, '-dict', create_patch_dict, '-overwrite'])
+
+def replace_patch_block(txt, patch, neighbour_region, neighbour_patch):
+    sample_mode = os.environ.get('CFDOF_MAPPED_WALL_SAMPLE_MODE', 'nearestPatchFaceAMI')
+    pattern = re.compile(r'(\n\s*' + re.escape(patch) + r'\s*\n\s*\{)(.*?)(\n\s*\})', re.S)
+    match = pattern.search(txt)
+    if not match:
+        raise RuntimeError("Patch '{}' was not found in boundary file".format(patch))
+    body = match.group(2)
+    body = re.sub(r'\n\s*type\s+\w+\s*;', '', body)
+    body = re.sub(r'\n\s*sampleMode\s+\w+\s*;', '', body)
+    body = re.sub(r'\n\s*sampleRegion\s+\w+\s*;', '', body)
+    body = re.sub(r'\n\s*samplePatch\s+\w+\s*;', '', body)
+    body = (
+        "\n        type            mappedWall;"
+        "\n        sampleMode      " + sample_mode + ";"
+        "\n        sampleRegion    " + neighbour_region + ";"
+        "\n        samplePatch     " + neighbour_patch + ";" + body
+    )
+    return txt[:match.start()] + match.group(1) + body + match.group(3) + txt[match.end():]
+
+def patch_region_boundary(region, patch, neighbour_region, neighbour_patch):
+    bfile = os.path.join('constant', region, 'polyMesh', 'boundary')
+    if not os.path.exists(bfile):
+        raise RuntimeError("Boundary file '{}' does not exist. Generate or copy the region mesh first.".format(bfile))
+    with open(bfile) as f:
+        txt = f.read()
+    txt = replace_patch_block(txt, patch, neighbour_region, neighbour_patch)
+    with open(bfile, 'w') as f:
+        f.write(txt)
+
+for master_region, master_patch, slave_region, slave_patch in couples:
+    patch_region_boundary(master_region, master_patch, slave_region, slave_patch)
+    patch_region_boundary(slave_region, slave_patch, master_region, master_patch)
+PYEOF
+py_status=$?
+if [ ! $py_status -eq 0 ]; then exit $py_status; fi
+
+%}
+%{%(meanVelocityForceCellZonesPresent%)
+%:True
+# Create mean velocity force cell zones inside the fluid region mesh
+runCommand topoSet -region %(multiRegionFluidNames/0%) -dict "$PWD/system/%(multiRegionFluidNames/0%)/topoSetMeanVelocityForceZonesDict"
+
+%}
+# Upgrade sampleMode on all mappedWall interface patches to nearestPatchFaceAMI (parallel-safe)
+# and add missing patch entries to 0/ field files for any interface patches splitMeshRegions created.
+# splitMeshRegions already creates correct <fluid>_to_<solid> / <solid>_to_<fluid> mappedWall pairs;
+# we only need to upgrade their sampleMode and populate the 0/ field files.
+env -u PYTHONPATH -u PYTHONHOME python3 << 'PYEOF'
+import re, os, glob
+
+FLUID_REGIONS = []
+SOLID_REGIONS = []
+try:
+    with open('constant/regionProperties') as f:
+        txt = f.read()
+    fm = re.search(r'fluid\s*\(\s*([^)]*?)\s*\)', txt)
+    sm = re.search(r'solid\s*\(\s*([^)]*?)\s*\)', txt)
+    if fm:
+        FLUID_REGIONS = fm.group(1).split()
+    if sm:
+        SOLID_REGIONS = sm.group(1).split()
+except FileNotFoundError:
+    pass
+
+def fix_samplemode_to_ami(bfile):
+    """Set mappedWall sampleMode to the runtime-compatible patch-to-patch mode."""
+    sample_mode = os.environ.get('CFDOF_MAPPED_WALL_SAMPLE_MODE', 'nearestPatchFaceAMI')
+    with open(bfile) as f:
+        txt = f.read()
+    txt = re.sub(r'sampleMode\s+\w+\s*;', 'sampleMode      ' + sample_mode + ';', txt)
+    with open(bfile, 'w') as f:
+        f.write(txt)
+
+def get_mapped_patches(bfile):
+    """Return names of all mappedWall patches in boundary file."""
+    with open(bfile) as f:
+        txt = f.read()
+    return re.findall(r'\n\s+(\w+)\s*\n\s*\{[^}]*type\s+mappedWall', txt)
+
+def get_nonmapped_patches(bfile):
+    """Return names of all non-mappedWall patches in boundary file."""
+    with open(bfile) as f:
+        txt = f.read()
+    all_patches = re.findall(r'\n    (\w+)\n    \{', txt)
+    mapped = set(re.findall(r'\n\s+(\w+)\s*\n\s*\{[^}]*type\s+mappedWall', txt))
+    return [p for p in all_patches if p not in mapped]
+
+def patch_present(field_txt, patch_name):
+    return bool(re.search(r'\n\s+' + re.escape(patch_name) + r'\s*\n\s*\{', field_txt))
+
+def add_patch_entry(field_file, patch_name, bc_lines):
+    with open(field_file) as f:
+        txt = f.read()
+    if patch_present(txt, patch_name):
+        return
+    entry = '\n    ' + patch_name + '\n    {\n'
+    for line in bc_lines:
+        entry += '        ' + line + '\n'
+    entry += '    }\n'
+    # Insert before the LAST closing brace (end of boundaryField, not FoamFile header)
+    matches = list(re.finditer(r'\n}', txt))
+    if matches:
+        pos = matches[-1].start() + 1
+        txt = txt[:pos] + entry + txt[pos:]
+    with open(field_file, 'w') as f:
+        f.write(txt)
+
+def add_missing_patches_to_fields(region, patches, is_fluid):
+    field_dir = os.path.join('0', region)
+    if not os.path.isdir(field_dir):
+        return
+    for patch in patches:
+        for field_file in glob.glob(os.path.join(field_dir, '*')):
+            fname = os.path.basename(field_file)
+            if fname == 'T':
+                kappa = 'fluidThermo' if is_fluid else 'solidThermo'
+                add_patch_entry(field_file, patch, [
+                    'type            compressible::turbulentTemperatureCoupledBaffleMixed;',
+                    'value           $internalField;',
+                    'Tnbr            T;',
+                    'kappaMethod     ' + kappa + ';',
+                ])
+            elif fname == 'U' and is_fluid:
+                add_patch_entry(field_file, patch, ['type            noSlip;'])
+            elif fname == 'p_rgh' and is_fluid:
+                add_patch_entry(field_file, patch, [
+                    'type            fixedFluxPressure;',
+                    'value           $internalField;',
+                ])
+            elif fname == 'p':
+                add_patch_entry(field_file, patch, [
+                    'type        calculated;',
+                    'value       $internalField;',
+                ])
+            elif fname == 'nut' and is_fluid:
+                add_patch_entry(field_file, patch, [
+                    'type            nutkWallFunction;',
+                    'value           $internalField;',
+                ])
+            elif fname in ('k', 'epsilon', 'omega', 'nuTilda', 'alphat') and is_fluid:
+                add_patch_entry(field_file, patch, ['type            zeroGradient;'])
+
+for r in FLUID_REGIONS:
+    bfile = 'constant/' + r + '/polyMesh/boundary'
+    if not os.path.exists(bfile):
+        continue
+%{%(solver/Parallel%)
+%:True
+    fix_samplemode_to_ami(bfile)
+%}
+for r in SOLID_REGIONS:
+    bfile = 'constant/' + r + '/polyMesh/boundary'
+    if not os.path.exists(bfile):
+        continue
+%{%(solver/Parallel%)
+%:True
+    fix_samplemode_to_ami(bfile)
+%}
+
+# Add 0/ field entries for all mappedWall interface patches splitMeshRegions created
+for r in FLUID_REGIONS:
+    bfile = 'constant/' + r + '/polyMesh/boundary'
+    if not os.path.exists(bfile):
+        continue
+    mapped = [p for p in get_mapped_patches(bfile) if p != 'defaultFaces']
+    add_missing_patches_to_fields(r, mapped, is_fluid=True)
+for r in SOLID_REGIONS:
+    bfile = 'constant/' + r + '/polyMesh/boundary'
+    if not os.path.exists(bfile):
+        continue
+    mapped = [p for p in get_mapped_patches(bfile) if p != 'defaultFaces']
+    add_missing_patches_to_fields(r, mapped, is_fluid=False)
+
+# Add default BC entries for non-mapped patches in solid regions that aren't yet in
+# the field files (e.g. inlet/outlet/wall faces that fall inside a solid volume after
+# splitMeshRegions). OpenFOAM requires an explicit entry for every patch in boundaryField.
+for r in SOLID_REGIONS:
+    bfile = 'constant/' + r + '/polyMesh/boundary'
+    if not os.path.exists(bfile):
+        continue
+    nonmapped = get_nonmapped_patches(bfile)
+    for patch in nonmapped:
+        for field_file in glob.glob(os.path.join('0', r, '*')):
+            fname = os.path.basename(field_file)
+            if fname == 'T':
+                add_patch_entry(field_file, patch, ['type            zeroGradient;'])
+            elif fname == 'p':
+                add_patch_entry(field_file, patch, [
+                    'type        calculated;',
+                    'value       $internalField;',
+                ])
+PYEOF
 
 %}
 %{%(initialisationZonesPresent%)
@@ -220,12 +539,23 @@ PNAME=p
 %}
 %{%(solver/Parallel%)
 %:True
+%{%(solver/SolverName%)
+%:chtMultiRegionSimpleFoam chtMultiRegionFoam
+# Parallel decomposition
+# Copy decomposeParDict to each region's system directory
+for region in $(ls -d constant/*/polyMesh 2>/dev/null | cut -d/ -f2); do
+    mkdir -p system/$region
+    cp system/decomposeParDict system/$region/decomposeParDict
+done
+runCommand decomposePar -allRegions -force
+%:default
 # Parallel decomposition
 if [ ! -d processor0 ]
 then
     runCommand decomposePar -force
 fi
 
+%}
 # Pick up number of parallel processes
 NPROC=$(foamDictionary -entry "numberOfSubdomains" -value system/decomposeParDict)
 
@@ -235,8 +565,12 @@ NPROC=$(foamDictionary -entry "numberOfSubdomains" -value system/decomposeParDic
 %:False
 %{%(MovingMeshRegionsPresent%)
 %:False
+%{%(solver/SolverName%)
+%:chtMultiRegionSimpleFoam chtMultiRegionFoam
+%:default
 # Mesh renumbering
 runParallel $NPROC renumberMesh -overwrite
+%}
 %}
 %}
 %:True
@@ -260,6 +594,10 @@ fi
 %}
 %{%(initialValues/PotentialFlow%)
 %:True
+%{%(solver/SolverName%)
+%:chtMultiRegionSimpleFoam chtMultiRegionFoam
+# potentialFoam not applicable to multi-region CHT (no single-region polyMesh after splitMeshRegions)
+%:default
 # Initialise flow
 %{%(bafflesPresent%)
 %:True
@@ -278,6 +616,7 @@ runParallel $NPROC potentialFoam -initialiseUBCs -pName $PNAME
 # Remove phi with wrong units
 rm -f processor*/0/phi
 %}
+%}
 
 %}
 # Run application in parallel
@@ -294,12 +633,22 @@ then
     runParallel $NPROC foamRun -solver incompressibleVoF
 %:multiphaseInterFoam
     runParallel $NPROC foamRun -solver incompressibleMultiphaseVoF
+%:chtMultiRegionSimpleFoam
+    if command -v chtMultiRegionSimpleFoam > /dev/null 2>&1
+    then
+        runParallel $NPROC chtMultiRegionSimpleFoam
+    else
+        runParallel $NPROC chtMultiRegionFoam
+    fi
+%:chtMultiRegionFoam
+    runParallel $NPROC chtMultiRegionFoam
 %:default
     runParallel $NPROC %(solver/SolverName%)
 %}
 else
     runParallel $NPROC %(solver/SolverName%)
 fi
+
 %:False
 %{%(dynamicMeshEnabled%)
 %:False
@@ -307,8 +656,12 @@ fi
 %:False
 %{%(MovingMeshRegionsPresent%)
 %:False
+%{%(solver/SolverName%)
+%:chtMultiRegionSimpleFoam chtMultiRegionFoam
+%:default
 # Mesh renumbering
 runCommand renumberMesh -overwrite
+%}
 %}
 %}
 %:True
@@ -352,11 +705,20 @@ then
     runCommand foamRun -solver incompressibleVoF
 %:multiphaseInterFoam
     runCommand foamRun -solver incompressibleMultiphaseVoF
+%:chtMultiRegionSimpleFoam
+    if command -v chtMultiRegionSimpleFoam > /dev/null 2>&1
+    then
+        runCommand chtMultiRegionSimpleFoam
+    else
+        runCommand chtMultiRegionFoam
+    fi
+%:chtMultiRegionFoam
+    runCommand chtMultiRegionFoam
 %:default
     runCommand %(solver/SolverName%)
 %}
 else
     runCommand %(solver/SolverName%)
 fi
-%}
 
+%}

@@ -156,6 +156,10 @@ def getMeshObject(analysis_object):
     return models[0] if len(models) else None
 
 
+def getMeshObjects(analysis_object):
+    return getModelsOfType(analysis_object if analysis_object else FreeCAD.activeDocument().Objects, 'CfdMesh')
+
+
 def getPorousZoneObjects(analysis_object):
     return getModelsOfType(analysis_object, 'CfdPorousZone')
 
@@ -166,7 +170,7 @@ def getInitialisationZoneObjects(analysis_object):
 
 def getZoneObjects(analysis_object):
     from CfdOF.Solve.CfdZone import CfdZone
-    return [i for i in analysis_object.Group if isinstance(i.Proxy, CfdZone)]
+    return [i for i in analysis_object.Group if isinstance(getattr(i, 'Proxy', None), CfdZone)]
 
 
 def getInitialConditions(analysis_object):
@@ -174,7 +178,16 @@ def getInitialConditions(analysis_object):
 
 
 def getMaterials(analysis_object):
-    return [i for i in analysis_object.Group if i.isDerivedFrom('App::MaterialObjectPython')]
+    from CfdOF.Solve.CfdSolidMaterial import CfdSolidMaterial
+    return [i for i in analysis_object.Group
+            if i.isDerivedFrom('App::MaterialObjectPython')
+            and not isinstance(getattr(i, 'Proxy', None), CfdSolidMaterial)]
+
+
+def getSolidMaterials(analysis_object):
+    from CfdOF.Solve.CfdSolidMaterial import CfdSolidMaterial
+    return [i for i in analysis_object.Group
+            if isinstance(getattr(i, 'Proxy', None), CfdSolidMaterial)]
 
 
 def getSolver(analysis_object):
@@ -194,6 +207,24 @@ def getSolverSettings(solver):
 
 def getCfdBoundaryGroup(analysis_object):
     return getModelsOfType(analysis_object, 'CfdFluidBoundary')
+
+
+def getRegionCoupledInterfaceGroup(analysis_object):
+    return getModelsOfType(analysis_object, 'CfdRegionCoupledInterface')
+
+
+def getCfdBoundaryGroupWithRegionInterfaces(analysis_object):
+    boundaries = list(getCfdBoundaryGroup(analysis_object))
+    for interface_obj in getRegionCoupledInterfaceGroup(analysis_object):
+        if hasattr(interface_obj.Proxy, 'makeBoundaryObjects'):
+            boundaries.extend(interface_obj.Proxy.makeBoundaryObjects(interface_obj))
+    return boundaries
+
+
+def boundaryToDict(obj):
+    if hasattr(obj, 'toDict'):
+        return obj.toDict()
+    return propsToDict(obj)
 
 
 def isPlanar(shape):
