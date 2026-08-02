@@ -588,6 +588,25 @@ class InterfaceNccGeometryTest(unittest.TestCase):
             FreeCAD.closeDocument(FreeCAD.ActiveDocument.Name)
 
 
+class SolidMaterialCardsTest(unittest.TestCase):
+    def test_solid_material_cards_are_complete(self):
+        expected_names = {
+            "AcrylicSolid", "AluminiumSolid", "BrassSolid", "BrickSolid",
+            "CopperSolid", "FiberglassSolid", "GlassSolid", "Inconel601Solid",
+            "IronSolid", "PolypropyleneSolid", "SandSolid", "SilverSolid",
+            "StainlessSteel316Solid", "StyrofoamSolid", "TitaniumSolid",
+        }
+        materials, name_path_list = CfdTools.importMaterials()
+        paths_by_name = {name: path for name, path in name_path_list}
+
+        self.assertTrue(expected_names.issubset(paths_by_name))
+        for name in expected_names:
+            material = materials[paths_by_name[name]]
+            self.assertEqual(material.get("Type"), "Solid")
+            for property_name in ("Density", "ThermalConductivity", "SpecificHeat"):
+                self.assertTrue(material.get(property_name), "{} lacks {}".format(name, property_name))
+
+
 def compareInpFiles(file_name1, file_name2):
     file1 = open(file_name1, 'r')
     f1 = file1.readlines()
