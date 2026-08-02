@@ -85,6 +85,10 @@ class BlockTest(unittest.TestCase):
         CfdTools.setActiveAnalysis(self.analysis)
         self.active_doc.recompute()
 
+    def test_fluid_boundary_has_no_region_override(self):
+        boundary = CfdFluidBoundary.makeCfdFluidBoundary('boundary')
+        self.assertNotIn('RegionName', boundary.PropertiesList)
+
     def createNewSolver(self):
         self.solver_object = CfdSolverFoam.makeCfdSolverFoam()
         self.analysis.addObject(self.solver_object)
@@ -135,6 +139,7 @@ class BlockTest(unittest.TestCase):
         self.inlet_boundary = CfdFluidBoundary.makeCfdFluidBoundary('inlet')
         self.analysis.addObject(self.inlet_boundary)
         bc_set = self.inlet_boundary
+        self.assertNotIn('RegionName', bc_set.PropertiesList)
         bc_set.BoundaryType = 'inlet'
         bc_set.BoundarySubType = 'uniformVelocityInlet'
         bc_set.Ux = 1
