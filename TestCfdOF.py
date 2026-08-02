@@ -564,10 +564,19 @@ class InterfaceNccGeometryTest(unittest.TestCase):
             [fluid, solid], analysis
         )
 
-        self.assertIsNone(interface)
+        self.assertIsNotNone(interface)
         self.assertEqual([region.RegionRole for region in regions], ["Fluid", "Solid"])
         self.assertAlmostEqual(regions[0].Shape.Volume, 936.0, places=5)
         self.assertAlmostEqual(regions[1].Shape.Volume, 64.0, places=5)
+        self.assertTrue(interface.InterfacePairs)
+        boundaries = interface.Proxy.makeBoundaryObjects(interface)
+        self.assertTrue(boundaries)
+        referenced_regions = {
+            reference[0].Name
+            for boundary in boundaries
+            for reference in boundary.ShapeRefs
+        }
+        self.assertEqual(referenced_regions, {region.Name for region in regions})
 
     def tearDown(self):
         if FreeCAD.ActiveDocument is not None:

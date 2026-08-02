@@ -235,6 +235,24 @@ def getCfdBoundaryGroup(analysis_object):
     return getModelsOfType(analysis_object, 'CfdFluidBoundary')
 
 
+def getRegionCoupledInterfaceGroup(analysis_object):
+    return getModelsOfType(analysis_object, 'CfdRegionCoupledInterface')
+
+
+def getCfdBoundaryGroupWithRegionInterfaces(analysis_object):
+    boundaries = list(getCfdBoundaryGroup(analysis_object))
+    for interface_obj in getRegionCoupledInterfaceGroup(analysis_object):
+        if hasattr(interface_obj.Proxy, 'makeBoundaryObjects'):
+            boundaries.extend(interface_obj.Proxy.makeBoundaryObjects(interface_obj))
+    return boundaries
+
+
+def boundaryToDict(obj):
+    if hasattr(obj, 'toDict'):
+        return obj.toDict()
+    return propsToDict(obj)
+
+
 def isPlanar(shape):
     """
     Return whether the shape is a planar face
