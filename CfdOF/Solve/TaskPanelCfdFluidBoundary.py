@@ -76,12 +76,12 @@ class TaskPanelCfdFluidBoundary:
         self.boundary_type_indices = [0, 4, 4] if solid_boundary else list(range(len(CfdFluidBoundary.BOUNDARY_TYPES)))
         if solid_boundary:
             self.form.comboBoundaryType.addItems([CfdFluidBoundary.BOUNDARY_NAMES[0],
-                                                  CfdFluidBoundary.translate("Boundary", "Symmetry"),
-                                                  CfdFluidBoundary.translate("Boundary", "Periodic")])
+                                                  CfdFluidBoundary.translate("Boundary", "Periodic"),
+                                                  CfdFluidBoundary.translate("Boundary", "Symmetry")])
         else:
             self.form.comboBoundaryType.addItems(CfdFluidBoundary.BOUNDARY_NAMES)
-        bi = (2 if self.obj.BoundarySubType == 'cyclic' else
-              1 if self.obj.BoundarySubType == 'symmetry' else 0) if solid_boundary else 0
+        bi = (1 if self.obj.BoundarySubType == 'cyclic' else
+              2 if self.obj.BoundarySubType == 'symmetry' else 0) if solid_boundary else 0
         if not solid_boundary:
             bi = indexOrDefault(CfdFluidBoundary.BOUNDARY_TYPES, self.obj.BoundaryType, 0)
         self.form.comboBoundaryType.currentIndexChanged.connect(self.comboBoundaryTypeChanged)
@@ -252,7 +252,7 @@ class TaskPanelCfdFluidBoundary:
     def updateUI(self):
         # Boundary type and subtype
         type_index = self.boundary_type_indices[self.form.comboBoundaryType.currentIndex()]
-        subtype_index = (self.form.comboBoundaryType.currentIndex() - 1
+        subtype_index = ((1 if self.form.comboBoundaryType.currentIndex() == 1 else 0)
                          if getattr(self.obj, 'SolidBoundary', False) and type_index == 4
                          else self.form.comboSubtype.currentIndex())
         tab_enabled = CfdFluidBoundary.BOUNDARY_UI[type_index][subtype_index][0]
@@ -337,7 +337,7 @@ class TaskPanelCfdFluidBoundary:
         self.form.comboSubtype.blockSignals(True)
         self.form.comboSubtype.clear()
         if getattr(self.obj, 'SolidBoundary', False):
-            subtype_index = (self.form.comboBoundaryType.currentIndex() - 1) if index == 4 else 0
+            subtype_index = (1 if self.form.comboBoundaryType.currentIndex() == 1 else 0) if index == 4 else 0
             self.form.comboSubtype.addItem(CfdFluidBoundary.SUBNAMES[index][subtype_index])
         else:
             self.form.comboSubtype.addItems(CfdFluidBoundary.SUBNAMES[index])
@@ -346,7 +346,7 @@ class TaskPanelCfdFluidBoundary:
         self.obj.BoundaryType = CfdFluidBoundary.BOUNDARY_TYPES[index]
         if getattr(self.obj, 'SolidBoundary', False):
             self.obj.BoundarySubType = ('fixedWall' if index == 0 else
-                                        'symmetry' if self.form.comboBoundaryType.currentIndex() == 1 else 'cyclic')
+                                        'cyclic' if self.form.comboBoundaryType.currentIndex() == 1 else 'symmetry')
         self.comboSubtypeChanged()
 
         # Change the color of the boundary condition as the selection is made
@@ -355,11 +355,11 @@ class TaskPanelCfdFluidBoundary:
 
     def comboSubtypeChanged(self):
         type_index = self.boundary_type_indices[self.form.comboBoundaryType.currentIndex()]
-        subtype_index = (self.form.comboBoundaryType.currentIndex() - 1
+        subtype_index = ((1 if self.form.comboBoundaryType.currentIndex() == 1 else 0)
                          if getattr(self.obj, 'SolidBoundary', False) and type_index == 4
                          else self.form.comboSubtype.currentIndex())
         self.form.labelBoundaryDescription.setText(CfdFluidBoundary.SUBTYPES_HELPTEXT[type_index][subtype_index])
-        self.obj.BoundarySubType = (('symmetry' if subtype_index == 0 else 'cyclic')
+        self.obj.BoundarySubType = (('cyclic' if subtype_index == 1 else 'symmetry')
                                     if getattr(self.obj, 'SolidBoundary', False) and type_index == 4
                                     else CfdFluidBoundary.SUBTYPES[type_index][self.form.comboSubtype.currentIndex()])
         self.updateUI()

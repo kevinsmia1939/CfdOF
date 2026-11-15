@@ -1,0 +1,33 @@
+%{%(solidPeriodics%)
+%[_header%]
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      solidPeriodicCouplesDict;
+}
+
+fields yes;
+
+nonConformalCouples
+{
+%{%(solidPeriodics%)
+    %(0%)
+    {
+        region %(solidPeriodics/%(0%)/Region%);
+        patches ( %(0%) %(solidPeriodics/%(0%)/SlavePatch%) );
+%{%(solidPeriodics/%(0%)/RotationalPeriodic%)
+%:True
+        transform rotational;
+        rotationAxis ( %(solidPeriodics/%(0%)/PeriodicCentreOfRotationAxis%) );
+        rotationCentre ( %(solidPeriodics/%(0%)/PeriodicCentreOfRotation%) );
+%:False
+        transform translational;
+        separationVector ( %(solidPeriodics/%(0%)/PeriodicSeparationVector%) );
+%}
+    }
+%}
+}
+%} system/solidPeriodicCouplesDict

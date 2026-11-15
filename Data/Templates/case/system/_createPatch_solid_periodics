@@ -1,0 +1,38 @@
+    {
+        name %(0%);
+        patchInfo
+        {
+            #include "solidPeriodicMeshType";
+            neighbourPatch %(solidPeriodics/%(0%)/SlavePatch%);
+%{%(solidPeriodics/%(0%)/RotationalPeriodic%)
+%:True
+            transform rotational;
+            rotationAxis ( %(solidPeriodics/%(0%)/PeriodicCentreOfRotationAxis%) );
+            rotationCentre ( %(solidPeriodics/%(0%)/PeriodicCentreOfRotation%) );
+%:False
+            transform translational;
+            separationVector ( %(solidPeriodics/%(0%)/PeriodicSeparationVector%) );
+%}
+        }
+        constructFrom patches;
+        patches ( %(solidPeriodics/%(0%)/PatchNamesList%) );
+    }
+    {
+        name %(solidPeriodics/%(0%)/SlavePatch%);
+        patchInfo
+        {
+            #include "solidPeriodicMeshType";
+            neighbourPatch %(0%);
+%{%(solidPeriodics/%(0%)/RotationalPeriodic%)
+%:True
+            transform rotational;
+            rotationAxis ( %(solidPeriodics/%(0%)/PeriodicCentreOfRotationAxis%) );
+            rotationCentre ( %(solidPeriodics/%(0%)/PeriodicCentreOfRotation%) );
+%:False
+            transform translational;
+            separationVector ( %(solidPeriodics/%(0%)/PeriodicSeparationVector%) );
+%}
+        }
+        constructFrom patches;
+        patches ( %(solidPeriodics/%(0%)/PatchNamesListSlave%) );
+    }
