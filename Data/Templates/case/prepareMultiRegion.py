@@ -34,6 +34,12 @@ COUPLES = [
 %}
 ]
 
+SOLID_PERIODICS = [
+%{%(solidPeriodics%)
+    ("%(solidPeriodics/%(0%)/Region%)", "%(0%)", "%(solidPeriodics/%(0%)/SlavePatch%)"),
+%}
+]
+
 
 def read_regions():
     with open(os.path.join("constant", "regionProperties")) as fid:
@@ -130,6 +136,10 @@ def write_region_create_patch_dict(region):
     ]
     system_dir = os.path.join("system", region)
     os.makedirs(system_dir, exist_ok=True)
+    for include_name in ("periodic_type", "solidPeriodicMeshType"):
+        include_path = os.path.join("system", include_name)
+        if os.path.isfile(include_path):
+            shutil.copyfile(include_path, os.path.join(system_dir, include_name))
     region_dict = os.path.join(system_dir, "createPatchDict")
     with open(region_dict, "w") as fid:
         fid.write(contents[:patches_match.start()])
@@ -167,6 +177,9 @@ def replace_patch_block(contents, patch, neighbour_region, neighbour_patch):
     if not match:
         raise RuntimeError("Patch '{}' was not found in boundary file".format(patch))
     body = match.group(2)
+    face_count = re.search(r"\bnFaces\s+(\d+)\s*;", body)
+    if not face_count or int(face_count.group(1)) == 0:
+        raise RuntimeError("Coupled patch '{}' has no mesh faces".format(patch))
     for keyword in ("type", "sampleMode", "sampleRegion", "samplePatch",
                     "method", "neighbourRegion", "neighbourPatch", "transformType"):
         body = re.sub(r"\n\s*" + keyword + r"\s+\w+\s*;", "", body)
@@ -320,6 +333,10 @@ def main():
         copy_region_meshes()
         create_region_patches()
         couple_region_patches()
+        if SOLID_PERIODICS and mapping_method()[0] == "method":
+            subprocess.check_call([
+                "createNonConformalCouples", "-dict", "system/solidPeriodicCouplesDict"
+            ])
         return
 
     fluid_regions, solid_regions = read_regions()

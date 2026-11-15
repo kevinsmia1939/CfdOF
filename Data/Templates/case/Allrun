@@ -54,6 +54,18 @@ then
 else
     CHT_VARIANT=esi
 fi
+%{%(solidPeriodics%)
+if $CHT_FOUNDATION
+then
+    printf 'type patch;\n' > system/solidPeriodicMeshType
+    printf 'type zeroGradient;\n' > system/solidPeriodicTemperatureType
+    printf 'type calculated;\nvalue $internalField;\n' > system/solidPeriodicPressureType
+else
+    printf 'type cyclicAMI;\n' > system/solidPeriodicMeshType
+    printf 'type cyclicAMI;\n' > system/solidPeriodicTemperatureType
+    printf 'type cyclicAMI;\n' > system/solidPeriodicPressureType
+fi
+%}
 %{%(multiRegionSolidNames%)
 runCommand rm -f constant/%(multiRegionSolidNames/%(0%)%)/fvOptions constant/%(multiRegionSolidNames/%(0%)%)/fvModels
 %}

@@ -669,6 +669,19 @@ class CfdMeshTools:
         # cfMesh settings
         if self.mesh_obj.MeshUtility == "cfMesh":
             self.cf_settings['ClMax'] = self.clmax*self.scale
+            physics = CfdTools.getPhysicsModel(self.analysis)
+            if getattr(physics, 'Phase', None) == 'MultiRegion':
+                # Small coplanar STL regions need local cells to survive cfMesh snapping.
+                boundaries = CfdTools.getCfdBoundaryGroupWithRegionInterfaces(self.analysis)
+                for k, boundary in enumerate(boundaries, start=1):
+                    if not hasattr(boundary, 'InterfaceObject'):
+                        continue
+                    for l, faces in enumerate(self.patch_faces[k]):
+                        if faces:
+                            region = self.cf_settings['MeshRegions'].setdefault(
+                                self.patch_names[k][l], {})
+                            region['RefinementLevel'] = max(2, region.get('RefinementLevel', 0))
+                            region.setdefault('RefinementThickness', 0.0)
             if len(self.cf_settings['BoundaryLayers']) > 0:
                 self.cf_settings['BoundaryLayerPresent'] = True
             else:
@@ -710,10 +723,12 @@ class CfdMeshTools:
             else:
                 self.snappy_settings['BoundaryLayerPresent'] = False
 
-            if self.mesh_obj.ImplicitEdgeDetection:
-                snappy_settings['ImplicitEdgeDetection'] = True
-            else:
-                snappy_settings['ImplicitEdgeDetection'] = False
+            physics = CfdTools.getPhysicsModel(self.analysis)
+            is_cht = getattr(physics, 'Phase', None) == 'MultiRegion'
+            # Interface patch boundaries can be coplanar, so snap to STL region
+            # edges rather than relying on changes in surface normal.
+            snappy_settings['PreservePatchEdges'] = is_cht
+            snappy_settings['ImplicitEdgeDetection'] = self.mesh_obj.ImplicitEdgeDetection and not is_cht
 
             inside_x = Units.Quantity(self.mesh_obj.PointInMesh.get('x')).Value*self.scale
             inside_y = Units.Quantity(self.mesh_obj.PointInMesh.get('y')).Value*self.scale
@@ -726,7 +741,8 @@ class CfdMeshTools:
                         shape_patch_names_list.append(self.patch_names[k][j])
 
             snappy_settings['ShapePatchNames'] = tuple(shape_patch_names_list)
-            snappy_settings['EdgeRefinementLevel'] = CfdTools.relLenToRefinementLevel(self.mesh_obj.EdgeRefinement)
+            edge_level = CfdTools.relLenToRefinementLevel(self.mesh_obj.EdgeRefinement)
+            snappy_settings['EdgeRefinementLevel'] = max(2, edge_level) if is_cht else edge_level
             snappy_settings['PointInMesh'] = \
                 {
                     "x": inside_x,

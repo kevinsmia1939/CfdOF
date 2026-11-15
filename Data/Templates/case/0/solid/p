@@ -21,7 +21,15 @@ boundaryField
 %{%(multiRegionSolidBoundariesByRegion/%(multiRegionSolidNames/%(0%)%)%)
 %{%(multiRegionSolidBoundariesByRegion/%(multiRegionSolidNames/%(1%)%)/%(0%)/BoundaryType%)
 %:constraint
+%{%(multiRegionSolidBoundariesByRegion/%(multiRegionSolidNames/%(1%)%)/%(0%)/BoundarySubType%)
+%:cyclic
+    %(0%)
+    {
+        #include "../../system/solidPeriodicPressureType";
+    }
+%:default
 %[0/_boundary_constraint%]
+%}
 %:default
     %(0%)
     {

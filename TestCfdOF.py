@@ -48,6 +48,7 @@ import unittest
 import os
 import re
 import shutil
+import subprocess
 
 # ***************************************************************************
 #                                                                           *
@@ -998,6 +999,10 @@ class MicrochipCoolingNccMacroWorkflowTest(unittest.TestCase):
             from unittest.mock import patch
             preparation = runpy.run_path(os.path.join(writer.case_folder, 'prepareMultiRegion.py'))
             boundary_text = '\ninterface_patch\n{\n    type wall;\n    nFaces 1;\n    startFace 0;\n}\n'
+            with self.assertRaisesRegex(RuntimeError, "Coupled patch 'interface_patch' has no mesh faces"):
+                preparation['replace_patch_block'](
+                    boundary_text.replace('nFaces 1;', 'nFaces 0;'),
+                    'interface_patch', 'solid', 'solid_patch')
             for version in ('13', '14'):
                 with patch.dict(os.environ, {'WM_PROJECT_VERSION': version}, clear=True):
                     mapped = preparation['replace_patch_block'](
@@ -1908,7 +1913,7 @@ class SolidExternalBoundaryTest(unittest.TestCase):
                 self.assertTrue(panel.form.turbulenceFrame.isHidden())
                 self.assertFalse(panel.form.thermalFrame.isHidden())
                 self.assertTrue(panel.form.comboBoundaryType.isEnabled())
-                self.assertEqual(panel.form.comboBoundaryType.count(), 1)
+                self.assertEqual(panel.form.comboBoundaryType.count(), 2)
                 self.assertEqual(panel.form.comboBoundaryType.currentText(), CfdFluidBoundary.BOUNDARY_NAMES[0])
                 self.assertEqual(boundary.BoundaryType, 'wall')
                 panel.closing()
@@ -1956,6 +1961,130 @@ class SolidExternalBoundaryTest(unittest.TestCase):
         finally:
             if FreeCAD.ActiveDocument:
                 FreeCAD.closeDocument(FreeCAD.ActiveDocument.Name)
+
+
+class SolidPeriodicBoundaryTest(unittest.TestCase):
+    def test_periodic_solid_pair_writes_mesh_and_field_conditions(self):
+        original_foam_dir = CfdTools.getFoamDir()
+        foam_dir = os.environ.get('CFDOF_SOLID_PERIODIC_FOAM_DIR', original_foam_dir)
+        foundation = 'foundation' in os.path.basename(foam_dir)
+        CfdTools.setFoamDir(foam_dir)
+        analysis = makeChtBoundaryTestCase()
+        doc = analysis.Document
+        try:
+            solid = doc.SolidRegion
+            wall = next(bc for bc in CfdTools.getCfdBoundaryGroup(analysis) if bc.Label == 'solid_wall')
+            wall.ShapeRefs = [(solid, ('Face3', 'Face4'))]
+            master = CfdFluidBoundary.makeCfdSolidBoundary()
+            slave = CfdFluidBoundary.makeCfdSolidBoundary()
+            for bc, label, face in ((master, 'periodic_master', 'Face1'),
+                                    (slave, 'periodic_slave', 'Face2')):
+                analysis.addObject(bc)
+                bc.Label = label
+                bc.BoundaryType = 'constraint'
+                bc.BoundarySubType = 'cyclic'
+                bc.ShapeRefs = [(solid, (face,))]
+            slave.PeriodicMaster = False
+            slave.PeriodicPartner = master.Label
+            slave.PeriodicSeparationVector = FreeCAD.Vector(60, 0, 0)
+            doc.recompute()
+
+            if FreeCAD.GuiUp:
+                from CfdOF.Solve import TaskPanelCfdFluidBoundary
+                panel = TaskPanelCfdFluidBoundary.TaskPanelCfdFluidBoundary(
+                    slave, CfdTools.getPhysicsModel(analysis), CfdTools.getMaterials(analysis))
+                self.assertEqual(panel.form.comboBoundaryType.currentText(), 'Periodic')
+                self.assertFalse(panel.form.periodicFrame.isHidden())
+                self.assertEqual(panel.form.comboBoxPeriodicPartner.currentText(), master.Label)
+                panel.form.comboBoundaryType.setCurrentIndex(0)
+                self.assertEqual((slave.BoundaryType, slave.BoundarySubType), ('wall', 'fixedWall'))
+                panel.form.comboBoundaryType.setCurrentIndex(1)
+                self.assertEqual((slave.BoundaryType, slave.BoundarySubType), ('constraint', 'cyclic'))
+                panel.closing()
+                panel.form.close()
+
+            with tempfile.TemporaryDirectory(prefix='cfdof-solid-periodic-') as output:
+                analysis.OutputPath = output
+                writer = CfdCaseWriterFoam.CfdCaseWriterFoam(analysis)
+                writer.writeCase()
+                subprocess.run(['bash', '-n', os.path.join(writer.case_folder, 'Allrun')], check=True)
+                pair = writer.settings['solidPeriodics'][master.Label]
+                self.assertEqual(pair['SlavePatch'], slave.Label)
+                self.assertEqual(pair['PeriodicSeparationVector'], (0.06, 0.0, 0.0))
+                with open(os.path.join(writer.case_folder, 'system', 'createPatchDict')) as fid:
+                    mesh_dict = fid.read()
+                for name, partner in ((master.Label, slave.Label), (slave.Label, master.Label)):
+                    self.assertRegex(mesh_dict, r'name\s+' + name + r';\s+patchInfo\s*\{\s*'
+                                     r'#include\s+"solidPeriodicMeshType";\s+'
+                                     r'neighbourPatch\s+' + partner + ';')
+                for field in ('T', 'p'):
+                    with open(os.path.join(writer.case_folder, '0', 'SolidRegion', field)) as fid:
+                        contents = fid.read()
+                    for name in (master.Label, slave.Label):
+                        include_name = ('solidPeriodicTemperatureType' if field == 'T'
+                                        else 'solidPeriodicPressureType')
+                        self.assertRegex(contents, name + r'\s*\{\s*#include\s+"../../system/'
+                                         + include_name + '";')
+
+                slave.PeriodicPartner = 'missing'
+                with self.assertRaisesRegex(ValueError, 'needs a solid periodic master'):
+                    writer.writeCase()
+                slave.PeriodicPartner = master.Label
+                writer.writeCase()
+
+                for mesh in CfdTools.getMeshObjects(analysis):
+                    mesh_tools = CfdMeshTools.CfdMeshTools(mesh)
+                    mesh_tools.writeMesh()
+                    subprocess.run(['bash', 'Allmesh'], cwd=mesh_tools.mesh_case_dir,
+                                   check=True, timeout=180, stdout=subprocess.DEVNULL)
+                host_env = os.environ.copy()
+                host_env.pop('PYTHONHOME', None)
+                host_env.pop('PYTHONPATH', None)
+                with open(os.path.join(writer.case_folder, 'system', 'turbulenceLib'), 'w') as fid:
+                    fid.write('"libmomentumTransportModels.so"\n')
+                runtime_types = {
+                    'solidPeriodicMeshType': 'patch' if foundation else 'cyclicAMI',
+                    'solidPeriodicTemperatureType': 'zeroGradient' if foundation else 'cyclicAMI',
+                    'solidPeriodicPressureType': 'calculated' if foundation else 'cyclicAMI',
+                }
+                for name, patch_type in runtime_types.items():
+                    with open(os.path.join(writer.case_folder, 'system', name), 'w') as fid:
+                        fid.write('type {};\n'.format(patch_type))
+                        if patch_type == 'calculated':
+                            fid.write('value $internalField;\n')
+                if foundation:
+                    for folder in ('constant', 'system'):
+                        shutil.copytree(os.path.join(writer.case_folder, 'system', 'chtVariants',
+                                                     'foundation', folder),
+                                        os.path.join(writer.case_folder, folder), dirs_exist_ok=True)
+                subprocess.run(
+                    ['bash', '-c', 'source "$1/etc/bashrc" >/dev/null; python3 prepareMultiRegion.py meshes',
+                     'bash', CfdTools.getFoamDir()],
+                    cwd=writer.case_folder, env=host_env, check=True, timeout=180,
+                    stdout=subprocess.DEVNULL)
+                subprocess.run(
+                    ['bash', '-c', 'source "$1/etc/bashrc" >/dev/null; checkMesh -region SolidRegion',
+                     'bash', CfdTools.getFoamDir()],
+                    cwd=writer.case_folder, env=host_env, check=True, timeout=60,
+                    stdout=subprocess.DEVNULL)
+                with open(os.path.join(writer.case_folder, 'constant', 'SolidRegion',
+                                       'polyMesh', 'boundary')) as fid:
+                    boundary_mesh = fid.read()
+                if foundation:
+                    for name in (master.Label, slave.Label):
+                        patch_name = master.Label + '_on_' + name
+                        self.assertRegex(boundary_mesh, patch_name + r'\s*\{[^}]*type\s+nonConformalCyclic;')
+                        for field in ('T', 'p'):
+                            with open(os.path.join(writer.case_folder, '0', 'SolidRegion', field)) as fid:
+                                field_text = fid.read()
+                            self.assertRegex(field_text, patch_name + r'\s*\{[^}]*type\s+nonConformalCyclic;')
+                else:
+                    for name, partner in ((master.Label, slave.Label), (slave.Label, master.Label)):
+                        self.assertRegex(boundary_mesh, name + r'\s*\{[^}]*type\s+cyclicAMI;'
+                                         r'[^}]*neighbourPatch\s+' + partner + ';')
+        finally:
+            CfdTools.setFoamDir(original_foam_dir)
+            FreeCAD.closeDocument(doc.Name)
 
 
 class RegionNamingTest(unittest.TestCase):
@@ -2012,6 +2141,24 @@ class ExplicitRegionBoundaryTest(unittest.TestCase):
         self.writer.processMultiRegionBoundaries()
         self.assertIn('SolidWall', self.writer.settings['multiRegionSolidBoundariesByRegion']['SolidRegion'])
         self.assertNotIn('SolidWall', self.writer.settings['multiRegionFluidBoundaries'])
+
+    def test_solid_periodic_faces_must_share_a_region(self):
+        from types import SimpleNamespace
+        other = self.document.addObject('Part::Box', 'OtherSolid')
+        self.document.recompute()
+        mesh = SimpleNamespace(Part=other, PartSubShape='', RegionRole='solid',
+                               Name=other.Name, Label=other.Label)
+        self.writer.mesh_objs.append(mesh)
+        master = self.boundary('Master', self.solid, SolidBoundary=True,
+                               PeriodicMaster=True, PeriodicPartner='')
+        slave = self.boundary('Slave', other, SolidBoundary=True,
+                              PeriodicMaster=False, PeriodicPartner='Master')
+        for boundary in (master, slave):
+            boundary.BoundaryType = 'constraint'
+            boundary.BoundarySubType = 'cyclic'
+        self.writer.bc_group = [master, slave]
+        with self.assertRaisesRegex(ValueError, 'same solid region'):
+            self.writer.processMultiRegionBoundaries()
 
     def test_unmeshed_geometry_is_not_inferred(self):
         other = self.document.addObject('Part::Box', 'Unmeshed')
@@ -2116,6 +2263,122 @@ class GmshRegionVolumeTest(unittest.TestCase):
                 self.assertEqual(tools.gmsh_settings['RegionVolumeMap'], {})
                 with open(tools.temp_file_geo) as stream:
                     self.assertIn('Physical Volume ("Internal")', stream.read())
+        finally:
+            FreeCAD.closeDocument(doc.Name)
+
+
+class SnappyChtPatchRefinementTest(unittest.TestCase):
+    def test_cht_snappy_refines_patch_edges_without_changing_single_region_settings(self):
+        analysis = makeChtBoundaryTestCase()
+        doc = analysis.Document
+        try:
+            physics = CfdTools.getPhysicsModel(analysis)
+            mesh = next(mesh for mesh in CfdTools.getMeshObjects(analysis) if mesh.Part == doc.SolidRegion)
+            mesh.MeshUtility = 'snappyHexMesh'
+            mesh.PointInMesh = {'x': '29.31 mm', 'y': '9.51 mm', 'z': '22.11 mm'}
+            mesh.ImplicitEdgeDetection = True
+            with tempfile.TemporaryDirectory(prefix='cfdof-snappy-cht-') as output:
+                analysis.OutputPath = output
+                for phase, edge_length, edge_level, surface_level, explicit in (
+                        ('MultiRegion', 1.0, 2, 1, True),
+                        ('MultiRegion', 0.125, 3, 1, True),
+                        ('Single', 1.0, 0, 0, False)):
+                    with self.subTest(phase=phase, edge_length=edge_length):
+                        physics.Phase = phase
+                        mesh.EdgeRefinement = edge_length
+                        doc.recompute()
+                        tools = CfdMeshTools.CfdMeshTools(mesh)
+                        tools.writeMesh()
+                        self.assertEqual(tools.snappy_settings['EdgeRefinementLevel'], edge_level)
+                        with open(os.path.join(tools.mesh_case_dir, 'system', 'snappyHexMeshDict')) as stream:
+                            contents = stream.read()
+                        self.assertIn('level ({0} {0});'.format(surface_level), contents)
+                        self.assertIn('explicitFeatureSnap {};'.format(str(explicit).lower()), contents)
+                        if explicit:
+                            self.assertTrue(any('fluid_solid_interface' in name
+                                                for name in tools.snappy_settings['ShapePatchNames']))
+        finally:
+            FreeCAD.closeDocument(doc.Name)
+
+
+class CfMeshChtPatchRefinementTest(unittest.TestCase):
+    def test_cht_cfmesh_refines_only_coupled_patches(self):
+        analysis = makeChtBoundaryTestCase()
+        doc = analysis.Document
+        try:
+            physics = CfdTools.getPhysicsModel(analysis)
+            mesh = next(mesh for mesh in CfdTools.getMeshObjects(analysis) if mesh.Part == doc.SolidRegion)
+            mesh.MeshUtility = 'cfMesh'
+            with tempfile.TemporaryDirectory(prefix='cfdof-cfmesh-cht-') as output:
+                analysis.OutputPath = output
+                tools = CfdMeshTools.CfdMeshTools(mesh)
+                tools.writeMesh()
+                regions = tools.cf_settings['MeshRegions']
+                self.assertTrue(regions)
+                self.assertTrue(all('fluid_solid_interface' in name for name in regions))
+                self.assertTrue(all(settings['RefinementLevel'] >= 2 for settings in regions.values()))
+                with open(os.path.join(tools.mesh_case_dir, 'system', 'meshDict')) as stream:
+                    mesh_dict = stream.read()
+                for patch in regions:
+                    self.assertIn(patch, mesh_dict)
+                self.assertIn('additionalRefinementLevels  2;', mesh_dict)
+
+                physics.Phase = 'Single'
+                tools = CfdMeshTools.CfdMeshTools(mesh)
+                tools.writeMesh()
+                self.assertFalse(tools.cf_settings['MeshRegions'])
+        finally:
+            FreeCAD.closeDocument(doc.Name)
+
+
+class NccPairingTopologyTest(unittest.TestCase):
+    def test_edge_and_point_contacts_are_not_coupled(self):
+        import json
+
+        doc = makeChtTestDocument()
+        try:
+            cap = doc.addObject('Part::Box', 'UpperSolid')
+            cap.Length, cap.Width, cap.Height = 60, 20, 5
+            cap.Placement.Base = FreeCAD.Vector(0, 0, 25)
+            side = doc.addObject('Part::Box', 'SideSolid')
+            side.Length, side.Width, side.Height = 10, 20, 5
+            side.Placement.Base = FreeCAD.Vector(60, 0, 20)
+            corner = doc.addObject('Part::Box', 'CornerSolid')
+            corner.Length, corner.Width, corner.Height = 5, 5, 5
+            corner.Placement.Base = FreeCAD.Vector(60, 20, 25)
+            doc.recompute()
+            _refs, encoded_pairs = CfdRegionCoupledInterface.generatePairedTouchingFaceData(
+                [doc.FluidRegion, doc.SolidRegion, cap, side, corner])
+            pairs = {(pair['region_a'], pair['region_b'])
+                     for pair in map(json.loads, encoded_pairs)}
+            self.assertEqual(pairs, {
+                ('FluidRegion', 'SolidRegion'),
+                ('SolidRegion', 'UpperSolid'),
+                ('SolidRegion', 'SideSolid'),
+            })
+        finally:
+            FreeCAD.closeDocument(doc.Name)
+
+    def test_one_face_cannot_have_two_partner_regions(self):
+        analysis = makeChtBoundaryTestCase()
+        doc = analysis.Document
+        try:
+            left = doc.addObject('Part::Box', 'LeftCap')
+            left.Length, left.Width, left.Height = 30, 20, 5
+            left.Placement.Base = FreeCAD.Vector(0, 0, 25)
+            right = doc.addObject('Part::Box', 'RightCap')
+            right.Length, right.Width, right.Height = 30, 20, 5
+            right.Placement.Base = FreeCAD.Vector(30, 0, 25)
+            doc.recompute()
+            interface = next(obj for obj in analysis.Group
+                             if isinstance(getattr(obj, 'Proxy', None),
+                                           CfdRegionCoupledInterface.CfdRegionCoupledInterface))
+            interface.RegionObjects = [doc.FluidRegion, doc.SolidRegion, left, right]
+            interface.RegionNames = [CfdTools.getRegionName(obj) for obj in interface.RegionObjects]
+            interface.ShapeRefs, interface.InterfacePairs = \
+                CfdRegionCoupledInterface.generatePairedTouchingFaceData(interface.RegionObjects)
+            with self.assertRaisesRegex(ValueError, 'one generated mesh face cannot be assigned'):
+                interface.Proxy.makeBoundaryObjects(interface)
         finally:
             FreeCAD.closeDocument(doc.Name)
 

@@ -1000,6 +1000,7 @@ class CfdCaseWriterFoam:
                 for kind in ('fluid', 'solid')}
         boundaries = {bc.Label: bc for bc in self.bc_group}
         couples = {}
+        owners_by_label = {}
         for bc in self.bc_group:
             is_default = getattr(bc, 'DefaultBoundary', False)
             if not is_default and not _faces_from_shape_refs(bc.ShapeRefs):
@@ -1026,12 +1027,15 @@ class CfdCaseWriterFoam:
                                 bc.Label, message, obj.Label))
                         owners.add(matches[0])
             if getattr(bc, 'SolidBoundary', False):
-                if bc.BoundaryType != 'wall' or bc.BoundarySubType != 'fixedWall':
-                    raise ValueError("Solid boundary '{}' must use a stationary wall.".format(bc.Label))
+                if (bc.BoundaryType, bc.BoundarySubType) not in (
+                        ('wall', 'fixedWall'), ('constraint', 'cyclic'), ('constraint', 'symmetry')):
+                    raise ValueError("Solid boundary '{}' must use a stationary wall, symmetry, or periodic condition.".format(
+                        bc.Label))
                 if any(regions[name][0] != 'solid' for name in owners):
                     raise ValueError("Solid boundary '{}' must reference faces on a solid region.".format(bc.Label))
                 if any(not subs for _, subs in bc.ShapeRefs):
                     raise ValueError("Solid boundary '{}' must reference faces, not whole solids.".format(bc.Label))
+            owners_by_label[bc.Label] = owners
             for name in owners:
                 maps[regions[name][0]][name][bc.Label] = settings['boundaries'][bc.Label]
             if bc.BoundaryType != 'wall' or bc.BoundarySubType != 'regionCoupledWall':
@@ -1053,6 +1057,36 @@ class CfdCaseWriterFoam:
                     'MasterRegion': sides[0][0], 'MasterPatch': sides[0][1],
                     'SlaveRegion': sides[1][0], 'SlavePatch': sides[1][1],
                 }
+        periodic_boundaries = {bc.Label: bc for bc in self.bc_group
+                               if getattr(bc, 'SolidBoundary', False) and bc.BoundarySubType == 'cyclic'}
+        solid_periodics = {}
+        for label, bc in periodic_boundaries.items():
+            if not bc.PeriodicMaster:
+                partner = periodic_boundaries.get(bc.PeriodicPartner)
+                if partner is None or not partner.PeriodicMaster:
+                    raise ValueError("Solid periodic boundary '{}' needs a solid periodic master.".format(label))
+        for label, bc in periodic_boundaries.items():
+            if not bc.PeriodicMaster:
+                continue
+            slaves = [slave for slave in periodic_boundaries.values()
+                      if not slave.PeriodicMaster and slave.PeriodicPartner == label]
+            if len(slaves) != 1:
+                raise ValueError("Solid periodic boundary '{}' must have exactly one slave.".format(label))
+            slave = slaves[0]
+            if len(owners_by_label[label]) != 1 or owners_by_label[label] != owners_by_label[slave.Label]:
+                raise ValueError("Solid periodic boundaries '{}' and '{}' must belong to the same solid region.".format(
+                    label, slave.Label))
+            solid_periodics[label] = {
+                'Region': next(iter(owners_by_label[label])),
+                'SlavePatch': slave.Label,
+                'RotationalPeriodic': slave.RotationalPeriodic,
+                'PeriodicCentreOfRotation': tuple(Units.Quantity(p, Units.Length).getValueAs('m').Value
+                                                  for p in slave.PeriodicCentreOfRotation),
+                'PeriodicCentreOfRotationAxis': tuple(slave.PeriodicCentreOfRotationAxis),
+                'PeriodicSeparationVector': tuple(Units.Quantity(p, Units.Length).getValueAs('m').Value
+                                                  for p in slave.PeriodicSeparationVector),
+            }
+        settings['solidPeriodics'] = solid_periodics
         for kind in ('fluid', 'solid'):
             prefix = 'multiRegion' + kind.capitalize()
             settings[prefix + 'BoundariesByRegion'] = maps[kind]
@@ -1330,7 +1364,7 @@ class CfdCaseWriterFoam:
             bcSubType = bc_obj.BoundarySubType
             patchType = CfdTools.getPatchType(bcType, bcSubType)
 
-            if not bcType == 'baffle' and not bcSubType == 'cyclicAMI':
+            if not bcType == 'baffle' and bcSubType not in ('cyclicAMI', 'cyclic'):
                 settings['createPatches'][bc_obj.Label] = {
                     'PatchNamesList': '"' + CfdTools.getBoundaryPatchPrefix(bc_obj, bc_id) + '_.*"',
                     'PatchType': patchType
@@ -1371,6 +1405,14 @@ class CfdCaseWriterFoam:
                             for p in slave_bc_obj.PeriodicSeparationVector),
                         'PatchNamesList': '"patch_'+str(bc_id+1)+'_.*"',
                         'PatchNamesListSlave': '"patch_'+str(slave_bc_id+1)+'_.*"'}
+
+        for label, pair in settings.get('solidPeriodics', {}).items():
+            master = next(bc for bc in bc_group if bc.Label == label)
+            slave = next((bc for bc in bc_group if bc.Label == pair['SlavePatch']), None)
+            master_id = bc_group.index(master)
+            slave_id = bc_group.index(slave)
+            pair['PatchNamesList'] = '"' + CfdTools.getBoundaryPatchPrefix(master, master_id) + '_.*"'
+            pair['PatchNamesListSlave'] = '"' + CfdTools.getBoundaryPatchPrefix(slave, slave_id) + '_.*"'
 
         # Set up default BC for unassigned faces
         settings['createPatches']['defaultFaces'] = {

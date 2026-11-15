@@ -45,7 +45,15 @@ boundaryField
 %}
 %}
 %:constraint
+%{%(multiRegionSolidBoundariesByRegion/%(multiRegionSolidNames/%(1%)%)/%(0%)/BoundarySubType%)
+%:cyclic
+    %(0%)
+    {
+        #include "../../system/solidPeriodicTemperatureType";
+    }
+%:default
 %[0/_boundary_constraint%]
+%}
 %}
 
 %}

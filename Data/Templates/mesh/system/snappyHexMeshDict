@@ -106,7 +106,12 @@ castellatedMeshControls
     {
         %(Name%)_Geometry
         {
+%{%(SnappySettings/PreservePatchEdges%)
+%:True
+            level (1 1);
+%:default
             level (0 0);
+%}
         }
 
 %{%(MeshRegionPresent%)

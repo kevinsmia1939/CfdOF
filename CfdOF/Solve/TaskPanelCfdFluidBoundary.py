@@ -73,15 +73,23 @@ class TaskPanelCfdFluidBoundary:
 
         # Boundary types
         solid_boundary = bool(getattr(obj, 'SolidBoundary', False))
-        self.form.comboBoundaryType.addItems(
-            CfdFluidBoundary.BOUNDARY_NAMES[:1] if solid_boundary else CfdFluidBoundary.BOUNDARY_NAMES)
-        bi = 0 if solid_boundary else indexOrDefault(CfdFluidBoundary.BOUNDARY_TYPES, self.obj.BoundaryType, 0)
+        self.boundary_type_indices = [0, 4, 4] if solid_boundary else list(range(len(CfdFluidBoundary.BOUNDARY_TYPES)))
+        if solid_boundary:
+            self.form.comboBoundaryType.addItems([CfdFluidBoundary.BOUNDARY_NAMES[0],
+                                                  CfdFluidBoundary.translate("Boundary", "Symmetry"),
+                                                  CfdFluidBoundary.translate("Boundary", "Periodic")])
+        else:
+            self.form.comboBoundaryType.addItems(CfdFluidBoundary.BOUNDARY_NAMES)
+        bi = (2 if self.obj.BoundarySubType == 'cyclic' else
+              1 if self.obj.BoundarySubType == 'symmetry' else 0) if solid_boundary else 0
+        if not solid_boundary:
+            bi = indexOrDefault(CfdFluidBoundary.BOUNDARY_TYPES, self.obj.BoundaryType, 0)
         self.form.comboBoundaryType.currentIndexChanged.connect(self.comboBoundaryTypeChanged)
         self.form.comboBoundaryType.setCurrentIndex(bi)
         self.comboBoundaryTypeChanged()
 
         # Boundary subtypes
-        si = indexOrDefault(CfdFluidBoundary.SUBTYPES[bi], self.obj.BoundarySubType, 0)
+        si = 0 if solid_boundary else indexOrDefault(CfdFluidBoundary.SUBTYPES[bi], self.obj.BoundarySubType, 0)
         self.form.comboSubtype.currentIndexChanged.connect(self.comboSubtypeChanged)
         self.form.comboSubtype.setCurrentIndex(si)
         self.comboSubtypeChanged()
@@ -138,7 +146,9 @@ class TaskPanelCfdFluidBoundary:
         boundary_patches = CfdTools.getCfdBoundaryGroup(self.analysis_obj)
         periodic_patches = []
         for patch in boundary_patches:
-            if patch.BoundarySubType == 'cyclicAMI' and patch.Label != self.obj.Label:
+            periodic_type = 'cyclic' if solid_boundary else 'cyclicAMI'
+            if (patch.BoundarySubType == periodic_type and patch.Label != self.obj.Label
+                    and bool(getattr(patch, 'SolidBoundary', False)) == solid_boundary):
                 periodic_patches.append(patch.Label)
 
         self.form.comboBoxPeriodicPartner.addItems(periodic_patches)
@@ -234,15 +244,17 @@ class TaskPanelCfdFluidBoundary:
             self.form.setWindowTitle("Solid boundary")
             self.form.comboSubtype.setVisible(False)
             self.form.labelSubtype.setVisible(False)
-            self.form.labelBoundaryDescription.setText("External solid thermal boundary")
+            self.form.labelBoundaryDescription.setText("Solid-region boundary")
             self.form.checkBoxDefaultBoundary.setVisible(False)
 
         self.updateUI()
 
     def updateUI(self):
         # Boundary type and subtype
-        type_index = self.form.comboBoundaryType.currentIndex()
-        subtype_index = self.form.comboSubtype.currentIndex()
+        type_index = self.boundary_type_indices[self.form.comboBoundaryType.currentIndex()]
+        subtype_index = (self.form.comboBoundaryType.currentIndex() - 1
+                         if getattr(self.obj, 'SolidBoundary', False) and type_index == 4
+                         else self.form.comboSubtype.currentIndex())
         tab_enabled = CfdFluidBoundary.BOUNDARY_UI[type_index][subtype_index][0]
 
         self.form.basicFrame.setVisible(tab_enabled)
@@ -274,7 +286,9 @@ class TaskPanelCfdFluidBoundary:
             self.form.turbulenceFrame.setVisible(False)
             self.form.volumeFractionsFrame.setVisible(False)
 
-        if not self.physics_model.Flow == 'Isothermal' and CfdFluidBoundary.BOUNDARY_UI[type_index][subtype_index][5]:
+        if (not self.physics_model.Flow == 'Isothermal' and
+                CfdFluidBoundary.BOUNDARY_UI[type_index][subtype_index][5] and
+                not (getattr(self.obj, 'SolidBoundary', False) and type_index == 4)):
             self.form.thermalFrame.setVisible(True)
             selected_rows = CfdFluidBoundary.BOUNDARY_UI[type_index][subtype_index][6]
             CfdTools.enableLayoutRows(self.form.layoutThermal, selected_rows)
@@ -319,21 +333,35 @@ class TaskPanelCfdFluidBoundary:
             self.form.periodicFrame.setVisible(False)
 
     def comboBoundaryTypeChanged(self):
-        index = self.form.comboBoundaryType.currentIndex()
+        index = self.boundary_type_indices[self.form.comboBoundaryType.currentIndex()]
+        self.form.comboSubtype.blockSignals(True)
         self.form.comboSubtype.clear()
-        self.form.comboSubtype.addItems(CfdFluidBoundary.SUBNAMES[index])
+        if getattr(self.obj, 'SolidBoundary', False):
+            subtype_index = (self.form.comboBoundaryType.currentIndex() - 1) if index == 4 else 0
+            self.form.comboSubtype.addItem(CfdFluidBoundary.SUBNAMES[index][subtype_index])
+        else:
+            self.form.comboSubtype.addItems(CfdFluidBoundary.SUBNAMES[index])
         self.form.comboSubtype.setCurrentIndex(0)
-        self.obj.BoundaryType = CfdFluidBoundary.BOUNDARY_TYPES[self.form.comboBoundaryType.currentIndex()]
+        self.form.comboSubtype.blockSignals(False)
+        self.obj.BoundaryType = CfdFluidBoundary.BOUNDARY_TYPES[index]
+        if getattr(self.obj, 'SolidBoundary', False):
+            self.obj.BoundarySubType = ('fixedWall' if index == 0 else
+                                        'symmetry' if self.form.comboBoundaryType.currentIndex() == 1 else 'cyclic')
+        self.comboSubtypeChanged()
 
         # Change the color of the boundary condition as the selection is made
         doc_name = str(self.obj.Document.Name)
         FreeCAD.getDocument(doc_name).recompute()
 
     def comboSubtypeChanged(self):
-        type_index = self.form.comboBoundaryType.currentIndex()
-        subtype_index = self.form.comboSubtype.currentIndex()
+        type_index = self.boundary_type_indices[self.form.comboBoundaryType.currentIndex()]
+        subtype_index = (self.form.comboBoundaryType.currentIndex() - 1
+                         if getattr(self.obj, 'SolidBoundary', False) and type_index == 4
+                         else self.form.comboSubtype.currentIndex())
         self.form.labelBoundaryDescription.setText(CfdFluidBoundary.SUBTYPES_HELPTEXT[type_index][subtype_index])
-        self.obj.BoundarySubType = CfdFluidBoundary.SUBTYPES[type_index][self.form.comboSubtype.currentIndex()]
+        self.obj.BoundarySubType = (('symmetry' if subtype_index == 0 else 'cyclic')
+                                    if getattr(self.obj, 'SolidBoundary', False) and type_index == 4
+                                    else CfdFluidBoundary.SUBTYPES[type_index][self.form.comboSubtype.currentIndex()])
         self.updateUI()
 
     def buttonDirectionClicked(self):

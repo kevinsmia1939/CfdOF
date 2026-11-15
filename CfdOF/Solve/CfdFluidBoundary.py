@@ -319,7 +319,7 @@ class CommandCfdFluidBoundary:
 def makeCfdSolidBoundary(name="CfdSolidBoundary"):
     obj = makeCfdFluidBoundary(name)
     addObjectProperty(obj, "SolidBoundary", True, "App::PropertyBool", "",
-                      QT_TRANSLATE_NOOP("App::Property", "External solid thermal boundary"))
+                      QT_TRANSLATE_NOOP("App::Property", "Solid-region boundary"))
     obj.setEditorMode("SolidBoundary", 1)
     obj.BoundaryType = "wall"
     obj.BoundarySubType = "fixedWall"
@@ -332,7 +332,7 @@ class CommandCfdSolidBoundary(CommandCfdFluidBoundary):
         return {
             'Pixmap': os.path.join(CfdTools.getModulePath(), "Gui", "Icons", "solid_boundary.svg"),
             'MenuText': QT_TRANSLATE_NOOP("CfdOF_SolidBoundary", "Solid boundary"),
-            'ToolTip': QT_TRANSLATE_NOOP("CfdOF_SolidBoundary", "Assign a thermal condition to external solid faces")}
+            'ToolTip': QT_TRANSLATE_NOOP("CfdOF_SolidBoundary", "Assign a thermal or periodic condition to solid faces")}
 
     def Activated(self):
         selection = [(entry.Object, tuple(entry.SubElementNames))
@@ -395,6 +395,8 @@ class CfdFluidBoundary:
         all_subtypes = []
         for s in SUBTYPES:
             all_subtypes += s
+
+        all_subtypes.append('cyclic')
 
         addObjectProperty(
             obj,
