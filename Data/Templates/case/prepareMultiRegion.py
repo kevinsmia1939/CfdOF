@@ -136,10 +136,9 @@ def write_region_create_patch_dict(region):
     ]
     system_dir = os.path.join("system", region)
     os.makedirs(system_dir, exist_ok=True)
-    for include_name in ("periodic_type", "solidPeriodicMeshType"):
-        include_path = os.path.join("system", include_name)
-        if os.path.isfile(include_path):
-            shutil.copyfile(include_path, os.path.join(system_dir, include_name))
+    if any(pair_region == region for pair_region, _, _ in SOLID_PERIODICS):
+        shutil.copyfile(os.path.join("system", "solidPeriodicMeshType"),
+                        os.path.join(system_dir, "solidPeriodicMeshType"))
     region_dict = os.path.join(system_dir, "createPatchDict")
     with open(region_dict, "w") as fid:
         fid.write(contents[:patches_match.start()])

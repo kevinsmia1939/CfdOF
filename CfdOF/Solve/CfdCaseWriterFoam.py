@@ -1028,8 +1028,8 @@ class CfdCaseWriterFoam:
                         owners.add(matches[0])
             if getattr(bc, 'SolidBoundary', False):
                 if (bc.BoundaryType, bc.BoundarySubType) not in (
-                        ('wall', 'fixedWall'), ('constraint', 'cyclic'), ('constraint', 'symmetry')):
-                    raise ValueError("Solid boundary '{}' must use a stationary wall, symmetry, or periodic condition.".format(
+                        ('wall', 'fixedWall'), ('constraint', 'cyclic')):
+                    raise ValueError("Solid boundary '{}' must use a stationary wall or periodic condition.".format(
                         bc.Label))
                 if any(regions[name][0] != 'solid' for name in owners):
                     raise ValueError("Solid boundary '{}' must reference faces on a solid region.".format(bc.Label))
