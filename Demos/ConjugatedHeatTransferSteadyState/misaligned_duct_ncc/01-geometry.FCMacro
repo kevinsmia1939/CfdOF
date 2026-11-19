@@ -1,0 +1,44 @@
+import FreeCAD as App
+
+
+document_name = "misaligned_duct_ncc"
+
+if document_name in App.listDocuments():
+    App.closeDocument(document_name)
+doc = App.newDocument(document_name)
+App.setActiveDocument(doc.Name)
+
+
+def make_box(name, label, length, width, height, placement, color):
+    obj = doc.addObject("Part::Box", name)
+    obj.Label = label
+    obj.Length = "{} mm".format(length)
+    obj.Width = "{} mm".format(width)
+    obj.Height = "{} mm".format(height)
+    obj.Placement.Base = App.Vector(*placement)
+    if obj.ViewObject is not None:
+        obj.ViewObject.ShapeColor = color
+    obj.addProperty("App::PropertyString", "TutorialRegion", "misalignedDuct")
+    return obj
+
+
+# OpenFOAM Foundation's misalignedDuct tutorial uses centimetres.  These are
+# the same dimensions in FreeCAD millimetres, extruded from z=-10 to z=10 mm.
+# The two fluid channels meet only over y=-10..10 mm at x=0.
+FluidLeft = make_box(
+    "FluidLeft", "fluid_left", 100, 40, 20, (-100, -30, -10), (0.30, 0.60, 1.00))
+FluidRight = make_box(
+    "FluidRight", "fluid_right", 100, 40, 20, (0, -10, -10), (0.30, 0.60, 1.00))
+
+# Four solids reproduce the surrounding copper parts in the tutorial.  The
+# two pairs touching at x=0 form the solid-solid non-conformal interfaces.
+SolidLeftLower = make_box(
+    "SolidLeftLower", "solid_left_lower", 100, 20, 20, (-100, -50, -10), (0.85, 0.45, 0.15))
+SolidLeftUpper = make_box(
+    "SolidLeftUpper", "solid_left_upper", 100, 40, 20, (-100, 10, -10), (0.85, 0.45, 0.15))
+SolidRightLower = make_box(
+    "SolidRightLower", "solid_right_lower", 100, 40, 20, (0, -50, -10), (0.85, 0.45, 0.15))
+SolidRightUpper = make_box(
+    "SolidRightUpper", "solid_right_upper", 100, 20, 20, (0, 30, -10), (0.85, 0.45, 0.15))
+
+doc.recompute()

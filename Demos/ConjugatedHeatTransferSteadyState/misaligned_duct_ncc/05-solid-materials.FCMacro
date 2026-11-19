@@ -1,0 +1,40 @@
+import FreeCAD as App
+
+from CfdOF import CfdTools
+from CfdOF.Solve import CfdRegionCoupledInterface
+from CfdOF.Solve import CfdSolidMaterial
+
+
+copper = {
+    "Author": "OpenFOAM Foundation misalignedDuct",
+    "AuthorAndLicense": "",
+    "CardName": "CopperSolid",
+    "Density": "8940 kg/m^3",
+    "Description": "Copper properties from the OpenFOAM misalignedDuct tutorial",
+    "License": "",
+    "Name": "Copper_solid",
+    "ReferenceSource": "OpenFOAM-14 tutorials/multiRegion/CHT/misalignedDuct",
+    "SourceURL": "",
+    "SpecificHeat": "385 J/kg/K",
+    "ThermalConductivity": "380 W/m/K",
+    "Type": "Solid",
+}
+
+
+def add_copper(source_name):
+    source = App.ActiveDocument.getObject(source_name)
+    region = CfdRegionCoupledInterface.getInterfaceRegionForSource(source)
+    if region is None:
+        raise RuntimeError("No interface region generated for '{}'".format(source_name))
+    material = CfdSolidMaterial.makeCfdSolidMaterial("{}Material".format(source_name))
+    CfdTools.getActiveAnalysis().addObject(material)
+    material.Label = "{}_copper".format(region.Label)
+    material.Material = copper.copy()
+    material.HeatGeneration = "0 W/m^3"
+    material.ShapeRefs = [(region, ("Solid1",))]
+
+
+for source_name in ("SolidLeftLower", "SolidLeftUpper", "SolidRightLower", "SolidRightUpper"):
+    add_copper(source_name)
+
+App.ActiveDocument.recompute()

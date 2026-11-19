@@ -43,6 +43,7 @@ boundaryField
 
 %}
 
+%[0/fluid/_periodic_scalar%]
 %{%(multiRegionUseSplitMeshRegions%)
 %:True
 %{%(multiRegionSolidNames%)

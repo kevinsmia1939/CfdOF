@@ -1,0 +1,12 @@
+from os import path
+
+from CfdOF.CfdTools import executeMacro
+
+macro_dir = path.dirname(__file__)
+for macro_name in (
+        "01-geometry.FCMacro",
+        "02-analysis.FCMacro",
+        "03-interface-regions-and-meshes.FCMacro",
+        "04-boundaries.FCMacro",
+        "05-solid-materials.FCMacro"):
+    executeMacro(path.join(macro_dir, macro_name))

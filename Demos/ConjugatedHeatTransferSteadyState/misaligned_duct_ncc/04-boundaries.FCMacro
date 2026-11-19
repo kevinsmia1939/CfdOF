@@ -1,0 +1,101 @@
+import json
+
+import FreeCAD as App
+
+from CfdOF import CfdTools
+from CfdOF.Solve import CfdFluidBoundary
+from CfdOF.Solve import CfdRegionCoupledInterface
+
+
+interface = App.ActiveDocument.InterfaceRegionCoupledInterface
+
+
+def region_for(source_name):
+    source = App.ActiveDocument.getObject(source_name)
+    region = CfdRegionCoupledInterface.getInterfaceRegionForSource(source)
+    if region is None:
+        raise RuntimeError("No interface region generated for '{}'".format(source_name))
+    return region
+
+
+def faces_on_x(region, x_value, tolerance=1e-6):
+    matches = []
+    for index, face in enumerate(region.Shape.Faces, 1):
+        bb = face.BoundBox
+        if abs(bb.XMin - x_value) <= tolerance and abs(bb.XMax - x_value) <= tolerance:
+            matches.append("Face{}".format(index))
+    if not matches:
+        raise RuntimeError("No face on x={} found for '{}'".format(x_value, region.Label))
+    return tuple(matches)
+
+
+def paired_faces(region):
+    names = set()
+    for entry in interface.InterfacePairs:
+        pair = json.loads(entry)
+        if pair["object_a"] == region.Name:
+            names.add(pair["face_a"])
+        if pair["object_b"] == region.Name:
+            names.add(pair["face_b"])
+    return names
+
+
+def unpaired_faces(region, excluded=()):
+    paired = paired_faces(region)
+    excluded = set(excluded)
+    return tuple(
+        "Face{}".format(index)
+        for index, _face in enumerate(region.Shape.Faces, 1)
+        if "Face{}".format(index) not in paired | excluded
+    )
+
+
+def add_boundary(label, boundary_type, subtype, thermal_type, refs,
+                 temperature="297 K", velocity=(0, 0, 0), heat_transfer_coeff="0 W/m^2/K"):
+    boundary = CfdFluidBoundary.makeCfdFluidBoundary()
+    CfdTools.getActiveAnalysis().addObject(boundary)
+    boundary.Label = label
+    boundary.BoundaryType = boundary_type
+    boundary.BoundarySubType = subtype
+    boundary.ThermalBoundaryType = thermal_type
+    boundary.Temperature = temperature
+    boundary.HeatTransferCoeff = heat_transfer_coeff
+    boundary.Pressure = "100 kPa"
+    boundary.Ux = "{} mm/s".format(velocity[0])
+    boundary.Uy = "{} mm/s".format(velocity[1])
+    boundary.Uz = "{} mm/s".format(velocity[2])
+    boundary.TurbulenceIntensityPercentage = 1.0
+    boundary.TurbulenceLengthScale = "10 mm"
+    boundary.ShapeRefs = refs
+    return boundary
+
+
+fluid_left = region_for("FluidLeft")
+fluid_right = region_for("FluidRight")
+inlet_faces = faces_on_x(fluid_left, -100)
+outlet_faces = faces_on_x(fluid_right, 100)
+
+add_boundary("inlet", "inlet", "uniformVelocityInlet", "fixedValue",
+             [(fluid_left, inlet_faces)], temperature="312 K", velocity=(100, 0, 0))
+add_boundary("outlet", "outlet", "staticPressureOutlet", "fixedValue",
+             [(fluid_right, outlet_faces)], temperature="297 K")
+
+fluid_walls = []
+for region, excluded in ((fluid_left, inlet_faces), (fluid_right, outlet_faces)):
+    faces = unpaired_faces(region, excluded)
+    if faces:
+        fluid_walls.append((region, faces))
+add_boundary("fluid_external", "wall", "fixedWall", "zeroGradient", fluid_walls)
+
+# This corresponds to the tutorial's externalWallHeatFluxTemperature condition:
+# h=1e4 W/(m^2 K), ambient temperature 297 K.
+solid_refs = []
+for source_name in ("SolidLeftLower", "SolidLeftUpper", "SolidRightLower", "SolidRightUpper"):
+    region = region_for(source_name)
+    faces = unpaired_faces(region)
+    if faces:
+        solid_refs.append((region, faces))
+add_boundary("external", "wall", "fixedWall", "heatTransferCoeff",
+             solid_refs, temperature="297 K", heat_transfer_coeff="10000 W/m^2/K")
+
+App.ActiveDocument.recompute()

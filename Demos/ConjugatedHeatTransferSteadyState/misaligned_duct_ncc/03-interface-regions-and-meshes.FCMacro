@@ -1,0 +1,78 @@
+import FreeCAD as App
+
+from CfdOF import CfdTools
+from CfdOF.Mesh import CfdMesh
+from CfdOF.Solve import CfdInterfaceNccRegions
+from CfdOF.Solve import CfdRegionCoupledInterface
+
+
+sources = [
+    App.ActiveDocument.FluidLeft,
+    App.ActiveDocument.FluidRight,
+    App.ActiveDocument.SolidLeftLower,
+    App.ActiveDocument.SolidLeftUpper,
+    App.ActiveDocument.SolidRightLower,
+    App.ActiveDocument.SolidRightUpper,
+]
+roles = {
+    "FluidLeft": "Fluid",
+    "FluidRight": "Fluid",
+    "SolidLeftLower": "Solid",
+    "SolidLeftUpper": "Solid",
+    "SolidRightLower": "Solid",
+    "SolidRightUpper": "Solid",
+}
+
+_group, regions, interface = CfdInterfaceNccRegions.createInterfaceNccRegions(
+    sources, region_roles=roles)
+interface.Label = "misaligned_duct_interfaces"
+interface.DisplaySolidSolidInterface = True
+interface.DisplaySolidLiquidInterface = True
+
+regions_by_source = {
+    source.Name: CfdRegionCoupledInterface.getInterfaceRegionForSource(source)
+    for source in sources
+}
+labels = {
+    "FluidLeft": "fluid_left",
+    "FluidRight": "fluid_right",
+    "SolidLeftLower": "solid_left_lower",
+    "SolidLeftUpper": "solid_left_upper",
+    "SolidRightLower": "solid_right_lower",
+    "SolidRightUpper": "solid_right_upper",
+}
+for source_name, label in labels.items():
+    regions_by_source[source_name].Label = label
+
+
+def add_mesh(name, source_name, region_type, case_name, max_length, point):
+    mesh = CfdMesh.makeCfdMesh(name)
+    CfdTools.getActiveAnalysis().addObject(mesh)
+    mesh.Label = name
+    mesh.Part = regions_by_source[source_name]
+    mesh.RegionType = region_type
+    mesh.CaseName = case_name
+    mesh.MeshUtility = "gmsh"
+    mesh.ElementDimension = "3D"
+    mesh.CharacteristicLengthMax = max_length
+    mesh.CellsBetweenLevels = 3
+    mesh.EdgeRefinement = 1.0
+    mesh.PointInMesh = {"x": "{} mm".format(point[0]),
+                        "y": "{} mm".format(point[1]),
+                        "z": "{} mm".format(point[2])}
+    mesh.NumberOfProcesses = 1
+    return mesh
+
+
+add_mesh("FluidLeftMesh", "FluidLeft", "fluid", "meshCaseMisalignedFluidLeft", "5 mm", (-50, -10, 0))
+add_mesh("FluidRightMesh", "FluidRight", "fluid", "meshCaseMisalignedFluidRight", "5 mm", (50, 10, 0))
+add_mesh("SolidLeftLowerMesh", "SolidLeftLower", "solid", "meshCaseMisalignedSolidLeftLower", "5 mm", (-50, -40, 0))
+add_mesh("SolidLeftUpperMesh", "SolidLeftUpper", "solid", "meshCaseMisalignedSolidLeftUpper", "5 mm", (-50, 30, 0))
+add_mesh("SolidRightLowerMesh", "SolidRightLower", "solid", "meshCaseMisalignedSolidRightLower", "5 mm", (50, -30, 0))
+add_mesh("SolidRightUpperMesh", "SolidRightUpper", "solid", "meshCaseMisalignedSolidRightUpper", "5 mm", (50, 40, 0))
+
+for source in sources:
+    if source.ViewObject is not None:
+        source.ViewObject.Visibility = False
+
+App.ActiveDocument.recompute()

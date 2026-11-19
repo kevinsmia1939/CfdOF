@@ -1,0 +1,33 @@
+%{%(multiRegionFluidPeriodicsByRegion/%(multiRegionFluidNames/0%)%)
+    %(0%)_on_%(0%)_master
+    {
+        type            nonConformalCyclic;
+        value           $internalField;
+    }
+
+    %(0%)_on_%(0%)_slave
+    {
+        type            nonConformalCyclic;
+        value           $internalField;
+    }
+
+    nonConformalError_on_%(0%)_master
+    {
+        type            nonConformalError;
+    }
+
+    nonConformalError_on_%(0%)_slave
+    {
+        type            nonConformalError;
+    }
+
+    %(0%)_master
+    {
+        #include "../MMR/scalar";
+    }
+
+    %(0%)_slave
+    {
+        #include "../MMR/scalar";
+    }
+%}

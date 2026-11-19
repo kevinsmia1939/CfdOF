@@ -267,11 +267,15 @@ class CfdMeshTools:
             bc_group = CfdTools.getCfdBoundaryGroupWithRegionInterfaces(analysis_obj)
         CfdTools.validateBoundaryFaceAssignments(bc_group)
         multi_mesh_analysis = bool(analysis_obj and len(CfdTools.getMeshObjects(analysis_obj)) > 1)
+        interface_region_mesh = bool(analysis_obj and any(
+            self.mesh_obj.Part in interface.RegionObjects
+            for interface in CfdTools.getRegionCoupledInterfaceGroup(analysis_obj)))
+        restrict_to_mesh_part = multi_mesh_analysis or interface_region_mesh
         boundary_applies = []
         seen_region_interface_refs = set()
         skipped_region_interface_bc_ids = set()
         for bc_id, bc_obj in enumerate(bc_group):
-            applies = not multi_mesh_analysis or _boundary_targets_mesh_part(bc_obj, self.part_obj)
+            applies = not restrict_to_mesh_part or _boundary_targets_mesh_part(bc_obj, self.part_obj)
             boundary_applies.append(applies)
             if not applies:
                 continue

@@ -181,7 +181,9 @@ class CfdCaseWriterFoam:
             'multiRegionFluidBoundaries': {},
             'multiRegionSolidBoundaries': {},
             'multiRegionFluidBoundariesByRegion': {},
+            'multiRegionFluidPeriodicsByRegion': {},
             'multiRegionSolidBoundariesByRegion': {},
+            'solidPeriodics': {},
             'multiRegionUseSplitMeshRegions': True,
             'multiRegionMeshDirs': {},
             'multiRegionNonConformalCouples': {},
@@ -1356,6 +1358,9 @@ class CfdCaseWriterFoam:
         settings['createPatches'] = {}
         settings['createPatchesSnappyBaffles'] = {}
         settings['createPeriodics'] = {}
+        settings['fluidPeriodics'] = {}
+        for region in settings['multiRegionFluidNames']:
+            settings['multiRegionFluidPeriodicsByRegion'].setdefault(region, {})
         bc_group = self.bc_group
 
         defaultPatchType = "patch"
@@ -1381,6 +1386,8 @@ class CfdCaseWriterFoam:
 
             if bcSubType == 'cyclicAMI':
                 settings['createPatchesForPeriodics'] = True
+                if getattr(bc_obj, 'PeriodicTemperatureJumpEnabled', False) and not bc_obj.PeriodicMaster:
+                    raise ValueError("Set the temperature jump on periodic master '{}' only.".format(bc_obj.Label))
                 if bc_obj.PeriodicMaster:
                     slave_bc_obj = None
                     slave_bc_id = -1
@@ -1395,6 +1402,9 @@ class CfdCaseWriterFoam:
                     settings['createPeriodics'][bc_obj.Label] = {
                         'PeriodicMaster': bc_obj.PeriodicMaster,
                         'PeriodicPartner': slave_bc_obj.Label if bc_obj.PeriodicMaster else slave_bc_obj.PeriodicPartner,
+                        'TemperatureJumpEnabled': bool(getattr(bc_obj, 'PeriodicTemperatureJumpEnabled', False)),
+                        'TemperatureJump': Units.Quantity(
+                            getattr(bc_obj, 'PeriodicTemperatureJump', '0 K')).getValueAs('K').Value,
                         'RotationalPeriodic': slave_bc_obj.RotationalPeriodic,
                         'PeriodicCentreOfRotation': tuple(
                             Units.Quantity(p, Units.Length).getValueAs('m').Value
@@ -1405,6 +1415,26 @@ class CfdCaseWriterFoam:
                             for p in slave_bc_obj.PeriodicSeparationVector),
                         'PatchNamesList': '"patch_'+str(bc_id+1)+'_.*"',
                         'PatchNamesListSlave': '"patch_'+str(slave_bc_id+1)+'_.*"'}
+
+                    if settings['multiRegionEnabled']:
+                        regions = [name for name, boundaries in
+                                   settings['multiRegionFluidBoundariesByRegion'].items()
+                                   if bc_obj.Label in boundaries and slave_bc_obj.Label in boundaries]
+                        if len(regions) != 1:
+                            raise ValueError("Periodic boundaries '{}' and '{}' must belong to one fluid region.".format(
+                                bc_obj.Label, slave_bc_obj.Label))
+                        region = regions[0]
+                        pair = settings['createPeriodics'][bc_obj.Label]
+                        settings['multiRegionFluidPeriodicsByRegion'].setdefault(region, {})[bc_obj.Label] = pair
+                        settings['fluidPeriodics'][bc_obj.Label] = {
+                            'Region': region,
+                            'MasterPatch': bc_obj.Label + '_master',
+                            'SlavePatch': bc_obj.Label + '_slave',
+                            'RotationalPeriodic': pair['RotationalPeriodic'],
+                            'PeriodicCentreOfRotation': pair['PeriodicCentreOfRotation'],
+                            'PeriodicCentreOfRotationAxis': pair['PeriodicCentreOfRotationAxis'],
+                            'PeriodicSeparationVector': pair['PeriodicSeparationVector'],
+                        }
 
         for label, pair in settings.get('solidPeriodics', {}).items():
             master = next(bc for bc in bc_group if bc.Label == label)

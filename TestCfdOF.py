@@ -280,7 +280,7 @@ class SteadyChtTemplateTest(unittest.TestCase):
 
 
 class ChtTemperatureTemplateTest(unittest.TestCase):
-    def render_fields(self, foundation=False):
+    def render_fields(self, foundation=False, periodic_jump=None):
         from CfdOF.TemplateBuilder import TemplateBuilder
 
         walls = {}
@@ -303,6 +303,13 @@ class ChtTemperatureTemplateTest(unittest.TestCase):
             fluid_boundaries[boundary_type + '_boundary'] = {
                 'BoundaryType': boundary_type, 'Temperature': 310,
             }
+        periodics = {}
+        if periodic_jump is not None:
+            periodics['periodic_master'] = {
+                'PeriodicPartner': 'periodic_slave',
+                'TemperatureJumpEnabled': periodic_jump,
+                'TemperatureJump': 12,
+            }
         settings = {
             'solver': {'SolverName': 'chtMultiRegionSimpleFoam'},
             'system': {'FoundationChtModels': foundation, 'FoamVersion': '14' if foundation else '2606'},
@@ -311,6 +318,7 @@ class ChtTemperatureTemplateTest(unittest.TestCase):
             'multiRegionFluidNames': ['cooling_air'],
             'multiRegionSolidNames': ['solid_a', 'solid_b'],
             'multiRegionFluidBoundariesByRegion': {'cooling_air': fluid_boundaries},
+            'multiRegionFluidPeriodicsByRegion': {'cooling_air': periodics},
             'multiRegionSolidBoundariesByRegion': {'solid_a': walls, 'solid_b': walls},
             'multiRegionUseSplitMeshRegions': False,
         }
@@ -328,6 +336,40 @@ class ChtTemperatureTemplateTest(unittest.TestCase):
             self.assertFalse(os.path.exists(os.path.join(output, '0', 'fluid')))
             self.assertFalse(os.path.exists(os.path.join(output, '0', 'solid')))
             return fields
+
+    def test_periodic_temperature_jump_templates(self):
+        from CfdOF.TemplateBuilder import TemplateBuilder
+
+        for foundation in (False, True):
+            fluid_t = self.render_fields(foundation, periodic_jump=True)['cooling_air']
+            self.assertIn('type            uniformJump;', fluid_t)
+            self.assertIn('periodic_master_on_periodic_master_master', fluid_t)
+            self.assertIn('patchType       nonConformalCyclic;', fluid_t)
+            self.assertIn('jumpTable       constant 12;', fluid_t)
+            self.assertIn('#include "../MMR/periodic_master_master_temperature";', fluid_t)
+            self.assertIn('#include "../MMR/periodic_master_slave_temperature";', fluid_t)
+
+            ordinary_t = self.render_fields(foundation, periodic_jump=False)['cooling_air']
+            self.assertNotIn('type            uniformJump;', ordinary_t)
+            self.assertIn('#include "../MMR/scalar";', ordinary_t)
+
+        with tempfile.TemporaryDirectory(prefix='cfdof-periodic-temperature-') as output:
+            builder = TemplateBuilder.__new__(TemplateBuilder)
+            builder.case_path = output
+            builder.template_path = os.path.join(home_path, 'Data', 'Templates', 'case')
+            builder.settings = {
+                'MovingMeshRegionsPresent': False,
+                'createPatchesForPeriodics': True,
+                'createPeriodics': {'periodic_master': {
+                    'PeriodicMaster': True,
+                    'PeriodicPartner': 'periodic_slave',
+                    'TemperatureJumpEnabled': True,
+                    'TemperatureJump': 12,
+                }},
+            }
+            scalar = builder.buildFile('0/_boundary_MMR_temperature', [])
+            self.assertIn('jumpTable       constant 12;', scalar)
+            self.assertIn('#include "MMR/periodic_master_master_temperature";', scalar)
 
     def test_fluid_and_solid_temperature_boundaries(self):
         for foundation in (False, True):
@@ -1853,6 +1895,30 @@ class MultiRegionRemeshTest(unittest.TestCase):
 
 
 class BoundaryFaceAssignmentTest(unittest.TestCase):
+    def test_first_region_mesh_uses_only_its_interface_side(self):
+        analysis = makeChtBoundaryTestCase()
+        doc = FreeCAD.ActiveDocument
+        try:
+            with tempfile.TemporaryDirectory(prefix='cfdof-first-region-mesh-') as output:
+                analysis.OutputPath = output
+                fluid_mesh, solid_mesh = CfdTools.getMeshObjects(analysis)
+                doc.removeObject(solid_mesh.Name)
+                CfdMeshTools.CfdMeshTools(fluid_mesh).writeMesh()
+                self.assertEqual(len(CfdTools.getMeshObjects(analysis)), 1)
+
+                solid_mesh = CfdMesh.makeCfdMesh('Solid_Mesh')
+                analysis.addObject(solid_mesh)
+                solid_mesh.Part = doc.SolidRegion
+                solid_mesh.CaseName = 'meshCaseSolidRegion'
+                solid_mesh.MeshUtility = 'gmsh'
+                solid_mesh.CharacteristicLengthMax = '3 mm'
+                doc.removeObject(fluid_mesh.Name)
+                CfdMeshTools.CfdMeshTools(solid_mesh).writeMesh()
+                self.assertEqual(len(CfdTools.getMeshObjects(analysis)), 1)
+        finally:
+            if FreeCAD.ActiveDocument:
+                FreeCAD.closeDocument(FreeCAD.ActiveDocument.Name)
+
     def test_solid_and_face_references_are_checked_together(self):
         from types import SimpleNamespace
         doc = FreeCAD.newDocument('SolidBoundaryAssignmentTest')
@@ -1915,6 +1981,9 @@ class SolidExternalBoundaryTest(unittest.TestCase):
                 self.assertTrue(panel.form.comboBoundaryType.isEnabled())
                 self.assertEqual(panel.form.comboBoundaryType.count(), 2)
                 self.assertEqual(panel.form.comboBoundaryType.currentText(), CfdFluidBoundary.BOUNDARY_NAMES[0])
+                self.assertFalse(panel.form.comboSubtype.isHidden())
+                self.assertFalse(panel.form.labelSubtype.isHidden())
+                self.assertEqual(panel.form.comboSubtype.currentText(), 'Stationary wall')
                 self.assertEqual(boundary.BoundaryType, 'wall')
                 panel.closing()
                 panel.form.close()
@@ -1963,6 +2032,107 @@ class SolidExternalBoundaryTest(unittest.TestCase):
                 FreeCAD.closeDocument(FreeCAD.ActiveDocument.Name)
 
 
+class SingleRegionPeriodicCaseTest(unittest.TestCase):
+    def test_empty_template_iteration_writes_no_blocks(self):
+        from CfdOF.TemplateBuilder import TemplateBuilder
+
+        builder = TemplateBuilder.__new__(TemplateBuilder)
+        builder.settings = {'items': {}}
+        self.assertEqual(builder.process('%{%(items%)\n%(0%)\n%}', 'test', []), '')
+
+    def test_no_solid_periodic_patches_in_fluid_case(self):
+        doc = makeChtTestDocument()
+        analysis = CfdTools.getActiveAnalysis()
+        try:
+            physics = CfdTools.getPhysicsModel(analysis)
+            physics.Phase = 'Single'
+            mesh = CfdMesh.makeCfdMesh('FluidMesh')
+            analysis.addObject(mesh)
+            mesh.Part = doc.FluidRegion
+            mesh.CaseName = 'meshCase1'
+            for label, face in (('periodic_master', 'Face1'), ('periodic_slave', 'Face2')):
+                boundary = CfdFluidBoundary.makeCfdFluidBoundary()
+                analysis.addObject(boundary)
+                boundary.Label = label
+                boundary.BoundaryType = 'constraint'
+                boundary.BoundarySubType = 'cyclicAMI'
+                boundary.ShapeRefs = [(doc.FluidRegion, (face,))]
+                if label == 'periodic_slave':
+                    boundary.PeriodicMaster = False
+                    boundary.PeriodicPartner = 'periodic_master'
+                    boundary.PeriodicSeparationVector = FreeCAD.Vector(60, 0, 0)
+            doc.recompute()
+
+            with tempfile.TemporaryDirectory(prefix='cfdof-single-periodic-') as output:
+                analysis.OutputPath = output
+                writer = CfdCaseWriterFoam.CfdCaseWriterFoam(analysis)
+                writer.writeCase()
+                self.assertEqual(writer.settings['solidPeriodics'], {})
+                with open(os.path.join(writer.case_folder, 'system', 'createPatchDict')) as fid:
+                    create_patch = fid.read()
+                self.assertNotIn('solidPeriodicMeshType', create_patch)
+                self.assertNotIn('name None;', create_patch)
+                self.assertIn('periodic_master_master', create_patch)
+        finally:
+            if FreeCAD.ActiveDocument:
+                FreeCAD.closeDocument(FreeCAD.ActiveDocument.Name)
+
+
+class FluidPeriodicTemperatureJumpTest(unittest.TestCase):
+    def test_cht_case_writes_periodic_temperature_jump(self):
+        analysis = makeChtBoundaryTestCase()
+        try:
+            boundaries = {bc.Label: bc for bc in CfdTools.getCfdBoundaryGroup(analysis)}
+            master = boundaries['inlet']
+            slave = boundaries['outlet']
+            for bc in (master, slave):
+                bc.BoundaryType = 'constraint'
+                bc.BoundarySubType = 'cyclicAMI'
+            slave.PeriodicMaster = False
+            slave.PeriodicPartner = master.Label
+            slave.PeriodicSeparationVector = FreeCAD.Vector(60, 0, 0)
+            master.PeriodicTemperatureJumpEnabled = True
+            master.PeriodicTemperatureJump = '15 K'
+            analysis.Document.recompute()
+
+            if FreeCAD.GuiUp:
+                from CfdOF.Solve import TaskPanelCfdFluidBoundary
+                panel = TaskPanelCfdFluidBoundary.TaskPanelCfdFluidBoundary(
+                    master, CfdTools.getPhysicsModel(analysis), CfdTools.getMaterials(analysis))
+                self.assertTrue(panel.form.checkPeriodicTemperatureJump.isChecked())
+                self.assertFalse(panel.form.periodicTemperatureFrame.isHidden())
+                self.assertTrue(panel.form.inputPeriodicTemperatureJump.isEnabled())
+                panel.closing()
+                panel.form.close()
+
+            with tempfile.TemporaryDirectory(prefix='cfdof-fluid-periodic-') as output:
+                analysis.OutputPath = output
+                writer = CfdCaseWriterFoam.CfdCaseWriterFoam(analysis)
+                writer.writeCase()
+                pair = writer.settings['createPeriodics']['inlet']
+                self.assertEqual(pair['TemperatureJump'], 15)
+                self.assertTrue(pair['TemperatureJumpEnabled'])
+                self.assertEqual(writer.settings['fluidPeriodics']['inlet']['Region'], 'FluidRegion')
+                with open(os.path.join(writer.case_folder, '0', 'FluidRegion', 'T')) as fid:
+                    temperature = fid.read()
+                self.assertIn('inlet_on_inlet_master', temperature)
+                self.assertIn('jumpTable       constant 15.0;', temperature)
+                self.assertIn('#include "../MMR/inlet_master_temperature";', temperature)
+                for field in ('U', 'p', 'p_rgh'):
+                    with open(os.path.join(writer.case_folder, '0', 'FluidRegion', field)) as fid:
+                        contents = fid.read()
+                    self.assertIn('inlet_master', contents)
+                    self.assertIn('inlet_slave', contents)
+                with open(os.path.join(writer.case_folder, 'Allrun')) as fid:
+                    allrun = fid.read()
+                self.assertIn('type uniformJumpAMI;', allrun)
+                self.assertIn('jumpTable constant 15.0;', allrun)
+                subprocess.run(['bash', '-n', os.path.join(writer.case_folder, 'Allrun')], check=True)
+        finally:
+            if FreeCAD.ActiveDocument:
+                FreeCAD.closeDocument(FreeCAD.ActiveDocument.Name)
+
+
 class SolidPeriodicBoundaryTest(unittest.TestCase):
     def test_periodic_solid_pair_writes_mesh_and_field_conditions(self):
         original_foam_dir = CfdTools.getFoamDir()
@@ -1993,7 +2163,8 @@ class SolidPeriodicBoundaryTest(unittest.TestCase):
                 from CfdOF.Solve import TaskPanelCfdFluidBoundary
                 panel = TaskPanelCfdFluidBoundary.TaskPanelCfdFluidBoundary(
                     slave, CfdTools.getPhysicsModel(analysis), CfdTools.getMaterials(analysis))
-                self.assertEqual(panel.form.comboBoundaryType.currentText(), 'Periodic')
+                self.assertEqual(panel.form.comboBoundaryType.currentText(), CfdFluidBoundary.BOUNDARY_NAMES[4])
+                self.assertEqual(panel.form.comboSubtype.currentText(), CfdFluidBoundary.SUBNAMES[4][1])
                 self.assertFalse(panel.form.periodicFrame.isHidden())
                 self.assertEqual(panel.form.comboBoxPeriodicPartner.currentText(), master.Label)
                 panel.form.comboBoundaryType.setCurrentIndex(0)

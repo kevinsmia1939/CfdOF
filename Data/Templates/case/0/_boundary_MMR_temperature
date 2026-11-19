@@ -1,0 +1,68 @@
+%{%(MovingMeshRegionsPresent%)
+%:True
+%{%(MovingMeshRegions%)
+%[0/_boundary_MMR%]
+
+%{%(0%)_M %(0%)_S
+    %(0%)
+    {
+        #include "MMR/scalar";
+    }
+%}
+
+%}
+%}
+%{%(createPatchesForPeriodics%)
+%:True
+%{%(createPeriodics%)
+%{%(createPeriodics/%(0%)/PeriodicMaster%)
+%:True
+%{%(createPeriodics/%(0%)/TemperatureJumpEnabled%)
+%:True
+    nonConformalCyclic_on_%(0%)_master
+    {
+        type            uniformJump;
+        patchType       nonConformalCyclic;
+        jumpTable       constant %(createPeriodics/%(0%)/TemperatureJump%);
+        value           $internalField;
+    }
+
+    nonConformalCyclic_on_%(0%)_slave
+    {
+        type            uniformJump;
+        patchType       nonConformalCyclic;
+        value           $internalField;
+    }
+
+    nonConformalError_on_%(0%)_master
+    {
+        type            nonConformalError;
+    }
+
+    nonConformalError_on_%(0%)_slave
+    {
+        type            nonConformalError;
+    }
+
+    %(0%)_master
+    {
+        #include "MMR/%(0%)_master_temperature";
+    }
+
+    %(0%)_slave
+    {
+        #include "MMR/%(0%)_slave_temperature";
+    }
+%:False
+%[0/_boundary_MMR_cyclic%]
+%{%(0%)_master %(0%)_slave
+    %(0%)
+    {
+        #include "MMR/scalar";
+    }
+
+%}
+%}
+%}
+%}
+%}

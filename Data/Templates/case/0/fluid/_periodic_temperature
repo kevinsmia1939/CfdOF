@@ -1,0 +1,71 @@
+%{%(multiRegionFluidPeriodicsByRegion/%(multiRegionFluidNames/0%)%)
+%{%(multiRegionFluidPeriodicsByRegion/%(multiRegionFluidNames/0%)/%(0%)/TemperatureJumpEnabled%)
+%:True
+    %(0%)_on_%(0%)_master
+    {
+        type            uniformJump;
+        patchType       nonConformalCyclic;
+        jumpTable       constant %(multiRegionFluidPeriodicsByRegion/%(multiRegionFluidNames/0%)/%(0%)/TemperatureJump%);
+        value           $internalField;
+    }
+
+    %(0%)_on_%(0%)_slave
+    {
+        type            uniformJump;
+        patchType       nonConformalCyclic;
+        value           $internalField;
+    }
+
+    nonConformalError_on_%(0%)_master
+    {
+        type            nonConformalError;
+    }
+
+    nonConformalError_on_%(0%)_slave
+    {
+        type            nonConformalError;
+    }
+
+    %(0%)_master
+    {
+        #include "../MMR/%(0%)_master_temperature";
+    }
+
+    %(0%)_slave
+    {
+        #include "../MMR/%(0%)_slave_temperature";
+    }
+%:False
+    %(0%)_on_%(0%)_master
+    {
+        type            nonConformalCyclic;
+        value           $internalField;
+    }
+
+    %(0%)_on_%(0%)_slave
+    {
+        type            nonConformalCyclic;
+        value           $internalField;
+    }
+
+    nonConformalError_on_%(0%)_master
+    {
+        type            nonConformalError;
+    }
+
+    nonConformalError_on_%(0%)_slave
+    {
+        type            nonConformalError;
+    }
+
+    %(0%)_master
+    {
+        #include "../MMR/scalar";
+    }
+
+    %(0%)_slave
+    {
+        #include "../MMR/scalar";
+    }
+%}
+%}

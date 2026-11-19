@@ -76,7 +76,7 @@ class TaskPanelCfdFluidBoundary:
         self.boundary_type_indices = [0, 4] if solid_boundary else list(range(len(CfdFluidBoundary.BOUNDARY_TYPES)))
         if solid_boundary:
             self.form.comboBoundaryType.addItems([CfdFluidBoundary.BOUNDARY_NAMES[0],
-                                                  CfdFluidBoundary.translate("Boundary", "Periodic")])
+                                                  CfdFluidBoundary.BOUNDARY_NAMES[4]])
         else:
             self.form.comboBoundaryType.addItems(CfdFluidBoundary.BOUNDARY_NAMES)
         bi = self.boundary_type_indices.index(4) if solid_boundary and self.obj.BoundarySubType == 'cyclic' else 0
@@ -87,7 +87,7 @@ class TaskPanelCfdFluidBoundary:
         self.comboBoundaryTypeChanged()
 
         # Boundary subtypes
-        si = 0 if solid_boundary else indexOrDefault(CfdFluidBoundary.SUBTYPES[bi], self.obj.BoundarySubType, 0)
+        si = 0 if solid_boundary else indexOrDefault(CfdFluidBoundary.SUBTYPES[bi], self.BoundarySubTypeOrig, 0)
         self.form.comboSubtype.currentIndexChanged.connect(self.comboSubtypeChanged)
         self.form.comboSubtype.setCurrentIndex(si)
         self.comboSubtypeChanged()
@@ -168,6 +168,8 @@ class TaskPanelCfdFluidBoundary:
         setQuantity(self.form.input_sepx, Units.Quantity(self.obj.PeriodicSeparationVector.x, Units.Length))
         setQuantity(self.form.input_sepy, Units.Quantity(self.obj.PeriodicSeparationVector.y, Units.Length))
         setQuantity(self.form.input_sepz, Units.Quantity(self.obj.PeriodicSeparationVector.z, Units.Length))
+        self.form.checkPeriodicTemperatureJump.setChecked(self.obj.PeriodicTemperatureJumpEnabled)
+        setQuantity(self.form.inputPeriodicTemperatureJump, self.obj.PeriodicTemperatureJump)
 
         # Turbulence
         if self.turb_model is not None:
@@ -233,6 +235,7 @@ class TaskPanelCfdFluidBoundary:
         self.form.radioButtonSlavePeriodic.toggled.connect(self.updateUI)
         self.form.rb_rotational_periodic.toggled.connect(self.updateUI)
         self.form.rb_translational_periodic.toggled.connect(self.updateUI)
+        self.form.checkPeriodicTemperatureJump.toggled.connect(self.updateUI)
 
         # Face list selection panel - modifies obj.ShapeRefs passed to it
         self.faceSelector = CfdFaceSelectWidget.CfdFaceSelectWidget(self.form.faceSelectWidget,
@@ -240,9 +243,6 @@ class TaskPanelCfdFluidBoundary:
 
         if getattr(obj, 'SolidBoundary', False):
             self.form.setWindowTitle("Solid boundary")
-            self.form.comboSubtype.setVisible(False)
-            self.form.labelSubtype.setVisible(False)
-            self.form.labelBoundaryDescription.setText("Solid-region boundary")
             self.form.checkBoxDefaultBoundary.setVisible(False)
 
         self.updateUI()
@@ -320,6 +320,11 @@ class TaskPanelCfdFluidBoundary:
         if periodic_enabled:
             self.form.periodicFrame.setVisible(True)
             self.form.frameSlave.setVisible(not self.form.radioButtonMasterPeriodic.isChecked())
+            jump_available = (not getattr(self.obj, 'SolidBoundary', False)
+                              and self.form.radioButtonMasterPeriodic.isChecked())
+            self.form.periodicTemperatureFrame.setVisible(jump_available)
+            self.form.inputPeriodicTemperatureJump.setEnabled(
+                jump_available and self.form.checkPeriodicTemperatureJump.isChecked())
             if self.form.rb_rotational_periodic.isChecked():
                 self.form.rotationalFrame.setVisible(True)
                 self.form.translationalFrame.setVisible(False)
@@ -334,7 +339,9 @@ class TaskPanelCfdFluidBoundary:
         self.form.comboSubtype.blockSignals(True)
         self.form.comboSubtype.clear()
         if getattr(self.obj, 'SolidBoundary', False):
-            self.form.comboSubtype.addItem(CfdFluidBoundary.SUBNAMES[index][0 if index == 0 else 1])
+            self.form.comboSubtype.addItem(
+                CfdFluidBoundary.translate("Subnames", "Stationary wall") if index == 0
+                else CfdFluidBoundary.SUBNAMES[index][1])
         else:
             self.form.comboSubtype.addItems(CfdFluidBoundary.SUBNAMES[index])
         self.form.comboSubtype.setCurrentIndex(0)
@@ -352,7 +359,10 @@ class TaskPanelCfdFluidBoundary:
         type_index = self.boundary_type_indices[self.form.comboBoundaryType.currentIndex()]
         subtype_index = (1 if getattr(self.obj, 'SolidBoundary', False) and type_index == 4
                          else self.form.comboSubtype.currentIndex())
-        self.form.labelBoundaryDescription.setText(CfdFluidBoundary.SUBTYPES_HELPTEXT[type_index][subtype_index])
+        self.form.labelBoundaryDescription.setText(
+            CfdFluidBoundary.translate("Subtypes", "Solid thermal boundary")
+            if getattr(self.obj, 'SolidBoundary', False) and type_index == 0
+            else CfdFluidBoundary.SUBTYPES_HELPTEXT[type_index][subtype_index])
         self.obj.BoundarySubType = ('cyclic' if getattr(self.obj, 'SolidBoundary', False) and type_index == 4
                                     else CfdFluidBoundary.SUBTYPES[type_index][self.form.comboSubtype.currentIndex()])
         self.updateUI()
@@ -514,6 +524,10 @@ class TaskPanelCfdFluidBoundary:
 
         storeIfChanged(self.obj, 'PeriodicPartner', self.form.comboBoxPeriodicPartner.currentText())
         storeIfChanged(self.obj, 'PeriodicMaster', self.form.radioButtonMasterPeriodic.isChecked())
+        storeIfChanged(self.obj, 'PeriodicTemperatureJumpEnabled',
+                       self.form.checkPeriodicTemperatureJump.isChecked())
+        storeIfChanged(self.obj, 'PeriodicTemperatureJump',
+                       getQuantity(self.form.inputPeriodicTemperatureJump))
 
         # Turbulence
         if self.turb_model in CfdFluidBoundary.TURBULENT_INLET_SPEC:

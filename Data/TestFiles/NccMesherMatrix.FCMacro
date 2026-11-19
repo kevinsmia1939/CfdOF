@@ -1,0 +1,137 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
+# SPDX-FileCopyrightText: © 2026 Kavin Teenakul <andythe_great@protonmail.com>
+
+import os
+import ast
+import json
+import re
+import traceback
+from pathlib import Path
+import FreeCAD as App
+import FreeCADGui as Gui
+
+from CfdOF import CfdTools
+from CfdOF.Mesh import CfdMesh, CfdMeshTools
+from CfdOF.Solve import CfdCaseWriterFoam, CfdRegionCoupledInterface, CfdSolidMaterial
+from TestCfdOF import makeChtBoundaryTestCase
+
+output_root = os.environ.get('CFDOF_NCC_MATRIX_OUTPUT', '/tmp/cfdof-ncc-mesher-matrix')
+selected_scenarios = set(filter(None, os.environ.get('CFDOF_NCC_MATRIX_SCENARIOS', '').split(',')))
+old_foam = CfdTools.getFoamDir()
+try:
+    CfdTools.setFoamDir(os.environ.get('CFDOF_NCC_FOAM_DIR', '/usr/lib/openfoam/openfoam2606'))
+    for scenario, methods in (
+        ('gmsh', ('gmsh',) * 4),
+        ('cfmesh', ('cfMesh',) * 4),
+        ('snappy', ('snappyHexMesh',) * 4),
+        ('mixed', ('gmsh', 'cfMesh', 'snappyHexMesh', 'gmsh')),
+        ('mixed_snappy_fluid', ('snappyHexMesh', 'gmsh', 'cfMesh', 'snappyHexMesh')),
+        ('mixed_cfmesh_fluid', ('cfMesh', 'snappyHexMesh', 'gmsh', 'cfMesh')),
+    ):
+        if selected_scenarios and scenario not in selected_scenarios:
+            continue
+        try:
+            analysis = makeChtBoundaryTestCase()
+            doc = analysis.Document
+            fluid, base = doc.FluidRegion, doc.SolidRegion
+            cap = doc.addObject('Part::Box', 'UpperSolid')
+            cap.Length, cap.Width, cap.Height = 60, 20, 5
+            cap.Placement.Base = App.Vector(0, 0, 25)
+            side = doc.addObject('Part::Box', 'SideSolid')
+            side.Length, side.Width, side.Height = 10, 20, 5
+            side.Placement.Base = App.Vector(60, 0, 20)
+            doc.recompute()
+            for region, name in ((cap, 'UpperSolidMesh'), (side, 'SideSolidMesh')):
+                CfdTools.addObjectProperty(region, 'RegionRole', 'Solid', 'App::PropertyString',
+                                           'Interface NCC', 'Region role')
+                mesh = CfdMesh.makeCfdMesh(name)
+                analysis.addObject(mesh)
+                mesh.Part = region
+                mesh.CaseName = 'meshCase' + name
+                mesh.CharacteristicLengthMax = '3 mm'
+                material = CfdSolidMaterial.makeCfdSolidMaterial(name + 'Material')
+                analysis.addObject(material)
+                material.Material = {'Name': 'TestSolid', 'Type': 'Solid',
+                                     'Density': '2699 kg/m^3',
+                                     'SpecificHeat': '897 J/kg/K',
+                                     'ThermalConductivity': '237 W/m/K'}
+                material.ShapeRefs = [(region, ('Solid1',))]
+            interface = next(o for o in analysis.Group if isinstance(getattr(o, 'Proxy', None),
+                                                                     CfdRegionCoupledInterface.CfdRegionCoupledInterface))
+            interface.RegionObjects = [fluid, base, cap, side]
+            interface.RegionNames = [CfdTools.getRegionName(r) for r in interface.RegionObjects]
+            interface.ShapeRefs, interface.InterfacePairs = CfdRegionCoupledInterface.generatePairedTouchingFaceData(
+                interface.RegionObjects)
+            pair_regions = {(pair['region_a'], pair['region_b'])
+                            for pair in map(json.loads, interface.InterfacePairs)}
+            assert pair_regions == {
+                ('FluidRegion', 'SolidRegion'),
+                ('SolidRegion', 'UpperSolid'),
+                ('SolidRegion', 'SideSolid'),
+            }, pair_regions
+            coupled_base_faces = set()
+            for encoded in interface.InterfacePairs:
+                pair = json.loads(encoded)
+                if pair['region_a'] == CfdTools.getRegionName(base):
+                    coupled_base_faces.add(pair['face_a'])
+                if pair['region_b'] == CfdTools.getRegionName(base):
+                    coupled_base_faces.add(pair['face_b'])
+            for boundary in analysis.Group:
+                if getattr(getattr(boundary, 'Proxy', None), 'Type', '') != 'CfdFluidBoundary':
+                    continue
+                refs = getattr(boundary, 'ShapeRefs', [])
+                if not refs or refs[0][0] != base:
+                    continue
+                if boundary.Label == 'heatsource':
+                    top_face = next('Face{}'.format(i) for i, face in enumerate(cap.Shape.Faces, 1)
+                                    if abs(face.CenterOfMass.z - 30) < 1e-6)
+                    boundary.ShapeRefs = [(cap, (top_face,))]
+                    continue
+                remaining = tuple(face for face in refs[0][1] if face not in coupled_base_faces)
+                boundary.ShapeRefs = [(base, remaining)] if remaining else []
+            analysis.OutputPath = os.path.join(output_root, scenario)
+            os.makedirs(analysis.OutputPath, exist_ok=True)
+            solver = CfdTools.getSolver(analysis)
+            solver.MaxIterations = 1
+            solver.SteadyWriteInterval = 1
+            for mesh, method in zip(CfdTools.getMeshObjects(analysis), methods):
+                mesh.MeshUtility = method
+                box = mesh.Part.Shape.BoundBox
+                mesh.PointInMesh = {
+                    'x': '{} mm'.format((box.XMin + box.XMax) / 2 + 0.13),
+                    'y': '{} mm'.format((box.YMin + box.YMax) / 2 + 0.13),
+                    'z': '{} mm'.format((box.ZMin + box.ZMax) / 2 + 0.13),
+                }
+                doc.recompute()
+                tools = CfdMeshTools.CfdMeshTools(mesh)
+                tools.writeMesh()
+                CfdTools.runFoamCommand('./Allmesh', case=tools.mesh_case_dir)
+                print('MATRIX_MESH', scenario, mesh.Part.Name, method, flush=True)
+            writer = CfdCaseWriterFoam.CfdCaseWriterFoam(analysis)
+            writer.writeCase()
+            CfdTools.runFoamCommand('./Allrun', case=writer.case_folder)
+            case_dir = Path(writer.case_folder)
+            script = ast.parse((case_dir / 'prepareMultiRegion.py').read_text())
+            couples = next(ast.literal_eval(node.value) for node in script.body
+                           if isinstance(node, ast.Assign)
+                           and any(isinstance(target, ast.Name) and target.id == 'COUPLES'
+                                   for target in node.targets))
+            for region in interface.RegionNames:
+                required = {patch for a, b, c, d in couples
+                            for name, patch in ((a, b), (c, d)) if name == region}
+                boundary_text = (case_dir / 'constant' / region / 'polyMesh' / 'boundary').read_text()
+                for patch in required:
+                    match = re.search(r'^\s*' + re.escape(patch) + r'\s*\{([^}]+)',
+                                      boundary_text, re.MULTILINE)
+                    if not match or int(re.search(r'\bnFaces\s+(\d+)', match[1])[1]) == 0:
+                        raise RuntimeError('{} has no faces on {} in {}'.format(patch, region, scenario))
+            print('MATRIX_SOLVE_OK', scenario, len(interface.InterfacePairs), flush=True)
+        except Exception:
+            traceback.print_exc()
+            print('MATRIX_FAILED', scenario, flush=True)
+        finally:
+            if App.ActiveDocument:
+                App.closeDocument(App.ActiveDocument.Name)
+finally:
+    CfdTools.setFoamDir(old_foam)
+    Gui.getMainWindow().close()

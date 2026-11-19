@@ -162,6 +162,19 @@ fi
 
 %}
 %}
+%{%(createPeriodics%)
+%{%(createPeriodics/%(0%)/TemperatureJumpEnabled%)
+%:True
+if command -v createNonConformalCouples > /dev/null 2>&1
+then
+    printf 'type zeroGradient;\n' > '0/MMR/%(0%)_master_temperature'
+    printf 'type zeroGradient;\n' > '0/MMR/%(0%)_slave_temperature'
+else
+    printf 'type uniformJumpAMI;\npatchType cyclicAMI;\njumpTable constant %(createPeriodics/%(0%)/TemperatureJump%);\nvalue $internalField;\n' > '0/MMR/%(0%)_master_temperature'
+    printf 'type uniformJumpAMI;\npatchType cyclicAMI;\nvalue $internalField;\n' > '0/MMR/%(0%)_slave_temperature'
+fi
+%}
+%}
 %{%(scalarTransportFunctionsEnabled%)
 %:True
 # Enable fvOption source for scalar transport in OpenFOAM v10+
@@ -192,6 +205,8 @@ runCommand createPatch -overwrite
 
 %{%(createPatchesForPeriodics%)
 %:True
+%{%(multiRegionEnabled%)
+%:False
 which createNonConformalCouples > /dev/null 2>&1
 if [ $? == 0 ]
 then
@@ -204,6 +219,7 @@ then
 %}
 fi
 
+%}
 %}
 %{%(zonesPresent%)
 %:True
@@ -319,6 +335,8 @@ runParallel $NPROC renumberMesh -overwrite
 
 %{%(createPatchesForPeriodics%)
 %:True
+%{%(multiRegionEnabled%)
+%:False
 which createNonConformalCouples > /dev/null 2>&1
 if [ $? == 0 ]
 then
@@ -331,6 +349,7 @@ then
 %}
 fi
 
+%}
 %}
 %{%(initialValues/PotentialFlow%)
 %:True

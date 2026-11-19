@@ -1,0 +1,73 @@
+import FreeCAD as App
+
+from CfdOF import CfdAnalysis, CfdTools
+from CfdOF.Solve import CfdFluidMaterial
+from CfdOF.Solve import CfdInitialiseFlowField
+from CfdOF.Solve import CfdPhysicsSelection
+from CfdOF.Solve import CfdSolverFoam
+
+
+analysis = CfdAnalysis.makeCfdAnalysis("CfdAnalysis")
+analysis.Label = "misalignedDuct CHT"
+CfdTools.setActiveAnalysis(analysis)
+analysis.addObject(CfdPhysicsSelection.makeCfdPhysicsSelection())
+analysis.addObject(CfdFluidMaterial.makeCfdFluidMaterial("FluidProperties"))
+analysis.addObject(CfdInitialiseFlowField.makeCfdInitialFlowField())
+analysis.addObject(CfdSolverFoam.makeCfdSolverFoam())
+
+physics = App.ActiveDocument.PhysicsModel
+physics.Time = "Steady"
+physics.Flow = "NonIsothermal"
+physics.Phase = "MultiRegion"
+physics.Turbulence = "Laminar"
+physics.gx = "0 mm/s^2"
+physics.gy = "0 mm/s^2"
+physics.gz = "0 mm/s^2"
+
+# Foundation's tutorial uses water at rho=998.19 kg/m^3 and mu=1.0005e-3
+# kg/(m s). CfdOF's incompressible material path uses temperature-dependent
+# cards, so this keeps the tutorial fluid type and its nominal values visible
+# in the document while the generated case uses the supported water card.
+fluid = App.ActiveDocument.FluidProperties
+fluid.Label = "Water"
+fluid.Material = {
+    "CardName": "WaterIncompressible",
+    "Author": "OpenFOAM Foundation misalignedDuct",
+    "AuthorAndLicense": "",
+    "Description": "Water properties corresponding to the misalignedDuct tutorial",
+    "License": "",
+    "Name": "Water",
+    "ReferenceSource": "OpenFOAM-14 tutorials/multiRegion/CHT/misalignedDuct",
+    "SourceURL": "",
+    "Type": "Incompressible",
+    "MolarMass": "0.018 kg/mol",
+    "DensityPolynomial": "998.19",
+    "CpPolynomial": "4150",
+    "DynamicViscosityPolynomial": "0.0010005",
+    "ThermalConductivityPolynomial": "0.6",
+}
+
+initial = App.ActiveDocument.InitialiseFields
+initial.PotentialFlow = False
+initial.PotentialFlowP = False
+initial.Pressure = "100 kPa"
+initial.Temperature = "297 K"
+initial.Ux = "100 mm/s"
+initial.Uy = "0 mm/s"
+initial.Uz = "0 mm/s"
+initial.k = "0 mm^2/s^2"
+initial.epsilon = "0 mm^2/s^3"
+initial.omega = "0 1/s"
+
+solver = App.ActiveDocument.CfdSolver
+solver.MaxIterations = 2000
+solver.SteadyWriteInterval = 100
+solver.Parallel = False
+solver.ParallelCores = 1
+solver.TurbulenceRelaxation = 0.7
+solver.URelaxation = 0.7
+solver.pRelaxation = 0.3
+solver.rhoRelaxation = 0.5
+solver.energyRelaxation = 0.7
+
+App.ActiveDocument.recompute()

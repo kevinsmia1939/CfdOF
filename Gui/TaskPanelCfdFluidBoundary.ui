@@ -2390,6 +2390,39 @@
             </layout>
            </widget>
           </item>
+          <item>
+           <widget class="QFrame" name="periodicTemperatureFrame">
+            <property name="frameShape">
+             <enum>QFrame::NoFrame</enum>
+            </property>
+            <layout class="QFormLayout" name="layoutPeriodicTemperature">
+             <item row="0" column="0" colspan="2">
+              <widget class="QCheckBox" name="checkPeriodicTemperatureJump">
+               <property name="text">
+                <string>Temperature jump</string>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="0">
+              <widget class="QLabel" name="labelPeriodicTemperatureJump">
+               <property name="text">
+                <string>Neighbour - owner</string>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="1">
+              <widget class="Gui::InputField" name="inputPeriodicTemperatureJump">
+               <property name="text">
+                <string notr="true">0 K</string>
+               </property>
+               <property name="unit" stdset="0">
+                <string notr="true">K</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
          </layout>
         </widget>
        </item>

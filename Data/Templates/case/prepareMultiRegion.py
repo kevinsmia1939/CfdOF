@@ -40,6 +40,12 @@ SOLID_PERIODICS = [
 %}
 ]
 
+FLUID_PERIODICS = [
+%{%(fluidPeriodics%)
+    ("%(fluidPeriodics/%(0%)/Region%)", "%(fluidPeriodics/%(0%)/MasterPatch%)", "%(fluidPeriodics/%(0%)/SlavePatch%)"),
+%}
+]
+
 
 def read_regions():
     with open(os.path.join("constant", "regionProperties")) as fid:
@@ -139,6 +145,9 @@ def write_region_create_patch_dict(region):
     if any(pair_region == region for pair_region, _, _ in SOLID_PERIODICS):
         shutil.copyfile(os.path.join("system", "solidPeriodicMeshType"),
                         os.path.join(system_dir, "solidPeriodicMeshType"))
+    if any(pair_region == region for pair_region, _, _ in FLUID_PERIODICS):
+        shutil.copyfile(os.path.join("system", "periodic_type"),
+                        os.path.join(system_dir, "periodic_type"))
     region_dict = os.path.join(system_dir, "createPatchDict")
     with open(region_dict, "w") as fid:
         fid.write(contents[:patches_match.start()])
@@ -332,9 +341,18 @@ def main():
         copy_region_meshes()
         create_region_patches()
         couple_region_patches()
+        fluid_regions, solid_regions = read_regions()
+        for region in fluid_regions:
+            add_interface_fields(region, patch_names(boundary_file(region), mapped=True), is_fluid=True)
+        for region in solid_regions:
+            add_interface_fields(region, patch_names(boundary_file(region), mapped=True), is_fluid=False)
         if SOLID_PERIODICS and mapping_method()[0] == "method":
             subprocess.check_call([
                 "createNonConformalCouples", "-dict", "system/solidPeriodicCouplesDict"
+            ])
+        if FLUID_PERIODICS and mapping_method()[0] == "method":
+            subprocess.check_call([
+                "createNonConformalCouples", "-dict", "system/fluidPeriodicCouplesDict"
             ])
         return
 

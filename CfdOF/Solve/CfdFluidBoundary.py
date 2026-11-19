@@ -673,6 +673,22 @@ class CfdFluidBoundary:
                 "App::Property", "Whether the current patch is the master or slave patch"
             ),
         )
+        addObjectProperty(
+            obj,
+            "PeriodicTemperatureJumpEnabled",
+            False,
+            "App::PropertyBool",
+            "Periodic",
+            QT_TRANSLATE_NOOP("App::Property", "Apply a uniform temperature jump across this periodic pair"),
+        )
+        addObjectProperty(
+            obj,
+            "PeriodicTemperatureJump",
+            "0 K",
+            "App::PropertyQuantity",
+            "Periodic",
+            QT_TRANSLATE_NOOP("App::Property", "Neighbour minus owner temperature [K]"),
+        )
 
         # Turbulence
         all_turb_specs = []
