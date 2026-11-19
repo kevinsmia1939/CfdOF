@@ -28,6 +28,14 @@ function runParallel([int]$NumProcs, [string]$cmd)
 # Set piping to file to ascii
 $PSDefaultParameterValues['Out-File:Encoding'] = 'ascii'
 
+%{%(sineMeanVelocityForcePresent%)
+%:True
+if ( !$Env:FOAM_API -and $Env:WM_PROJECT_VERSION -notlike "v*" )
+{
+    throw "Sine-wave mean velocity force requires OpenCFD OpenFOAM."
+}
+
+%}
 # Copy mesh from mesh case dir if available
 $MESHDIR = "%(meshDir%)"
 if( Test-Path -PathType Leaf $MESHDIR/constant/polyMesh/faces )

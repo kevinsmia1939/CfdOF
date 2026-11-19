@@ -58,6 +58,16 @@ FoamFile
 
 %{%(meanVelocityForceEnabled%)
 %:True
+%{%(meanVelocityForce/SineEnabled%)
+%:True
+%{meanVelocityForce
+%{momentumSource
+%{all
+%[system/_sineMeanVelocityForce%]
+%}
+%}
+%}
+%:default
 momentumSource
 {
     type            meanVelocityForce;
@@ -75,10 +85,21 @@ momentumSource
 }
 
 %}
+%}
 %{%(meanVelocityForceCellZonesPresent%)
 %:True
 %{%(meanVelocityForceCellZones%)
 %{%(meanVelocityForceCellZones/%(0%)/PartNameList%)
+%{%(meanVelocityForceCellZones/%(1%)/SineEnabled%)
+%:True
+%{meanVelocityForceCellZones/%(1%)
+%{%(1%)MomentumSource
+%{cellZone
+%[system/_sineMeanVelocityForce%]
+%}
+%}
+%}
+%:default
 %(0%)MomentumSource
 {
     type            meanVelocityForce;
@@ -96,6 +117,7 @@ momentumSource
     }
 }
 
+%}
 %}
 %}
 %}

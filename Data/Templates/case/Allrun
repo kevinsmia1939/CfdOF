@@ -43,6 +43,15 @@ then
     source "$FOAMDIR/etc/bashrc"
 fi
 
+%{%(sineMeanVelocityForcePresent%)
+%:True
+if [ -z "${FOAM_API}" ] && [[ "$WM_PROJECT_VERSION" != v* ]]
+then
+    echo "Sine-wave mean velocity force requires OpenCFD OpenFOAM." >&2
+    exit 1
+fi
+
+%}
 # Copy mesh from mesh case dir if available
 MESHDIR="%(meshDir%)"
 if [ -f "$MESHDIR"/constant/polyMesh/faces ]

@@ -1,12 +1,15 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 # SPDX-FileNotice: Part of the CfdOF addon.
 
+import math
 import os
 
 import FreeCAD
 from FreeCAD import Units
 from CfdOF import CfdTools, CfdFaceSelectWidget
 from CfdOF.CfdTools import setQuantity, getMeshObject, getQuantity, if2Float, makeShapeFromReferences, storeIfChanged
+from CfdOF.Solve.CfdMeanVelocityForce import VELOCITY_PROFILES
+
 if FreeCAD.GuiUp:
     import FreeCADGui
     from PySide import QtGui
@@ -14,6 +17,7 @@ if FreeCAD.GuiUp:
     from pivy import coin
 
 SELECTION_MODE_LABELS = ["all", "cellZone"]
+SINE_PROPERTIES = ("SineAverageVelocity", "SineAmplitude", "SineFrequency")
 
 
 class TaskPanelCfdMeanVelocityForce:
@@ -40,6 +44,7 @@ class TaskPanelCfdMeanVelocityForce:
             self.form.faceSelectWidget, self.obj, False, False, True)
 
         self.form.comboSelectionMode.currentIndexChanged.connect(self.updateUI)
+        self.form.comboVelocityProfile.currentIndexChanged.connect(self.updateUI)
         if FreeCAD.GuiUp:
             self.mesh_obj = getMeshObject(self.analysis_obj)
             self.form.inputDirectionX.valueChanged.connect(self.updateArrowDirection)
@@ -69,11 +74,21 @@ class TaskPanelCfdMeanVelocityForce:
         setQuantity(self.form.inputUbarY, Units.Quantity("{} mm/s".format(float(self.obj.Ubar.y) * 1000.0)))
         setQuantity(self.form.inputUbarZ, Units.Quantity("{} mm/s".format(float(self.obj.Ubar.z) * 1000.0)))
 
+        self.form.comboVelocityProfile.setCurrentIndex(VELOCITY_PROFILES.index(self.obj.VelocityProfile))
+        for name in SINE_PROPERTIES:
+            setQuantity(getattr(self.form, 'input' + name), getattr(self.obj, name))
+
         setQuantity(self.form.inputRelaxation, Units.Quantity(self.obj.Relaxation))
 
     def updateUI(self):
         is_cell_zone = self.form.comboSelectionMode.currentIndex() == 1
         self.form.faceSelectWidget.setVisible(is_cell_zone)
+        sine = self.form.comboVelocityProfile.currentIndex() == 1
+        for name in ('labelUbar', 'inputUbarX', 'inputUbarY', 'inputUbarZ'):
+            getattr(self.form, name).setVisible(not sine)
+        for name in SINE_PROPERTIES:
+            getattr(self.form, 'label' + name).setVisible(sine)
+            getattr(self.form, 'input' + name).setVisible(sine)
         if FreeCAD.GuiUp:
             self.updateArrowData()
 
@@ -112,12 +127,29 @@ class TaskPanelCfdMeanVelocityForce:
                 self.form.inputDirectionX.property("quantity").Value,
                 self.form.inputDirectionY.property("quantity").Value,
                 self.form.inputDirectionZ.property("quantity").Value)
-            ubar = FreeCAD.Vector(
-                self._toMS(self.form.inputUbarX, 'Ubar X'),
-                self._toMS(self.form.inputUbarY, 'Ubar Y'),
-                self._toMS(self.form.inputUbarZ, 'Ubar Z'))
+            profile = VELOCITY_PROFILES[self.form.comboVelocityProfile.currentIndex()]
+            values = {}
+            if profile == 'Sine wave':
+                physics = CfdTools.getPhysicsModel(self.analysis_obj)
+                if (physics is None or physics.Time != 'Transient' or
+                        physics.Phase != 'Single' or physics.Flow != 'Isothermal'):
+                    raise ValueError("Sine-wave mean velocity force requires a transient incompressible analysis.")
+                if not math.isfinite(direction.Length) or direction.Length == 0:
+                    raise ValueError("Enter a nonzero direction for the sine wave.")
+                for name, unit in zip(SINE_PROPERTIES, ('m/s', 'm/s', 'Hz')):
+                    quantity = getQuantity(getattr(self.form, 'input' + name))
+                    value = float(Units.Quantity(quantity).getValueAs(unit))
+                    if not math.isfinite(value) or (name == 'SineAmplitude' and value < 0) or (
+                            name == 'SineFrequency' and value <= 0):
+                        raise ValueError("Enter a finite average velocity, a nonnegative amplitude and a positive frequency.")
+                    values[name] = quantity
+            else:
+                values['Ubar'] = FreeCAD.Vector(
+                    self._toMS(self.form.inputUbarX, 'Ubar X'),
+                    self._toMS(self.form.inputUbarY, 'Ubar Y'),
+                    self._toMS(self.form.inputUbarZ, 'Ubar Z'))
             relaxation = self.form.inputRelaxation.property("quantity").Value
-        except ValueError as err:
+        except (ValueError, RuntimeError) as err:
             CfdTools.cfdErrorBox(str(err))
             return
 
@@ -131,7 +163,9 @@ class TaskPanelCfdMeanVelocityForce:
 
         storeIfChanged(self.obj, 'SelectionMode', mode)
         storeIfChanged(self.obj, 'Direction', direction)
-        storeIfChanged(self.obj, 'Ubar', ubar)
+        storeIfChanged(self.obj, 'VelocityProfile', profile)
+        for name, value in values.items():
+            storeIfChanged(self.obj, name, value)
         storeIfChanged(self.obj, 'Relaxation', relaxation)
         # ShapeRefs is modified in-place by CfdFaceSelectWidget — no explicit store needed
 

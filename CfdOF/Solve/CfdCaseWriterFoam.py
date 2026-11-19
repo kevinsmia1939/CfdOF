@@ -25,6 +25,7 @@
 #                                                                              #
 ################################################################################
 
+import math
 import os
 import os.path
 from FreeCAD import Units, Vector
@@ -219,6 +220,15 @@ class CfdCaseWriterFoam:
         self.processBoundaryConditions()
         self.processReferenceFrames()
         self.processInitialConditions()
+        if self.mean_velocity_force_cellzone_objs:
+            self.processMeanVelocityForceCellZoneProperties()
+        self.settings['sineMeanVelocityForcePresent'] = False
+        forces = [self.settings['meanVelocityForce'], *self.settings['meanVelocityForceCellZones'].values()]
+        for force in forces:
+            if force.get('VelocityProfile') == 'Sine wave':
+                self.processSineMeanVelocityForce(force)
+                self.settings['sineMeanVelocityForcePresent'] = True
+
         CfdTools.clearCase(self.case_folder)
 
         self.exportZoneStlSurfaces()
@@ -229,7 +239,6 @@ class CfdCaseWriterFoam:
         if self.mean_velocity_force_cellzone_objs:
             cfdMessage('Mean velocity force cell zone(s) present\n')
             self.exportMeanVelocityForceCellZoneStlSurfaces()
-            self.processMeanVelocityForceCellZoneProperties()
 
         if self.reporting_functions:
             cfdMessage('Reporting functions present\n')
@@ -821,15 +830,26 @@ class CfdCaseWriterFoam:
         for o in self.mean_velocity_force_cellzone_objs:
             od = CfdTools.propsToDict(o)
             part_name_list = tuple(r[0].Name for r in o.ShapeRefs)
-            settings['meanVelocityForceCellZones'][o.Label] = {
-                'PartNameList': part_name_list,
-                'Direction': od['Direction'],
-                'Ubar': od['Ubar'],
-                'Relaxation': od['Relaxation'],
-            }
+            od['PartNameList'] = part_name_list
+            settings['meanVelocityForceCellZones'][o.Label] = od
             # Register the zone for topoSetZonesDict so the cellZoneSet is created
             settings['zones'][o.Label] = {'PartNameList': part_name_list}
         settings['zonesPresent'] = True
+
+    def processSineMeanVelocityForce(self, force):
+        if self.settings['solver']['SolverName'] != 'pimpleFoam':
+            raise ValueError("Sine-wave mean velocity force requires a transient incompressible analysis.")
+        average = force['SineAverageVelocity']
+        amplitude = force['SineAmplitude']
+        frequency = force['SineFrequency']
+        direction_length = math.hypot(*force['Direction'])
+        if not math.isfinite(direction_length) or direction_length == 0:
+            raise ValueError("Enter a nonzero direction for the sine wave.")
+        if (not all(map(math.isfinite, (average, amplitude, frequency))) or
+                amplitude < 0 or frequency <= 0):
+            raise ValueError("Enter a finite average velocity, a nonnegative amplitude and a positive frequency.")
+        force['SineEnabled'] = True
+        force['SineDirection'] = tuple(component / direction_length for component in force['Direction'])
 
     def processInitialisationZoneProperties(self):
         settings = self.settings

@@ -1,0 +1,124 @@
+        codeInclude
+        #{
+            #include "IOdictionary.H"
+            #include "mathematicalConstants.H"
+        #};
+
+        localCode
+        #{
+            // Store the pressure gradient per source and mesh, including across restarts.
+            static IOdictionary& gradientState(const fvMesh& mesh, const word& name)
+            {
+                const word key(name + "Properties");
+                auto* state = mesh.getObjectPtr<IOdictionary>(key);
+                if (!state)
+                {
+                    state = new IOdictionary
+                    (
+                        IOobject
+                        (
+                            key, mesh.time().timeName(), "uniform", mesh,
+                            IOobject::READ_IF_PRESENT, IOobject::AUTO_WRITE
+                        )
+                    );
+                    regIOobject::store(state);
+                }
+                return *state;
+            }
+        #};
+
+        codeAddSup
+        #{
+            const vector direction(coeffs_.get<vector>("direction"));
+            const scalar gradient =
+                gradientState(mesh_, name_).getOrDefault<scalar>("gradient", 0);
+            volVectorField::Internal source
+            (
+                IOobject
+                (
+                    name_ + "Sup", mesh_.time().timeName(), mesh_,
+                    IOobject::NO_READ, IOobject::NO_WRITE, false
+                ),
+                mesh_,
+                dimensionedVector(eqn.dimensions()/dimVolume, Zero)
+            );
+            for (const label cell : cells_)
+            {
+                source[cell] = direction*gradient;
+            }
+            eqn += source;
+        #};
+
+        codeConstrain
+        #{
+            // Each correction for this matrix uses the gradient already applied in addSup.
+            auto& state = gradientState(mesh_, name_);
+            state.set("baseGradient", state.getOrDefault<scalar>("gradient", 0));
+
+            const word key(name_ + ":rA");
+            auto* rA = mesh_.getObjectPtr<volScalarField>(key);
+            if (rA)
+            {
+                *rA = 1.0/eqn.A();
+            }
+            else
+            {
+                regIOobject::store(new volScalarField
+                (
+                    IOobject
+                    (
+                        key, mesh_.time().timeName(), mesh_,
+                        IOobject::NO_READ, IOobject::NO_WRITE
+                    ),
+                    1.0/eqn.A()
+                ));
+            }
+        #};
+
+        codeCorrect
+        #{
+            const auto* rA = mesh_.findObject<volScalarField>(name_ + ":rA");
+            if (!rA)
+            {
+                return;
+            }
+
+            const vector direction(coeffs_.get<vector>("direction"));
+            const scalar average = coeffs_.get<scalar>("average");
+            const scalar amplitude = coeffs_.get<scalar>("amplitude");
+            const scalar frequency = coeffs_.get<scalar>("frequency");
+            const scalar target = average + amplitude*sin
+            (
+                constant::mathematical::twoPi*frequency*mesh_.time().value()
+            );
+
+            scalar sumVelocity = 0;
+            scalar sumResponse = 0;
+            const scalarField& volumes = mesh_.V();
+            for (const label cell : cells_)
+            {
+                sumVelocity += (direction & fld[cell])*volumes[cell];
+                sumResponse += (*rA)[cell]*volumes[cell];
+            }
+            reduce(sumVelocity, sumOp<scalar>());
+            reduce(sumResponse, sumOp<scalar>());
+            if (sumResponse <= VSMALL)
+            {
+                return;
+            }
+
+            const scalar relaxation = coeffs_.get<scalar>("relaxation");
+            const scalar increment = relaxation*(target*V_ - sumVelocity)/sumResponse;
+            for (const label cell : cells_)
+            {
+                fld[cell] += direction*((*rA)[cell]*increment);
+            }
+            fld.correctBoundaryConditions();
+
+            auto& state = gradientState(mesh_, name_);
+            const scalar gradient = state.get<scalar>("baseGradient") + increment;
+            state.set("gradient", gradient);
+            Info<< name_ << ": target Ubar = " << target
+                << ", uncorrected Ubar = " << sumVelocity/V_
+                << ", pressure gradient = " << gradient << endl;
+        #};

@@ -33,6 +33,9 @@ from CfdOF.CfdTools import addObjectProperty
 QT_TRANSLATE_NOOP = FreeCAD.Qt.QT_TRANSLATE_NOOP
 
 
+VELOCITY_PROFILES = ["Steady-state", "Sine wave"]
+
+
 def makeCfdMeanVelocityForce(name="MeanVelocityForce"):
     obj = FreeCAD.ActiveDocument.addObject("Part::FeaturePython", name)
     CfdMeanVelocityForce(obj)
@@ -110,6 +113,20 @@ class CfdMeanVelocityForce:
             "Mean velocity force",
             QT_TRANSLATE_NOOP("App::Property", "Target mean velocity vector"),
         )
+        addObjectProperty(
+            obj,
+            "VelocityProfile",
+            VELOCITY_PROFILES,
+            "App::PropertyEnumeration",
+            "Mean velocity force",
+            QT_TRANSLATE_NOOP("App::Property", "Target velocity profile"),
+        )
+        for name, default, description in (
+            ("SineAverageVelocity", "0 m/s", QT_TRANSLATE_NOOP("App::Property", "Average velocity")),
+            ("SineAmplitude", "0 m/s", QT_TRANSLATE_NOOP("App::Property", "Velocity amplitude")),
+            ("SineFrequency", "1 Hz", QT_TRANSLATE_NOOP("App::Property", "Oscillation frequency")),
+        ):
+            addObjectProperty(obj, name, default, "App::PropertyQuantity", "Mean velocity force", description)
         addObjectProperty(
             obj,
             "Relaxation",

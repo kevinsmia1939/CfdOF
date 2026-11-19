@@ -1,0 +1,28 @@
+%(1%)
+{
+    type            vectorCodedSource;
+    active          yes;
+    name            %(1%);
+    selectionMode   %(0%);
+%{%(0%)
+%:cellZone
+    cellZone        %(3%);
+%}
+
+    vectorCodedSourceCoeffs
+    {
+        selectionMode   %(0%);
+%{%(0%)
+%:cellZone
+        cellZone        %(3%);
+%}
+        fields          (U);
+        direction       (%(%(2%)/SineDirection%));
+        average         %(%(2%)/SineAverageVelocity%);
+        amplitude       %(%(2%)/SineAmplitude%);
+        frequency       %(%(2%)/SineFrequency%);
+        relaxation      %(%(2%)/Relaxation%);
+
+%[system/_sineMeanVelocityForceCode%]
+    }
+}
